@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+﻿/* eslint-disable max-lines */
 /* eslint-disable prettier/prettier */
 /* eslint-disable security/detect-object-injection */
 "use client";
@@ -8,12 +8,14 @@ import React, { useMemo, useState } from "react";
 import NextImage from "next/image";
 
 import {
+  Copy,
+  Database,
   Palette,
   FormInput,
-  MessageSquare,
   FileText,
+  Globe,
+  MessageSquare,
   Save,
-  Eye,
   Upload,
   X,
   Image as ImageIcon,
@@ -21,8 +23,9 @@ import {
   Calendar,
   MapPin,
 } from "lucide-react";
+import { toast } from "sonner";
 
-import TemplateRenderer from "@/components/form-template/TemplateRenderer";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -164,33 +167,140 @@ function ToggleField({
   );
 }
 
+function normalizePublicPath(
+  currentTemplateSlug: string,
+  persistedPublicPath: string | undefined,
+  originalSlug: string,
+  currentSavedSlug: string,
+) {
+  const trimmedPublicPath = persistedPublicPath?.trim() ?? "";
+  const defaultPaths = new Set([`/t/${originalSlug}`, `/t/${currentSavedSlug}`]);
+
+  if (!trimmedPublicPath || defaultPaths.has(trimmedPublicPath)) {
+    return `/t/${currentTemplateSlug}`;
+  }
+
+  if (/^https?:\/\//i.test(trimmedPublicPath)) {
+    return trimmedPublicPath;
+  }
+
+  return trimmedPublicPath.startsWith("/") ? trimmedPublicPath : `/${trimmedPublicPath}`;
+}
+
+function buildPublicUrl(pathOrUrl: string, publicBaseUrl?: string) {
+  const trimmedBaseUrl = publicBaseUrl?.trim() ?? "";
+  const trimmedPath = pathOrUrl.trim();
+
+  if (!trimmedPath) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmedPath) || !trimmedBaseUrl) {
+    return trimmedPath;
+  }
+
+  try {
+    const baseUrl = trimmedBaseUrl.endsWith("/") ? trimmedBaseUrl : `${trimmedBaseUrl}/`;
+    return new URL(trimmedPath, baseUrl).toString();
+  } catch {
+    return trimmedPath;
+  }
+}
+
+function StatTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+      <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.16em]">{label}</div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+      <p className="text-muted-foreground mt-1 text-sm leading-5">{hint}</p>
+    </div>
+  );
+}
+
 export default function AdminTemplateEditor({
   slug,
   initialName,
   initialConfig,
+  editorTitle,
+  publicBaseUrl,
+  publicPath,
 }: {
   slug: string;
   initialName: string;
   initialConfig: FormTemplateConfig;
+  editorTitle?: string;
+  publicBaseUrl?: string;
+  publicPath?: string;
 }) {
   const [config, setConfig] = useState<FormTemplateConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
   const [templateSlug, setTemplateSlug] = useState(slug);
+  const [currentSlug, setCurrentSlug] = useState(slug);
 
   const update = (patch: Partial<FormTemplateConfig>) => setConfig((s) => ({ ...s, ...patch }));
 
-  const previewConfig = useMemo(() => config, [config]);
+  const resolvedPublicPath = useMemo(
+    () => normalizePublicPath(templateSlug, publicPath, slug, currentSlug),
+    [currentSlug, publicPath, slug, templateSlug],
+  );
+  const publicUrl = useMemo(() => buildPublicUrl(resolvedPublicPath, publicBaseUrl), [publicBaseUrl, resolvedPublicPath]);
+  const publicHost = useMemo(() => {
+    try {
+      return new URL(publicUrl).host;
+    } catch {
+      const trimmedBaseUrl = publicBaseUrl?.trim();
+      return trimmedBaseUrl && trimmedBaseUrl.length > 0 ? trimmedBaseUrl : "Chưa cấu hình domain";
+    }
+  }, [publicBaseUrl, publicUrl]);
+  const visibleDefaultFieldsCount = useMemo(
+    () => [config.fields.full_name, config.fields.phone, config.fields.email].filter((field) => field.enabled).length,
+    [config.fields.email, config.fields.full_name, config.fields.phone],
+  );
+  const enabledQuestionsCount = useMemo(
+    () => config.questions.slice(0, 5).filter((question) => question.enabled).length,
+    [config.questions],
+  );
+  const requiredInputCount = useMemo(() => {
+    const requiredBaseFields = [config.fields.full_name, config.fields.phone, config.fields.email].filter(
+      (field) => field.enabled && field.required,
+    ).length;
+    const requiredQuestions = config.questions.slice(0, 5).filter((question) => question.enabled && question.required).length;
+    return requiredBaseFields + requiredQuestions;
+  }, [config.fields.email, config.fields.full_name, config.fields.phone, config.questions]);
+  const themeSwatches = useMemo(
+    () => [config.theme.primary, config.theme.primary2, config.theme.bg, config.footer.gradientFrom, config.footer.gradientTo],
+    [config.footer.gradientFrom, config.footer.gradientTo, config.theme.bg, config.theme.primary, config.theme.primary2],
+  );
+
+  async function handleCopyPublicUrl() {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success("Đã sao chép URL website hiển thị.");
+    } catch {
+      toast.error("Không thể sao chép URL website hiển thị.");
+    }
+  }
 
   async function onSave() {
     try {
       setSaving(true);
       const nextSlug = templateSlug.trim();
-      await saveTemplateAction(slug, nextSlug, initialName, config);
-      alert("Đã lưu template thành công!");
+      await saveTemplateAction(currentSlug, nextSlug, config.behavior.eventName.trim() || initialName, config);
+      setCurrentSlug(nextSlug);
+      setTemplateSlug(nextSlug);
+      toast.success("Đã lưu cấu hình ladipage.");
     } catch (error) {
-        alert("Lỗi khi lưu template");
-        console.error(error);
-      } finally {
+      toast.error(error instanceof Error ? error.message : "Không thể lưu cấu hình ladipage.");
+      console.error(error);
+    } finally {
       setSaving(false);
     }
   }
@@ -198,23 +308,15 @@ export default function AdminTemplateEditor({
   return (
     <div className="template-editor-container bg-background flex h-screen flex-col">
       {/* Header */}
-      <div className="nice-scroll border-b shadow-sm">
-        <div className="flex h-12 w-full items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div>
-                <h1 className="text-lg font-bold">Chỉnh sửa Template</h1>
-              </div>
-            </div>
+      <div className="border-b bg-background/85 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <h1 className="text-xl font-semibold tracking-tight">{editorTitle ?? "Chỉnh sửa Ladipage sự kiện"}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(`/t/${templateSlug}`, "_blank")}
-              className="cursor-pointer gap-2"
-            >
-              <Eye className="h-4 w-4" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void handleCopyPublicUrl()} className="cursor-pointer gap-2">
+              <Copy className="h-4 w-4" />
+              Sao chép URL public
             </Button>
             <Button onClick={onSave} disabled={saving} size="sm" className="cursor-pointer gap-2">
               <Save className="h-4 w-4" />
@@ -226,7 +328,7 @@ export default function AdminTemplateEditor({
 
       {/* Main Content */}
       <div className="nice-scroll flex-1 overflow-hidden">
-        <div className="grid h-full grid-cols-[440px_1fr]">
+        <div className="grid h-full lg:grid-cols-[minmax(0,1fr)_400px]">
           {/* Left Sidebar - Editor */}
           <div className="bg-muted/10 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/30 overflow-y-auto border-r">
             <Tabs defaultValue="theme" className="w-full">
@@ -305,15 +407,41 @@ export default function AdminTemplateEditor({
                       </div>
                       <div className="space-y-2">
                         <label className="block text-sm font-medium !text-black dark:!text-white">
-                          URL trang check-in
+                          Slug trang
                         </label>
                         <Input
                           value={templateSlug}
                           onChange={(e) => setTemplateSlug(e.target.value)}
                           placeholder="VD: eac-checkin"
                         />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium !text-black dark:!text-white">
+                            Domain website hiển thị
+                          </label>
+                          <Input value={publicHost} readOnly className="font-mono text-sm" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium !text-black dark:!text-white">
+                            Public path
+                          </label>
+                          <Input value={resolvedPublicPath} readOnly className="font-mono text-sm" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium !text-black dark:!text-white">
+                          URL website hiển thị
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input value={publicUrl} readOnly className="font-mono text-sm" />
+                          <Button type="button" variant="outline" onClick={() => void handleCopyPublicUrl()} className="gap-2">
+                            <Copy className="h-4 w-4" />
+                            Sao chép
+                          </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                          Link: /t/{templateSlug || "..."}
+                          CRM chỉ lưu cấu hình vào DB. Website public sẽ lấy dữ liệu từ bản ghi này để hiển thị.
                         </p>
                       </div>
                     </CardContent>
@@ -848,10 +976,113 @@ export default function AdminTemplateEditor({
             </Tabs>
           </div>
 
-          {/* Right Side - Preview */}
+          {/* Right Side - Database Flow */}
           <div className="from-muted/20 via-background to-muted/30 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/30 overflow-y-auto bg-linear-to-br">
-            <div className="w-full">
-              <TemplateRenderer config={previewConfig} />
+            <div className="space-y-4 p-4">
+              <Card className="border-2 bg-background/90 shadow-sm">
+                <CardHeader className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                        <Globe className="h-4 w-4" />
+                        Xuất bản qua database
+                      </CardTitle>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{config.templateStyle ?? "default"}</Badge>
+                    <Badge variant="outline">{publicHost}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                    <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.16em]">URL public</div>
+                    <div className="mt-2 font-mono text-sm break-all">{publicUrl || "(chưa có URL)"}</div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleCopyPublicUrl()}
+                      className="mt-3 w-full gap-2"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Sao chép URL website hiển thị
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                          1
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Chỉnh nội dung trong CRM</p>
+                          <p className="text-muted-foreground mt-1 text-sm leading-6">
+                            Tên sự kiện, giao diện, hình ảnh và các trường form được chỉnh tại đây.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                          2
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Lưu cấu hình vào DB</p>
+                          <p className="text-muted-foreground mt-1 text-sm leading-6">
+                            Hệ thống cập nhật slug, public path và toàn bộ cấu hình render trong bảng dùng chung.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                          3
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Website public đọc DB để hiển thị</p>
+                          <p className="text-muted-foreground mt-1 text-sm leading-6">
+                            Website ở domain khác sẽ lấy đúng bản ghi này để render Ladipage cho người dùng cuối.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-2 bg-background/90 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                    <Database className="h-4 w-4" />
+                    Dữ liệu đồng bộ
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                    <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.16em]">Slug hiện tại</div>
+                    <div className="mt-2 font-mono text-sm">{templateSlug}</div>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                    <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.16em]">Sự kiện</div>
+                    <div className="mt-2 text-sm font-medium">{config.behavior.eventName || initialName}</div>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                    <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.16em]">Theme tokens</div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {themeSwatches.map((color) => (
+                        <span
+                          key={`sidebar-${color}`}
+                          className="size-8 rounded-full border border-border/70 shadow-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

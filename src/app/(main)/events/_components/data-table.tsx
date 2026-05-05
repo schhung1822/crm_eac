@@ -210,10 +210,10 @@ export function DataTable({ data: initialData }: { data: Academy[] }) {
         </div>
         <div className="flex items-center gap-2">
           <DataTableViewOptions table={table} />
-          <Link className="cursor-pointer" href="/admin/templates/edit">
+          <Link className="cursor-pointer" href="/srx/ladipage-events">
             <Button className="cursor-pointer" variant="outline" size="sm">
               <LayoutTemplate />
-              <span className="hidden lg:inline">Quản lý template</span>
+              <span className="hidden lg:inline">Ladipage sự kiện</span>
             </Button>
           </Link>
           <Button

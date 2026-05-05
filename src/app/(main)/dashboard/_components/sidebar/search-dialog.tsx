@@ -1,8 +1,9 @@
 "use client";
 import * as React from "react";
+
 import Link from "next/link";
 
-import { LayoutDashboard, ChartBar, Gauge, ShoppingBag, GraduationCap, Forklift, Search, Calendar, Calendar1, User } from "lucide-react";
+import { LayoutDashboard, Search, Calendar1, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +15,6 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { url } from "inspector";
 
 const searchItems = [
   // { group: "Báo cáo", icon: LayoutDashboard, label: "Tổng quan", url: "/dashboard/default" },
@@ -22,7 +22,7 @@ const searchItems = [
   // { group: "Báo cáo", icon: Gauge, label: "Phân tích", disabled: true, url: "/dashboard/analytics" },
   // { group: "Báo cáo", icon: ShoppingBag, label: "Trenđing", disabled: true, url: "/dashboard/trending" },
   // { group: "Báo cáo", icon: GraduationCap, label: "Zalo OA", disabled: true, url: "/dashboard/zaloOA" },
-  { group: "Quản lý", icon: LayoutDashboard, label: "Template sự kiện", disabled: true, url: "/admin/templates/edit" },
+  { group: "Quản lý", icon: LayoutDashboard, label: "Ladipage sự kiện", disabled: true, url: "/srx/ladipage-events" },
   { group: "Quản lý", icon: Calendar1, label: "Thông tin sự kiện", disabled: true, url: "/events" },
   { group: "Quản lý", icon: User, label: "Zalo OA", disabled: true, url: "/zalo-oa" },
   { group: "Thông tin", label: "Thông báo dịch vụ", url: "/noti/service-notifications" },

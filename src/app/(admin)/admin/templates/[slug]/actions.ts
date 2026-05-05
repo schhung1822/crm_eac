@@ -1,7 +1,7 @@
 "use server";
 
-import { updateTemplateBySlug } from "@/lib/form-template/repo";
 import type { FormTemplateConfig } from "@/lib/form-template/types";
+import { saveSrxLadipageEvent } from "@/lib/srx-ladipage-events";
 
 export async function saveTemplateAction(
   slug: string,
@@ -10,6 +10,6 @@ export async function saveTemplateAction(
   config: FormTemplateConfig
 ) {
   // TODO: nếu CRM bạn có auth, check role admin ở đây
-  await updateTemplateBySlug(slug, nextSlug, name, config);
+  await saveSrxLadipageEvent(slug, nextSlug, name, config);
   return { ok: true };
 }
