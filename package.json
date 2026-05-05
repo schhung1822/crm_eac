@@ -6,12 +6,12 @@
     "dev": "next dev",
     "dev:swc": "next dev --no-turbo",
     "postinstall": "node scripts/postinstall.js",
-    "build": "next build",
-    "start": "next start",
+    "build": "node scripts/next-build.js",
+    "start": "node scripts/next-start.js",
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky",
+    "prepare": "node scripts/prepare.js",
     "generate:presets": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' src/scripts/generate-theme-presets.ts"
   },
   "lint-staged": {
@@ -20,6 +20,7 @@
     ]
   },
   "dependencies": {
+    "@ckeditor/ckeditor5-react": "^11.1.2",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
@@ -31,6 +32,7 @@
     "@types/papaparse": "^5.5.2",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
+    "ckeditor5": "^48.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -73,6 +75,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/parser": "^8.26.0",
     "babel-plugin-react-compiler": "^1.0.0",
+    "baseline-browser-mapping": "^2.10.21",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.3",
     "eslint-plugin-import": "^2.32.0",

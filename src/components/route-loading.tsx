@@ -11,14 +11,14 @@ declare global {
   }
 }
 
-export function NavigationLoading({
-  text = "Chờ một chút",
+function NavigationLoadingContent({
+  text = "Cho mot chut",
   maxMs = 12000,
   minShowMs = 300,
 }: {
   text?: string;
-  maxMs?: number; // fail-safe: quá X ms sẽ tự tắt
-  minShowMs?: number; // đã hiện thì tối thiểu hiện X ms
+  maxMs?: number;
+  minShowMs?: number;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -27,20 +27,21 @@ export function NavigationLoading({
   const startedAtRef = React.useRef<number | null>(null);
   const maxTimerRef = React.useRef<number | null>(null);
 
-  // ===== START LOADING =====
   const start = React.useCallback(() => {
     if (show) return;
     startedAtRef.current = Date.now();
     setShow(true);
 
-    if (maxTimerRef.current) clearTimeout(maxTimerRef.current);
+    if (maxTimerRef.current) {
+      clearTimeout(maxTimerRef.current);
+    }
+
     maxTimerRef.current = window.setTimeout(() => {
       setShow(false);
       startedAtRef.current = null;
     }, maxMs);
   }, [show, maxMs]);
 
-  // ===== DONE LOADING =====
   const done = React.useCallback(() => {
     const startedAt = startedAtRef.current;
     const elapsed = startedAt ? Date.now() - startedAt : 0;
@@ -48,7 +49,9 @@ export function NavigationLoading({
     const finish = () => {
       setShow(false);
       startedAtRef.current = null;
-      if (maxTimerRef.current) clearTimeout(maxTimerRef.current);
+      if (maxTimerRef.current) {
+        clearTimeout(maxTimerRef.current);
+      }
       maxTimerRef.current = null;
     };
 
@@ -59,25 +62,24 @@ export function NavigationLoading({
     }
   }, [show, minShowMs]);
 
-  // ===== expose automation =====
   React.useEffect(() => {
     window.__navLoadingStart = start;
     window.__navLoadingDone = done;
+
     return () => {
       delete window.__navLoadingStart;
       delete window.__navLoadingDone;
     };
   }, [start, done]);
 
-  // ===== bật NGAY khi click link internal =====
   React.useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
       const link = target.closest("a");
-      if (!link) return;
 
+      if (!link) return;
       if (link.target === "_blank") return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
       const href = link.getAttribute("href");
       if (!href) return;
@@ -91,21 +93,21 @@ export function NavigationLoading({
     return () => document.removeEventListener("click", onClick, true);
   }, [start]);
 
-  // ===== tắt khi route đổi xong =====
   React.useEffect(() => {
-    if (show) done();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, searchParams]);
+    if (show) {
+      done();
+    }
+  }, [pathname, searchParams, show, done]);
 
-  if (!show) return null;
+  if (!show) {
+    return null;
+  }
 
   return (
     <div className="nav-toast-in fixed right-8 bottom-8 z-[9999]">
       <div className="bg-background/90 flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow backdrop-blur">
         <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
         <span className="font-medium">{text}</span>
-
-        {/* dots animation */}
         <span className="ml-1 inline-flex gap-1">
           <span className="bg-foreground/50 dot-bounce h-1 w-1 rounded-full" />
           <span className="bg-foreground/50 dot-bounce h-1 w-1 rounded-full delay-1" />
@@ -114,4 +116,18 @@ export function NavigationLoading({
       </div>
     </div>
   );
+}
+
+export function NavigationLoading(props: { text?: string; maxMs?: number; minShowMs?: number }) {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return <NavigationLoadingContent {...props} />;
 }

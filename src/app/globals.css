@@ -1,3 +1,4 @@
+@import "../../public/vendor/ckeditor5.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -267,4 +268,81 @@ html {
 
 .dot-bounce.delay-2 {
   animation-delay: 240ms;
+}
+
+.srx-ckeditor {
+  --ck-border-radius: calc(var(--radius) - 2px);
+  --ck-color-base-background: var(--card);
+  --ck-color-base-border: var(--border);
+  --ck-color-base-text: var(--card-foreground);
+  --ck-color-text: var(--card-foreground);
+  --ck-color-focus-border: var(--ring);
+  --ck-color-button-default-background: transparent;
+  --ck-color-button-default-hover-background: color-mix(in oklch, var(--accent) 90%, transparent);
+  --ck-color-button-default-active-background: color-mix(in oklch, var(--accent) 82%, transparent);
+  --ck-color-button-on-background: color-mix(in oklch, var(--accent) 86%, transparent);
+  --ck-color-button-on-color: var(--accent-foreground);
+  --ck-color-button-action-background: var(--primary);
+  --ck-color-button-action-hover-background: color-mix(in oklch, var(--primary) 88%, white 12%);
+  --ck-color-button-action-text: var(--primary-foreground);
+  --ck-color-dropdown-panel-background: var(--popover);
+  --ck-color-dropdown-panel-border: var(--border);
+  --ck-color-input-background: var(--background);
+  --ck-color-input-border: var(--border);
+  --ck-color-input-text: var(--foreground);
+  --ck-color-list-background: var(--popover);
+  --ck-color-panel-background: var(--popover);
+  --ck-color-panel-border: var(--border);
+  --ck-color-toolbar-background: color-mix(in oklch, var(--card) 88%, var(--foreground) 12%);
+  --ck-color-toolbar-border: var(--border);
+  --ck-color-tooltip-background: var(--foreground);
+  --ck-color-tooltip-text: var(--background);
+  --ck-focus-ring: 1px solid var(--ring);
+  --ck-focus-outer-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 35%, transparent);
+  color: var(--card-foreground);
+}
+
+.srx-ckeditor-shell {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+}
+
+.srx-ckeditor .ck.ck-editor {
+  width: 100%;
+}
+
+.srx-ckeditor .ck.ck-toolbar {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.srx-ckeditor .ck.ck-editor__main > .ck-editor__editable {
+  min-height: 640px;
+  border: 0;
+  background: transparent;
+  color: var(--card-foreground);
+}
+
+.srx-ckeditor .ck.ck-editor__main > .ck-editor__editable.ck-focused {
+  box-shadow: none;
+}
+
+.srx-ckeditor .ck.ck-content.ck-editor__editable {
+  padding: 1rem 1.125rem;
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+.srx-ckeditor .ck.ck-content.ck-editor__editable.ck-placeholder::before {
+  color: var(--muted-foreground);
+}
+
+.srx-ckeditor .ck.ck-powered-by {
+  display: none;
+}
+
+.srx-ckeditor.is-disabled {
+  opacity: 0.72;
 }

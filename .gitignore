@@ -11,6 +11,10 @@
 
 # next.js
 /.next/
+/.next-build/
+/.next-build-runs/
+/.next-build-manifest.json
+/.next-build-debug*/
 /out/
 
 # production
@@ -37,7 +41,14 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+/prisma/generated/
 
 # .gitignore
 .mcp/
 .env
+.env2
+.build-verify/
+.deploy-stage/
+.next-clean-log/
+.next-webpack-clean/
+.github-export/

@@ -1,8 +1,6 @@
-"use client";
-
 import Link from "next/link";
 
-import { Settings, CircleHelp, Search, Database, ClipboardList, File, Command } from "lucide-react";
+import { Command } from "lucide-react";
 
 import {
   Sidebar,
@@ -14,49 +12,23 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
-import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
+import { getPendingSrxAffiliateApplicationCount } from "@/lib/srx-affiliates";
+import { getPendingSrxOrderCount } from "@/lib/srx-orders";
 
 import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 
-const data = {
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: CircleHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: Search,
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: Database,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: ClipboardList,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: File,
-    },
-  ],
-};
+export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [pendingOrderCount, pendingAffiliateApplicationCount] = await Promise.all([
+    getPendingSrxOrderCount(),
+    getPendingSrxAffiliateApplicationCount(),
+  ]);
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const indicators = {
+    "/srx/orders": pendingOrderCount > 0,
+    "/srx/affiliates/approval": pendingAffiliateApplicationCount > 0,
+  };
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -72,9 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className="nice-scroll max-h-[80vh] sm:max-h-[82vh]">
-        <NavMain items={sidebarItems} />
-        {/* <NavDocuments items={data.documents} /> */}
-        {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
+        <NavMain indicators={indicators} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

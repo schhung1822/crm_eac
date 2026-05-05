@@ -5,9 +5,9 @@ import { getOrdersByCustomer } from "@/lib/ordersByCustomer";
 
 import { DataTable } from "./_components/data-table";
 
-export default async function Page({ params }: { params: Promise<{ customerId: string }> | { customerId: string } }) {
+export default async function Page({ params }: { params: Promise<{ customerId: string }> }) {
   // ✅ an toàn cho cả 2 trường hợp: params là object hoặc Promise
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await params;
   const rawCustomerId = resolvedParams?.customerId;
 
   const customerId = String(rawCustomerId ?? "").trim();

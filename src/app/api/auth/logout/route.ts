@@ -1,14 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { removeAuthCookie } from "@/lib/auth";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    await removeAuthCookie();
+    const response = NextResponse.json({ message: "Dang xuat thanh cong" }, { status: 200 });
 
-    return NextResponse.json({ message: "Đăng xuất thành công" }, { status: 200 });
+    removeAuthCookie(response, request);
+
+    return response;
   } catch (error) {
     console.error("Logout error:", error);
-    return NextResponse.json({ message: "Có lỗi xảy ra" }, { status: 500 });
+    return NextResponse.json({ message: "Co loi xay ra" }, { status: 500 });
   }
 }

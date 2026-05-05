@@ -29,6 +29,10 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   dndEnabled?: boolean;
   onReorder?: (newData: TData[]) => void;
+  tableClassName?: string;
+  headClassName?: string;
+  rowClassName?: string;
+  cellClassName?: string;
 }
 
 function renderTableBody<TData, TValue>({
@@ -36,11 +40,15 @@ function renderTableBody<TData, TValue>({
   columns,
   dndEnabled,
   dataIds,
+  rowClassName,
+  cellClassName,
 }: {
   rows: ReturnType<TanStackTable<TData>["getRowModel"]>["rows"];
   columns: ColumnDef<TData, TValue>[];
   dndEnabled: boolean;
   dataIds: UniqueIdentifier[];
+  rowClassName?: string;
+  cellClassName?: string;
 }) {
   if (!rows.length) {
     return (
@@ -56,16 +64,18 @@ function renderTableBody<TData, TValue>({
     return (
       <SortableContext items={dataIds} strategy={verticalListSortingStrategy}>
         {rows.map((row) => (
-          <DraggableRow key={row.id} row={row} />
+          <DraggableRow key={row.id} row={row} rowClassName={rowClassName} cellClassName={cellClassName} />
         ))}
       </SortableContext>
     );
   }
 
   return rows.map((row) => (
-    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"} className={rowClassName}>
       {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+        <TableCell key={cell.id} className={cellClassName}>
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </TableCell>
       ))}
     </TableRow>
   ));
@@ -76,6 +86,10 @@ export function DataTable<TData, TValue>({
   columns,
   dndEnabled = false,
   onReorder,
+  tableClassName,
+  headClassName,
+  rowClassName,
+  cellClassName,
 }: DataTableProps<TData, TValue>) {
   // ---- Phân trang cục bộ ----
   const [pageSize, setPageSize] = React.useState(10);
@@ -96,7 +110,7 @@ export function DataTable<TData, TValue>({
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (active && over && active.id !== over.id && onReorder) {
+    if (over && active.id !== over.id && onReorder) {
       const oldIndex = dataIds.indexOf(active.id);
       const newIndex = dataIds.indexOf(over.id);
 
@@ -106,12 +120,12 @@ export function DataTable<TData, TValue>({
   }
 
   const tableElement = (
-    <Table>
+    <Table className={tableClassName}>
       <TableHeader className="bg-muted sticky top-0 z-10">
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
-              <TableHead key={header.id} colSpan={header.colSpan}>
+              <TableHead key={header.id} colSpan={header.colSpan} className={headClassName}>
                 {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
               </TableHead>
             ))}
@@ -124,6 +138,8 @@ export function DataTable<TData, TValue>({
           columns,
           dndEnabled,
           dataIds,
+          rowClassName,
+          cellClassName,
         })}
       </TableBody>
     </Table>

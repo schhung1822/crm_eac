@@ -9,6 +9,13 @@ import { SearchDialog } from "@/app/(main)/dashboard/_components/sidebar/search-
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  DEFAULT_CONTENT_LAYOUT,
+  DEFAULT_NAVBAR_STYLE,
+  DEFAULT_SIDEBAR_COLLAPSIBLE,
+  DEFAULT_SIDEBAR_OPEN,
+  DEFAULT_SIDEBAR_VARIANT,
+} from "@/lib/default-layout-preferences";
 import { cn } from "@/lib/utils";
 import { getPreference } from "@/server/server-actions";
 import {
@@ -24,13 +31,13 @@ import {
 
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
-  const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
+  const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false" && DEFAULT_SIDEBAR_OPEN;
 
   const [sidebarVariant, sidebarCollapsible, contentLayout, navbarStyle] = await Promise.all([
-    getPreference<SidebarVariant>("sidebar_variant", SIDEBAR_VARIANT_VALUES, "inset"),
-    getPreference<SidebarCollapsible>("sidebar_collapsible", SIDEBAR_COLLAPSIBLE_VALUES, "icon"),
-    getPreference<ContentLayout>("content_layout", CONTENT_LAYOUT_VALUES, "centered"),
-    getPreference<NavbarStyle>("navbar_style", NAVBAR_STYLE_VALUES, "scroll"),
+    getPreference<SidebarVariant>("sidebar_variant", SIDEBAR_VARIANT_VALUES, DEFAULT_SIDEBAR_VARIANT),
+    getPreference<SidebarCollapsible>("sidebar_collapsible", SIDEBAR_COLLAPSIBLE_VALUES, DEFAULT_SIDEBAR_COLLAPSIBLE),
+    getPreference<ContentLayout>("content_layout", CONTENT_LAYOUT_VALUES, DEFAULT_CONTENT_LAYOUT),
+    getPreference<NavbarStyle>("navbar_style", NAVBAR_STYLE_VALUES, DEFAULT_NAVBAR_STYLE),
   ]);
 
   const layoutPreferences = {

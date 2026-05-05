@@ -1,8 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-
-import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { toast } from "sonner";
 
@@ -28,14 +26,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const response = await fetch("/api/auth/me");
+      const contentType = response.headers.get("content-type") ?? "";
+
+      if (!contentType.includes("application/json")) {
+        setUser(null);
+        return;
+      }
+
       if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
+        const data = (await response.json()) as { user?: User };
+        setUser(data.user ?? null);
       } else {
         setUser(null);
       }
@@ -45,13 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUser();
   }, []);
 
-  const logout = async () => {
+  useEffect(() => {
+    void fetchUser();
+  }, [fetchUser]);
+
+  const logout = useCallback(async () => {
     try {
       const response = await fetch("/api/auth/logout", {
         method: "POST",
@@ -59,29 +63,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         setUser(null);
-        toast.success("Đăng xuất thành công!");
-        router.push("/auth/v2/login");
-        router.refresh();
+        toast.success("Dang xuat thanh cong");
+        window.location.assign("/auth/v2/login");
       } else {
-        toast.error("Đăng xuất thất bại");
+        toast.error("Dang xuat that bai");
       }
     } catch (error) {
       console.error("Logout error:", error);
-      toast.error("Có lỗi xảy ra");
+      toast.error("Co loi xay ra");
     }
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     await fetchUser();
-  };
+  }, [fetchUser]);
 
-  return <AuthContext.Provider value={{ user, isLoading, logout, refreshUser }}>{children}</AuthContext.Provider>;
+  const contextValue = useMemo(
+    () => ({ user, isLoading, logout, refreshUser }),
+    [user, isLoading, logout, refreshUser],
+  );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
+
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
 }

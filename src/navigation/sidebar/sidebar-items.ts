@@ -1,19 +1,20 @@
 import {
-  Users,
-  SquareArrowUpRight,
-  LayoutDashboard,
-  ChartBar,
   Banknote,
+  Calendar1Icon,
+  ChartBar,
   Gauge,
-  type LucideIcon,
-  TrendingUp,
+  Handshake,
+  LayoutDashboard,
+  Newspaper,
+  PackageIcon,
   Scale,
   ShoppingBagIcon,
-  PackageIcon,
-  Calendar1Icon,
+  SquareArrowUpRight,
+  Store,
+  type LucideIcon,
   User,
   UserCog,
-  Bell,
+  Users,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -23,6 +24,7 @@ export interface NavSubItem {
   comingSoon?: boolean;
   newTab?: boolean;
   isNew?: boolean;
+  showIndicator?: boolean;
 }
 
 export interface NavMainItem {
@@ -33,6 +35,7 @@ export interface NavMainItem {
   comingSoon?: boolean;
   newTab?: boolean;
   isNew?: boolean;
+  showIndicator?: boolean;
 }
 
 export interface NavGroup {
@@ -50,25 +53,16 @@ export const sidebarItems: NavGroup[] = [
         title: "Tổng quan",
         url: "/dashboard/default",
         icon: LayoutDashboard,
-        comingSoon: true,
       },
       {
         title: "CRM",
         url: "/dashboard/crm",
         icon: ChartBar,
-        comingSoon: true,
       },
       {
-        title: "Tài chính",
-        url: "/dashboard/finance",
-        icon: Banknote,
-        comingSoon: true,
-      },
-      {
-        title: "Phân tích",
-        url: "/dashboard/coming-soon",
+        title: "SRX Việt Nam",
+        url: "/dashboard/srxvietnam",
         icon: Gauge,
-        comingSoon: true,
       },
     ],
   },
@@ -80,19 +74,16 @@ export const sidebarItems: NavGroup[] = [
         title: "Đơn hàng",
         url: "/orders",
         icon: ShoppingBagIcon,
-        comingSoon: true,
       },
       {
         title: "Khách hàng",
         url: "/customers",
         icon: Users,
-        comingSoon: true,
       },
       {
         title: "Hàng hóa",
         url: "/products",
         icon: PackageIcon,
-        comingSoon: true,
       },
       {
         title: "Sự kiện",
@@ -104,19 +95,60 @@ export const sidebarItems: NavGroup[] = [
         url: "/zalo-oa",
         icon: User,
       },
-      {
-        title: "Thông báo",
-        url: "#",
-        icon: Bell,
-        subItems: [
-          { title: "Cập nhật", url: "/noti/update-notifications" },
-          { title: "Dịch vụ", url: "/noti/service-notifications" },
-        ],
-      },
     ],
   },
   {
     id: 3,
+    label: "Website SRX",
+    items: [
+      {
+        title: "Shop",
+        url: "#",
+        icon: Store,
+        subItems: [
+          { title: "Đơn hàng", url: "/srx/orders" },
+          { title: "Sản phẩm", url: "/srx/products" },
+          { title: "Danh mục sản phẩm", url: "/srx/products_categories" },
+          { title: "Từ điển thành phần", url: "/srx/product_tags" },
+          { title: "Mã giảm giá", url: "/srx/voucher" },
+          { title: "Banner", url: "/srx/banner" },
+          { title: "Thanh toán", url: "/srx/payment" },
+        ],
+      },
+      {
+        title: "Khách hàng",
+        url: "/srx/customers",
+        icon: Users,
+      },
+      {
+        title: "Tin tức",
+        url: "#",
+        icon: Newspaper,
+        subItems: [
+          { title: "Quản lý tin tức", url: "/srx/news" },
+          { title: "Danh mục tin tức", url: "/srx/news_categories" },
+          { title: "Thẻ tin tức", url: "/srx/news_tags" },
+        ],
+      },
+      {
+        title: "Affiliate",
+        url: "#",
+        icon: Handshake,
+        subItems: [
+          { title: "Quản lý affiliate", url: "/srx/affiliates/manage" },
+          { title: "Phê duyệt hồ sơ", url: "/srx/affiliates/approval" },
+          { title: "Thiết lập hoa hồng", url: "/srx/affiliates/commission" },
+        ],
+      },
+      {
+        title: "Ladipage sự kiện",
+        url: "/srx/ladipage-events",
+        icon: LayoutDashboard,
+      },
+    ],
+  },
+  {
+    id: 4,
     label: "Khác",
     items: [
       {

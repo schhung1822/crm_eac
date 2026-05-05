@@ -1,6 +1,7 @@
+/* eslint-disable complexity */
 import { NextRequest, NextResponse } from "next/server";
 
-import { verifyPassword, createToken, setAuthCookie } from "@/lib/auth";
+import { createToken, setAuthCookie, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -8,12 +9,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { username, password } = body;
 
-    // Validate input
     if (!username || !password) {
-      return NextResponse.json({ message: "Tên đăng nhập và mật khẩu là bắt buộc" }, { status: 400 });
+      return NextResponse.json({ message: "Ten dang nhap va mat khau la bat buoc" }, { status: 400 });
     }
 
-    // Find user by username or email
     const userRecord = await prisma.user.findFirst({
       where: {
         OR: [{ user: username }, { email: username }],
@@ -21,39 +20,33 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userRecord || !userRecord.password) {
-      return NextResponse.json({ message: "Tên đăng nhập hoặc mật khẩu không đúng" }, { status: 401 });
+      return NextResponse.json({ message: "Ten dang nhap hoac mat khau khong dung" }, { status: 401 });
     }
 
-    // Verify password
     const isValidPassword = await verifyPassword(password, userRecord.password);
 
     if (!isValidPassword) {
-      return NextResponse.json({ message: "Tên đăng nhập hoặc mật khẩu không đúng" }, { status: 401 });
+      return NextResponse.json({ message: "Ten dang nhap hoac mat khau khong dung" }, { status: 401 });
     }
 
-    // Update last login
     await prisma.user.update({
       where: { id: userRecord.id },
       data: { last_login: new Date() },
     });
 
-    // Create JWT token
     const token = await createToken({
       userId: userRecord.id,
-      username: userRecord.user || "",
-      email: userRecord.email || "",
-      role: userRecord.role || "user",
-      name: userRecord.name || undefined,
-      phone: userRecord.phone || undefined,
+      username: userRecord.user ?? "",
+      email: userRecord.email ?? "",
+      role: userRecord.role ?? "user",
+      name: userRecord.name ?? undefined,
+      phone: userRecord.phone ?? undefined,
       avatar: undefined,
     });
 
-    // Set cookie
-    await setAuthCookie(token);
-
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
-        message: "Đăng nhập thành công",
+        message: "Dang nhap thanh cong",
         user: {
           userId: userRecord.id,
           username: userRecord.user,
@@ -65,8 +58,12 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 },
     );
+
+    setAuthCookie(response, token, request);
+
+    return response;
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json({ message: "Có lỗi xảy ra. Vui lòng thử lại!" }, { status: 500 });
+    return NextResponse.json({ message: "Co loi xay ra. Vui long thu lai!" }, { status: 500 });
   }
 }

@@ -1,5 +1,7 @@
 "use client"
 
+import * as React from "react"
+
 import {
   CircleCheckIcon,
   InfoIcon,
@@ -7,11 +9,36 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react"
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  const [theme, setTheme] = React.useState<ToasterProps["theme"]>("light")
+
+  React.useEffect(() => {
+    setMounted(true)
+
+    const root = document.documentElement
+    const applyTheme = () => {
+      setTheme(root.classList.contains("dark") ? "dark" : "light")
+    }
+
+    applyTheme()
+
+    const observer = new MutationObserver(applyTheme)
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   return (
     <Sonner

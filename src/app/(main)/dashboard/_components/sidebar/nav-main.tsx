@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { PlusCircleIcon, MailIcon, ChevronRight } from "lucide-react";
+import { MailIcon, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -25,15 +25,51 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { type NavGroup, type NavMainItem } from "@/navigation/sidebar/sidebar-items";
+import { sidebarItems, type NavGroup, type NavMainItem, type NavSubItem } from "@/navigation/sidebar/sidebar-items";
 
 interface NavMainProps {
-  readonly items: readonly NavGroup[];
+  readonly indicators?: Record<string, boolean>;
 }
 
 const IsComingSoon = () => (
   <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>
 );
+
+function IndicatorDot({ className = "" }: { className?: string }) {
+  return <span className={`bg-primary size-2 shrink-0 rounded-full ${className}`} aria-hidden="true" />;
+}
+
+function hasIndicator(
+  item?: Pick<NavMainItem, "showIndicator" | "subItems"> | Pick<NavSubItem, "showIndicator">,
+): boolean {
+  if (!item) {
+    return false;
+  }
+
+  if (item.showIndicator) {
+    return true;
+  }
+
+  return "subItems" in item ? (item.subItems?.some((subItem) => subItem.showIndicator) ?? false) : false;
+}
+
+function withSidebarIndicators(items: readonly NavGroup[], indicators: Record<string, boolean>): NavGroup[] {
+  return items.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const subItems = item.subItems?.map((subItem) => ({
+        ...subItem,
+        showIndicator: indicators[subItem.url] ?? false,
+      }));
+
+      return {
+        ...item,
+        subItems,
+        showIndicator: subItems?.some((subItem) => subItem.showIndicator) ?? false,
+      };
+    }),
+  }));
+}
 
 const NavItemExpanded = ({
   item,
@@ -56,8 +92,9 @@ const NavItemExpanded = ({
             >
               {item.icon && <item.icon />}
               <span>{item.title}</span>
+              {hasIndicator(item) ? <IndicatorDot className="ml-auto" /> : null}
               {item.comingSoon && <IsComingSoon />}
-              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
             </SidebarMenuButton>
           ) : (
             <SidebarMenuButton
@@ -69,6 +106,7 @@ const NavItemExpanded = ({
               <Link href={item.url} target={item.newTab ? "_blank" : undefined}>
                 {item.icon && <item.icon />}
                 <span>{item.title}</span>
+                {hasIndicator(item) ? <IndicatorDot className="ml-auto" /> : null}
                 {item.comingSoon && <IsComingSoon />}
               </Link>
             </SidebarMenuButton>
@@ -83,6 +121,7 @@ const NavItemExpanded = ({
                     <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                       {subItem.icon && <subItem.icon />}
                       <span>{subItem.title}</span>
+                      {subItem.showIndicator ? <IndicatorDot className="ml-auto" /> : null}
                       {subItem.comingSoon && <IsComingSoon />}
                     </Link>
                   </SidebarMenuSubButton>
@@ -114,6 +153,7 @@ const NavItemCollapsed = ({
           >
             {item.icon && <item.icon />}
             <span>{item.title}</span>
+            {hasIndicator(item) ? <IndicatorDot className="ml-auto" /> : null}
             <ChevronRight />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
@@ -130,6 +170,7 @@ const NavItemCollapsed = ({
                 <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                   {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
                   <span>{subItem.title}</span>
+                  {subItem.showIndicator ? <IndicatorDot className="ml-auto" /> : null}
                   {subItem.comingSoon && <IsComingSoon />}
                 </Link>
               </SidebarMenuSubButton>
@@ -141,9 +182,10 @@ const NavItemCollapsed = ({
   );
 };
 
-export function NavMain({ items }: NavMainProps) {
+export function NavMain({ indicators = {} }: NavMainProps) {
   const path = usePathname();
   const { state, isMobile } = useSidebar();
+  const items = withSidebarIndicators(sidebarItems, indicators);
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -188,7 +230,6 @@ export function NavMain({ items }: NavMainProps) {
             <SidebarMenu>
               {group.items.map((item) => {
                 if (state === "collapsed" && !isMobile) {
-                  // If no subItems, just render the button as a link
                   if (!item.subItems) {
                     return (
                       <SidebarMenuItem key={item.title}>
@@ -201,15 +242,16 @@ export function NavMain({ items }: NavMainProps) {
                           <Link href={item.url} target={item.newTab ? "_blank" : undefined}>
                             {item.icon && <item.icon />}
                             <span>{item.title}</span>
+                            {hasIndicator(item) ? <IndicatorDot className="ml-auto" /> : null}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
                   }
-                  // Otherwise, render the dropdown as before
+
                   return <NavItemCollapsed key={item.title} item={item} isActive={isItemActive} />;
                 }
-                // Expanded view
+
                 return (
                   <NavItemExpanded key={item.title} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} />
                 );

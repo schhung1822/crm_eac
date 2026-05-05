@@ -4,7 +4,15 @@ import { Row, flexRender } from "@tanstack/react-table";
 
 import { TableCell, TableRow } from "@/components/ui/table";
 
-export function DraggableRow<TData>({ row }: { row: Row<TData> }) {
+export function DraggableRow<TData>({
+  row,
+  rowClassName,
+  cellClassName,
+}: {
+  row: Row<TData>;
+  rowClassName?: string;
+  cellClassName?: string;
+}) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: (row.original as { id: number }).id,
   });
@@ -13,14 +21,16 @@ export function DraggableRow<TData>({ row }: { row: Row<TData> }) {
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
       ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      className={`relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 ${rowClassName ?? ""}`}
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
       }}
     >
       {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+        <TableCell key={cell.id} className={cellClassName}>
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </TableCell>
       ))}
     </TableRow>
   );
