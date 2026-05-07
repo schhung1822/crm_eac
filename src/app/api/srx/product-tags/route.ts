@@ -6,7 +6,7 @@ import { createSrxProductTag, parseSrxProductTagInput } from "@/lib/srx-products
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý từ điển thành phần");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý từ điển thành phần");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo thành phần");
   }
 }
+

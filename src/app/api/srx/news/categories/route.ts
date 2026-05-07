@@ -6,7 +6,7 @@ import { createSrxNewsCategory, parseSrxNewsCategoryInput } from "@/lib/srx-news
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý danh mục tin tức");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý danh mục tin tức");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo danh mục tin tức");
   }
 }
+

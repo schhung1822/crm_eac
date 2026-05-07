@@ -1,15 +1,9 @@
-import * as React from "react";
-
 import {
   ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
   getCoreRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFilteredRowModel,
-  // ❌ bỏ getPaginationRowModel
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -31,36 +25,29 @@ export function useDataTableInstance<TData, TValue>({
   defaultPageSize = 10,
   getRowId,
 }: UseDataTableInstanceProps<TData, TValue>) {
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [pagination, setPagination] = React.useState({
-    pageIndex: defaultPageIndex,
-    pageSize: defaultPageSize,
-  });
+  const resolveRowId =
+    getRowId ??
+    ((row: TData) => {
+      if (row && typeof row === "object" && "id" in row) {
+        const id = (row as { id?: string | number | null }).id;
+        return id === undefined || id === null ? "" : String(id);
+      }
+
+      return "";
+    });
 
   const table = useReactTable({
     data,
     columns,
-    state: {
-      sorting,
-      columnVisibility,
-      rowSelection,
-      columnFilters,
-      pagination,
+    initialState: {
+      pagination: {
+        pageIndex: defaultPageIndex,
+        pageSize: defaultPageSize,
+      },
     },
-    manualPagination: false,
-    pageCount: Math.ceil(data.length / pagination.pageSize),
 
     enableRowSelection,
-    getRowId: getRowId ?? ((row) => (row as any).id?.toString() ?? ""),
-
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    onPaginationChange: setPagination,
+    getRowId: resolveRowId,
 
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

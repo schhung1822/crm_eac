@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createToken, setAuthCookie, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeRole } from "@/lib/rbac";
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,11 +35,13 @@ export async function POST(request: NextRequest) {
       data: { last_login: new Date() },
     });
 
+    const normalizedRole = normalizeRole(userRecord.role);
+
     const token = await createToken({
       userId: userRecord.id,
       username: userRecord.user ?? "",
       email: userRecord.email ?? "",
-      role: userRecord.role ?? "user",
+      role: normalizedRole,
       name: userRecord.name ?? undefined,
       phone: userRecord.phone ?? undefined,
       avatar: undefined,
@@ -52,7 +55,7 @@ export async function POST(request: NextRequest) {
           username: userRecord.user,
           email: userRecord.email,
           name: userRecord.name,
-          role: userRecord.role,
+          role: normalizedRole,
           phone: userRecord.phone,
         },
       },

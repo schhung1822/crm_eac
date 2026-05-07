@@ -20,7 +20,7 @@ function makeSafeFilename(name: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền tải ảnh sản phẩm");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền tải ảnh sản phẩm");
 
     if (accessError) {
       return accessError;

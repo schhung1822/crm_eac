@@ -6,7 +6,7 @@ import { createSrxPaymentMethod, parseSrxPaymentMethodInput } from "@/lib/srx-we
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý phương thức thanh toán SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý phương thức thanh toán SRX");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo phương thức thanh toán");
   }
 }
+

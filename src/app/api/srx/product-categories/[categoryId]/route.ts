@@ -22,7 +22,7 @@ export async function PATCH(
   context: { params: Promise<{ categoryId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý danh mục sản phẩm");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý danh mục sản phẩm");
 
     if (accessError) {
       return accessError;
@@ -46,11 +46,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ categoryId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý danh mục sản phẩm");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý danh mục sản phẩm");
 
     if (accessError) {
       return accessError;
@@ -66,3 +66,4 @@ export async function DELETE(
     return buildApiErrorResponse(error, "Không thể xóa danh mục sản phẩm");
   }
 }
+

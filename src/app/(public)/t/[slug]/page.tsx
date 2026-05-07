@@ -1,12 +1,8 @@
 import TemplateRenderer from "@/components/form-template/TemplateRenderer";
-import {
-  ensureDefaultSrxLadipageEvent,
-  getPublishedSrxLadipageEventBySlug,
-} from "@/lib/srx-ladipage-events";
+import { getPublishedSrxLadipageEventBySlug } from "@/lib/srx-ladipage-events";
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  await ensureDefaultSrxLadipageEvent();
 
   const ladipageEvent = await getPublishedSrxLadipageEventBySlug(slug);
 

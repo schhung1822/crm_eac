@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { MailIcon, ChevronRight } from "lucide-react";
+import { MailIcon, ChevronRight, Globe } from "lucide-react";
 
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -25,6 +26,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { filterSidebarGroupsByRole } from "@/lib/rbac";
 import { sidebarItems, type NavGroup, type NavMainItem, type NavSubItem } from "@/navigation/sidebar/sidebar-items";
 
 interface NavMainProps {
@@ -185,7 +187,8 @@ const NavItemCollapsed = ({
 export function NavMain({ indicators = {} }: NavMainProps) {
   const path = usePathname();
   const { state, isMobile } = useSidebar();
-  const items = withSidebarIndicators(sidebarItems, indicators);
+  const { user } = useAuth();
+  const items = withSidebarIndicators(filterSidebarGroupsByRole(sidebarItems, user?.role), indicators);
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -205,19 +208,24 @@ export function NavMain({ indicators = {} }: NavMainProps) {
           <SidebarMenu>
             <SidebarMenuItem className="flex items-center gap-2">
               <SidebarMenuButton
+                asChild
                 tooltip="Quick Create"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
               >
-                <MailIcon />
-                <span>Liên hệ</span>
+                <a href="https://srx.eventhub.vn/" target="_blank" rel="noopener noreferrer">
+                  <Globe />
+                  <span>Mở website</span>
+                </a>
               </SidebarMenuButton>
               <Button
                 size="icon"
                 className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:opacity-0"
                 variant="outline"
               >
-                <MailIcon />
-                <span className="sr-only">Liên hệ</span>
+                <a href="https://srx.eventhub.vn/" target="_blank" rel="noopener noreferrer">
+                  <Globe />
+                  <span className="sr-only">Mở website</span>
+                </a>
               </Button>
             </SidebarMenuItem>
           </SidebarMenu>

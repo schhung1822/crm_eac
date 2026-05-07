@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ZodError, z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
+import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { parseUpdateSrxCustomerInput, updateSrxCustomer } from "@/lib/srx-users";
 
 const routeParamsSchema = z.object({
@@ -22,25 +22,11 @@ async function resolveCustomerId(context: RouteContext): Promise<string> {
   return routeParamsSchema.parse(paramsResolved).customerId;
 }
 
-async function ensureAdminAccess(): Promise<NextResponse | null> {
-  const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    return NextResponse.json({ message: "Chưa đăng nhập" }, { status: 401 });
-  }
-
-  if (currentUser.role !== "admin") {
-    return NextResponse.json({ message: "Bạn không có quyền cập nhật khách hàng website" }, { status: 403 });
-  }
-
-  return null;
-}
-
 function buildRouteErrorResponse(error: unknown): NextResponse {
   if (error instanceof ZodError) {
     return NextResponse.json(
       {
-        message: "Dữ liệu cập nhật không hợp lệ",
+        message: "Du lieu cap nhat khong hop le",
         issues: error.issues,
       },
       { status: 400 },
@@ -50,7 +36,7 @@ function buildRouteErrorResponse(error: unknown): NextResponse {
   if (isDuplicateEntryError(error)) {
     return NextResponse.json(
       {
-        message: "Email hoặc số điện thoại đã tồn tại trong website SRX",
+        message: "Email hoac so dien thoai da ton tai trong website SRX",
       },
       { status: 409 },
     );
@@ -60,7 +46,7 @@ function buildRouteErrorResponse(error: unknown): NextResponse {
 
   return NextResponse.json(
     {
-      message: "Có lỗi xảy ra khi cập nhật khách hàng website",
+      message: "Co loi xay ra khi cap nhat khach hang website",
       error: error instanceof Error ? error.message : String(error),
     },
     { status: 500 },
@@ -69,7 +55,7 @@ function buildRouteErrorResponse(error: unknown): NextResponse {
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const accessError = await ensureAdminAccess();
+    const accessError = await ensureAdminApiAccess(request, "Ban khong co quyen cap nhat khach hang website");
 
     if (accessError) {
       return accessError;
@@ -80,12 +66,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const customer = await updateSrxCustomer(customerId, payload);
 
     if (!customer) {
-      return NextResponse.json({ message: "Không tìm thấy khách hàng website" }, { status: 404 });
+      return NextResponse.json({ message: "Khong tim thay khach hang website" }, { status: 404 });
     }
 
     return NextResponse.json(
       {
-        message: "Cập nhật khách hàng website thành công",
+        message: "Cap nhat khach hang website thanh cong",
         customer,
       },
       { status: 200 },

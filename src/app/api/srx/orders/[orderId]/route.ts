@@ -23,7 +23,7 @@ export async function PATCH(
   context: { params: Promise<{ orderId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý đơn hàng website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý đơn hàng website");
 
     if (accessError) {
       return accessError;
@@ -46,3 +46,4 @@ export async function PATCH(
     return buildApiErrorResponse(error, "Không thể cập nhật đơn hàng");
   }
 }
+

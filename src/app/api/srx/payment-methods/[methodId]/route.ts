@@ -9,7 +9,7 @@ export async function PATCH(
   { params }: { params: Promise<{ methodId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý phương thức thanh toán SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý phương thức thanh toán SRX");
 
     if (accessError) {
       return accessError;
@@ -33,11 +33,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ methodId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý phương thức thanh toán SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý phương thức thanh toán SRX");
 
     if (accessError) {
       return accessError;
@@ -53,3 +53,4 @@ export async function DELETE(
     return buildApiErrorResponse(error, "Không thể xóa phương thức thanh toán");
   }
 }
+

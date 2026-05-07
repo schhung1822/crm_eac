@@ -4,12 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { toast } from "sonner";
 
+import type { AppRole } from "@/lib/rbac";
+
 interface User {
   userId: number;
   username: string;
   email: string;
   name?: string;
-  role: string;
+  role: AppRole;
   phone?: string;
   avatar?: string;
 }

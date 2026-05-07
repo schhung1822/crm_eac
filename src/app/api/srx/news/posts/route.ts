@@ -6,7 +6,7 @@ import { createSrxNewsPost, parseSrxNewsPostInput } from "@/lib/srx-news";
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý tin tức website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý tin tức website");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo bài viết");
   }
 }
+

@@ -7,7 +7,7 @@ import { parseSrxAffiliateApplicationReviewInput, reviewSrxAffiliateApplication 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ applicationId: string }> }) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền phê duyệt affiliate SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền phê duyệt affiliate SRX");
 
     if (accessError) {
       return accessError;
@@ -30,3 +30,4 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return buildApiErrorResponse(error, "Không thể cập nhật hồ sơ affiliate");
   }
 }
+

@@ -6,7 +6,7 @@ import { createSrxDiscountCode, parseSrxDiscountCodeInput } from "@/lib/srx-webs
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý mã giảm giá SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý mã giảm giá SRX");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo mã giảm giá");
   }
 }
+

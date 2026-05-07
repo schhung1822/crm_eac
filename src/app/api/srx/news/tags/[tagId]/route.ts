@@ -17,7 +17,7 @@ async function resolveTagId(context: { params: Promise<{ tagId: string }> }): Pr
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ tagId: string }> }) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý thẻ tin tức");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý thẻ tin tức");
 
     if (accessError) {
       return accessError;
@@ -41,11 +41,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ t
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ tagId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý thẻ tin tức");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý thẻ tin tức");
 
     if (accessError) {
       return accessError;
@@ -61,3 +61,4 @@ export async function DELETE(
     return buildApiErrorResponse(error, "Không thể xóa thẻ tin tức");
   }
 }
+

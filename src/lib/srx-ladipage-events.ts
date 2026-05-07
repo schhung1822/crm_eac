@@ -1,5 +1,5 @@
 /* eslint-disable max-lines */
-import type { RowDataPacket } from "mysql2/promise";
+import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { defaultConfig } from "@/lib/form-template/defaultConfig";
 import type { FormTemplateConfig } from "@/lib/form-template/types";
@@ -175,6 +175,28 @@ async function fetchLadipageEventBySlug(slug: string): Promise<SrxLadipageEvent 
   return fetchLadipageEventByWhere("slug = ?", [slug]);
 }
 
+async function fetchLadipageEventById(id: string): Promise<SrxLadipageEvent | null> {
+  return fetchLadipageEventByWhere("id = ?", [id]);
+}
+
+export async function getSrxLadipageEvents(): Promise<SrxLadipageEvent[]> {
+  try {
+    const rows = await queryRows<LadipageEventRow>(
+      `SELECT *
+       FROM ladipage_events
+       ORDER BY sort_order ASC, updated_at DESC, created_at DESC`,
+    );
+
+    return rows.map((row) => mapLadipageEvent(row));
+  } catch (error) {
+    wrapMissingLadipageEventsTableError(error);
+  }
+}
+
+export async function getSrxLadipageEventById(id: string): Promise<SrxLadipageEvent | null> {
+  return fetchLadipageEventById(id);
+}
+
 export async function getSrxLadipageEventBySlug(slug: string): Promise<SrxLadipageEvent | null> {
   return fetchLadipageEventBySlug(slug);
 }
@@ -211,7 +233,9 @@ export async function getPublishedSrxLadipageEventBySlug(
 
 export async function ensureDefaultSrxLadipageEvent(): Promise<void> {
   try {
-    const totalRow = await queryFirst<RowDataPacket & { total: number }>("SELECT COUNT(*) AS total FROM ladipage_events");
+    const totalRow = await queryFirst<RowDataPacket & { total: number }>(
+      "SELECT COUNT(*) AS total FROM ladipage_events",
+    );
 
     if ((totalRow?.total ?? 0) > 0) {
       return;
@@ -416,6 +440,17 @@ export async function saveSrxLadipageEvent(
     }
 
     return updateLadipageEvent(existingCurrent, normalizedNextSlug, normalizedName, normalizedEventName, config);
+  } catch (error) {
+    wrapMissingLadipageEventsTableError(error);
+  }
+}
+
+export async function deleteSrxLadipageEvent(eventId: string): Promise<boolean> {
+  try {
+    const [result] = await getSrxDB().query<ResultSetHeader>("DELETE FROM ladipage_events WHERE id = ? LIMIT 1", [
+      eventId,
+    ]);
+    return result.affectedRows > 0;
   } catch (error) {
     wrapMissingLadipageEventsTableError(error);
   }

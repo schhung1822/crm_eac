@@ -12,7 +12,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền tải banner SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền tải banner SRX");
 
     if (accessError) {
       return accessError;
@@ -57,3 +57,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tải banner");
   }
 }
+

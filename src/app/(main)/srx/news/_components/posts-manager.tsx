@@ -127,7 +127,8 @@ export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: Sr
               className="hover:text-primary inline-block leading-6 font-medium break-words transition-colors"
             >
               {row.original.title}
-            </Link> <br></br>
+            </Link>{" "}
+            <br />
             <Link
               href={`/srx/news/${row.original.id}/edit`}
               className="text-muted-foreground hover:text-primary inline-block text-xs break-all transition-colors"

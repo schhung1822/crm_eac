@@ -17,7 +17,7 @@ async function resolveTagId(context: { params: Promise<{ tagId: string }> }): Pr
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ tagId: string }> }) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý từ điển thành phần");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý từ điển thành phần");
 
     if (accessError) {
       return accessError;
@@ -40,9 +40,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ t
   }
 }
 
-export async function DELETE(_request: NextRequest, context: { params: Promise<{ tagId: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ tagId: string }> }) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý từ điển thành phần");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý từ điển thành phần");
 
     if (accessError) {
       return accessError;
@@ -58,3 +58,4 @@ export async function DELETE(_request: NextRequest, context: { params: Promise<{
     return buildApiErrorResponse(error, "Không thể xóa thành phần");
   }
 }
+

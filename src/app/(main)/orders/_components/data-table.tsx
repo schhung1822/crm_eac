@@ -61,7 +61,11 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
   const table = useDataTableInstance({
     data: filteredData,
     columns,
-    getRowId: (row) => row.order_ID.toString(),
+    getRowId: (row, index) =>
+      String(
+        row.id ||
+          `${row.order_ID}-${row.pro_ID}-${row.create_time instanceof Date ? row.create_time.toISOString() : row.create_time}-${index}`,
+      ),
   });
 
   const handleExport = React.useCallback(

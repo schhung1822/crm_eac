@@ -81,6 +81,45 @@ function renderTableBody<TData, TValue>({
   ));
 }
 
+function DndTableWrapper<TData>({
+  dataIds,
+  onReorder,
+  sourceData,
+  tableElement,
+}: {
+  dataIds: UniqueIdentifier[];
+  onReorder?: (newData: TData[]) => void;
+  sourceData: TData[];
+  tableElement: React.ReactNode;
+}) {
+  const sortableId = React.useId();
+  const sensors = useSensors(useSensor(MouseSensor, {}), useSensor(TouchSensor, {}), useSensor(KeyboardSensor, {}));
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id && onReorder) {
+      const oldIndex = dataIds.indexOf(active.id);
+      const newIndex = dataIds.indexOf(over.id);
+
+      const newData = arrayMove(sourceData, oldIndex, newIndex);
+      onReorder(newData);
+    }
+  }
+
+  return (
+    <DndContext
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      onDragEnd={handleDragEnd}
+      sensors={sensors}
+      id={sortableId}
+    >
+      {tableElement}
+    </DndContext>
+  );
+}
+
 export function DataTable<TData, TValue>({
   table,
   columns,
@@ -104,20 +143,6 @@ export function DataTable<TData, TValue>({
   const pageRows = allRows.slice(start, end);
 
   const dataIds: UniqueIdentifier[] = pageRows.map((row) => Number(row.id) as UniqueIdentifier);
-
-  const sortableId = React.useId();
-  const sensors = useSensors(useSensor(MouseSensor, {}), useSensor(TouchSensor, {}), useSensor(KeyboardSensor, {}));
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (over && active.id !== over.id && onReorder) {
-      const oldIndex = dataIds.indexOf(active.id);
-      const newIndex = dataIds.indexOf(over.id);
-
-      const newData = arrayMove(table.options.data, oldIndex, newIndex);
-      onReorder(newData);
-    }
-  }
 
   const tableElement = (
     <Table className={tableClassName}>
@@ -146,15 +171,12 @@ export function DataTable<TData, TValue>({
   );
 
   const content = dndEnabled ? (
-    <DndContext
-      collisionDetection={closestCenter}
-      modifiers={[restrictToVerticalAxis]}
-      onDragEnd={handleDragEnd}
-      sensors={sensors}
-      id={sortableId}
-    >
-      {tableElement}
-    </DndContext>
+    <DndTableWrapper
+      dataIds={dataIds}
+      onReorder={onReorder}
+      sourceData={table.options.data}
+      tableElement={tableElement}
+    />
   ) : (
     tableElement
   );

@@ -22,7 +22,7 @@ export async function PATCH(
   context: { params: Promise<{ productId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý sản phẩm website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý sản phẩm website");
 
     if (accessError) {
       return accessError;
@@ -46,11 +46,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ productId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý sản phẩm website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý sản phẩm website");
 
     if (accessError) {
       return accessError;
@@ -66,3 +66,4 @@ export async function DELETE(
     return buildApiErrorResponse(error, "Không thể xóa sản phẩm");
   }
 }
+

@@ -4,6 +4,7 @@ import type { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 import { createToken, verifyToken, type JWTPayload } from "@/lib/auth-token";
+import { normalizeRole } from "@/lib/rbac";
 
 const COOKIE_NAME = "auth-token";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -71,7 +72,16 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
   const token = await getAuthCookie();
   if (!token) return null;
 
-  return verifyToken(token);
+  const payload = await verifyToken(token);
+
+  if (!payload) {
+    return null;
+  }
+
+  return {
+    ...payload,
+    role: normalizeRole(payload.role),
+  };
 }
 
 export async function isAuthenticated(): Promise<boolean> {

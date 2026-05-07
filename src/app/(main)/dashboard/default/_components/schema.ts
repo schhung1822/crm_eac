@@ -2,6 +2,7 @@
 import { z } from "zod";
 
 export const channelSchema = z.object({
+  id: z.number(),
   order_ID: z.string(),
   brand: z.string(),
   create_time: z.date(),

@@ -6,7 +6,7 @@ import { createSrxProduct, parseSrxProductInput } from "@/lib/srx-products";
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý sản phẩm website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý sản phẩm website");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo sản phẩm");
   }
 }
+

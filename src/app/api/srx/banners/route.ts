@@ -6,7 +6,7 @@ import { createSrxBanner, parseSrxBannerInput } from "@/lib/srx-website";
 
 export async function POST(request: NextRequest) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý banner SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý banner SRX");
 
     if (accessError) {
       return accessError;
@@ -26,3 +26,4 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo banner");
   }
 }
+

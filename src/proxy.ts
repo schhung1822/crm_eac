@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { verifyToken } from "@/lib/auth-token";
+import { canAccessPath, getDefaultRouteForRole, normalizeRole } from "@/lib/rbac";
 
 const PUBLIC_ROUTES = ["/auth/v2/login", "/api/auth/login", "/api/auth/me", "/api/auth/logout"];
 const AUTH_ROUTES = ["/auth/v2/login"];
@@ -15,7 +16,7 @@ export async function proxy(request: NextRequest) {
   if (token && isAuthRoute) {
     const payload = await verifyToken(token);
     if (payload) {
-      return NextResponse.redirect(new URL("/dashboard/default", request.url));
+      return NextResponse.redirect(new URL(getDefaultRouteForRole(payload.role), request.url));
     }
   }
 
@@ -37,6 +38,16 @@ export async function proxy(request: NextRequest) {
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete("auth-token");
     return response;
+  }
+
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
+  const role = normalizeRole(payload.role);
+
+  if (!canAccessPath(role, pathname)) {
+    return NextResponse.redirect(new URL(getDefaultRouteForRole(role), request.url));
   }
 
   return NextResponse.next();

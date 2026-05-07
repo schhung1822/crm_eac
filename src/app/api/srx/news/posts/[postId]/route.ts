@@ -20,7 +20,7 @@ export async function PATCH(
   context: { params: Promise<{ postId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý tin tức website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý tin tức website");
 
     if (accessError) {
       return accessError;
@@ -44,11 +44,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ postId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý tin tức website");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý tin tức website");
 
     if (accessError) {
       return accessError;
@@ -64,3 +64,4 @@ export async function DELETE(
     return buildApiErrorResponse(error, "Không thể xóa bài viết");
   }
 }
+

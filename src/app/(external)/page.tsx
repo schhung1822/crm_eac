@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 
-export default function Home() {
-  redirect("/dashboard/default");
+import { getCurrentUser } from "@/lib/auth";
+import { getDefaultRouteForRole } from "@/lib/rbac";
+
+export default async function Home() {
+  const currentUser = await getCurrentUser();
+  redirect(getDefaultRouteForRole(currentUser?.role));
 }

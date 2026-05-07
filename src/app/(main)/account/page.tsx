@@ -15,11 +15,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { canCreateUsers, getRoleLabel, ROLE_OPTIONS } from "@/lib/rbac";
 import { getInitials } from "@/lib/utils";
+
+import { AccountsManagementTable } from "./_components/accounts-management-table";
 
 export default function AccountPage() {
   const { user, logout } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const canManageUsers = canCreateUsers(user?.role);
+  const [accountsRefreshToken, setAccountsRefreshToken] = useState(0);
 
   const handleLogout = async () => {
     await logout();
@@ -67,6 +72,7 @@ export default function AccountPage() {
           role: "user",
           phone: "",
         });
+        setAccountsRefreshToken((current) => current + 1);
       } else {
         toast.error(data.message || "Có lỗi xảy ra");
       }
@@ -130,8 +136,8 @@ export default function AccountPage() {
                 </Avatar>
                 <div className="text-center">
                   <h3 className="text-xl font-semibold">{user?.name || user?.username}</h3>
-                  <Badge variant={user?.role === "admin" ? "default" : "secondary"} className="mt-2 capitalize">
-                    {user?.role || "user"}
+                  <Badge variant={user?.role === "admin" ? "default" : "secondary"} className="mt-2">
+                    {getRoleLabel(user?.role)}
                   </Badge>
                 </div>
               </div>
@@ -177,12 +183,12 @@ export default function AccountPage() {
         {/* Cột phải: Actions */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="change-password" className="w-full">
-            <TabsList className={`grid w-full ${user?.role === "admin" ? "grid-cols-2" : "grid-cols-1"}`}>
+            <TabsList className={`grid w-full ${canManageUsers ? "grid-cols-2" : "grid-cols-1"}`}>
               <TabsTrigger value="change-password">
                 <KeyRound className="mr-2 h-4 w-4" />
                 Đổi mật khẩu
               </TabsTrigger>
-              {user?.role === "admin" && (
+              {canManageUsers && (
                 <TabsTrigger value="create-user">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Tạo tài khoản
@@ -240,7 +246,7 @@ export default function AccountPage() {
               </Card>
             </TabsContent>
 
-            {user?.role === "admin" && (
+            {canManageUsers && (
               <TabsContent value="create-user">
                 <Card>
                   <CardHeader>
@@ -320,8 +326,11 @@ export default function AccountPage() {
                               <SelectValue placeholder="Chọn vai trò" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="user">User</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
+                              {ROLE_OPTIONS.map((roleOption) => (
+                                <SelectItem key={roleOption.value} value={roleOption.value}>
+                                  {roleOption.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -338,6 +347,10 @@ export default function AccountPage() {
           </Tabs>
         </div>
       </div>
+
+      {canManageUsers ? (
+        <AccountsManagementTable currentUserId={user?.userId ?? null} refreshToken={accountsRefreshToken} />
+      ) : null}
     </div>
   );
 }

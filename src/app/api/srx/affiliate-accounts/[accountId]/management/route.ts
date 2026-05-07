@@ -10,7 +10,7 @@ export async function PATCH(
   { params }: { params: Promise<{ accountId: string }> },
 ) {
   try {
-    const accessError = await ensureAdminApiAccess("Bạn không có quyền quản lý affiliate SRX");
+    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý affiliate SRX");
 
     if (accessError) {
       return accessError;
@@ -33,3 +33,4 @@ export async function PATCH(
     return buildApiErrorResponse(error, "Không thể cập nhật affiliate");
   }
 }
+

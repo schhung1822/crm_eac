@@ -61,18 +61,6 @@ export function AccountSwitcher() {
               <span>Tài khoản</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/finance" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              <span>Thanh toán</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/noti/service-notifications" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              <span>Thông báo</span>
-            </Link>
-          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
