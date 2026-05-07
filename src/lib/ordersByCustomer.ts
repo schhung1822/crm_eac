@@ -1,6 +1,7 @@
 // src/lib/ordersByCustomer.ts
 import { channelSchema, type Channel } from "@/app/(main)/orders/_components/schema";
 import { getDB } from "@/lib/db";
+import { legacyEacTables } from "@/lib/legacy-db";
 
 type Paging = { page?: number; pageSize?: number | "all" | -1 };
 
@@ -24,6 +25,7 @@ export async function getOrdersByCustomer(
   // Fetch orders by customer ID
   const selectBase = `
     SELECT
+      id,
       order_ID,
       brand,
       create_time,
@@ -42,7 +44,7 @@ export async function getOrdersByCustomer(
       pro_ID,
       name_pro,
       brand_pro
-    FROM orders
+    FROM ${legacyEacTables.orders}
     WHERE customer_ID = ?
     ORDER BY create_time DESC
     ${limitSql}
@@ -55,7 +57,7 @@ export async function getOrdersByCustomer(
   if (wantAll) {
     total = rows?.length ?? 0;
   } else {
-    const [cntResult] = await db.query<any[]>(`SELECT COUNT(*) AS total FROM orders WHERE customer_ID = ?`, [
+    const [cntResult] = await db.query<any[]>(`SELECT COUNT(*) AS total FROM ${legacyEacTables.orders} WHERE customer_ID = ?`, [
       customerId,
     ]);
     total = Number(cntResult?.[0]?.total ?? 0);
@@ -63,6 +65,7 @@ export async function getOrdersByCustomer(
 
   const parsed = (rows ?? []).map((r) =>
     channelSchema.parse({
+      id: Number(r.id) || 0,
       order_ID: String(r.order_ID),
       brand: String(r.brand ?? ""),
       create_time: r.create_time ? new Date(r.create_time) : new Date(0),

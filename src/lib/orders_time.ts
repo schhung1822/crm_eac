@@ -1,5 +1,6 @@
 import { channelSchema, Channel } from "@/app/(main)/dashboard/default/_components/schema";
 import { getDB } from "@/lib/db";
+import { legacyEacTables } from "@/lib/legacy-db";
 
 type GetChannelsParams = {
   from?: string | Date;
@@ -41,6 +42,7 @@ export async function getChannels(params: GetChannelsParams = {}): Promise<Chann
 
   const sql = `
     SELECT
+      id,
       order_ID,
       brand,
       create_time,
@@ -59,7 +61,7 @@ export async function getChannels(params: GetChannelsParams = {}): Promise<Chann
       pro_ID,
       name_pro,
       brand_pro
-    FROM orders
+    FROM ${legacyEacTables.orders}
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY create_time DESC
   `;
@@ -68,6 +70,7 @@ export async function getChannels(params: GetChannelsParams = {}): Promise<Chann
 
   return (rows ?? []).map((r) =>
     channelSchema.parse({
+      id: Number(r.id) || 0,
       order_ID: String(r.order_ID),
       brand: String(r.brand ?? ""),
       create_time: r.create_time ? new Date(r.create_time) : new Date(0),

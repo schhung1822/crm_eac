@@ -1,6 +1,6 @@
 import { ensureSrxDatabaseEnv } from "@/lib/srx-env";
 
-import { PrismaClient } from "../../prisma/generated/srx-client";
+import { PrismaClient } from "../../prisma/generated/srx-app-client";
 
 const globalForPrisma2 = globalThis as unknown as {
   prisma2: PrismaClient | undefined;

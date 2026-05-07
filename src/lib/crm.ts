@@ -1,5 +1,6 @@
 import { OrderSchema, type Order } from "@/app/(main)/dashboard/crm/_components/schema";
 import { getDB } from "@/lib/db";
+import { legacyEacTables } from "@/lib/legacy-db";
 
 export async function getOrders(): Promise<Order[]> {
   const db = getDB();
@@ -24,7 +25,7 @@ export async function getOrders(): Promise<Order[]> {
       pro_ID,
       name_pro,
       brand_pro
-    FROM orders
+    FROM ${legacyEacTables.orders}
     ORDER BY create_time DESC
   `);
 

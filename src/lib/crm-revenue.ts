@@ -6,6 +6,7 @@ import {
   type RevenueGroupRow,
 } from "@/app/(main)/dashboard/crm/_components/crm.config";
 import { getDB } from "@/lib/db";
+import { legacyEacTables } from "@/lib/legacy-db";
 
 type ChartResult = ReturnType<typeof buildRevenuePie>;
 
@@ -46,7 +47,7 @@ export const getRevenueByChannelChart = unstable_cache(
       `
       SELECT COALESCE(kenh_ban, 'Khong ro') AS name,
              SUM(COALESCE(thanh_tien, 0)) AS revenue
-      FROM orders
+      FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       GROUP BY COALESCE(kenh_ban, 'Khong ro')
       ORDER BY revenue DESC
@@ -70,7 +71,7 @@ export const getRevenueByBranchBarChart = unstable_cache(
       `
       SELECT COALESCE(brand, 'Khong ro') AS name,
              SUM(COALESCE(thanh_tien, 0)) AS revenue
-      FROM orders
+      FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       GROUP BY COALESCE(brand, 'Khong ro')
       ORDER BY revenue DESC
@@ -103,7 +104,7 @@ export const getCRMStats = unstable_cache(
         SUM(COALESCE(quantity, 0)) AS totalQuantity,
         SUM(COALESCE(tien_hang, 0)) AS totalTienHang,
         SUM(COALESCE(thanh_tien, 0)) AS totalThanhTien
-      FROM orders
+      FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       `,
       dateFilter.params,
@@ -133,7 +134,7 @@ export const getBrandConversionFunnel = unstable_cache(
       SELECT
         COALESCE(o.brand_pro, o.brand, 'Khong ro') AS brand,
         COUNT(DISTINCT o.order_ID) AS orders
-      FROM orders o
+      FROM ${legacyEacTables.orders} o
       WHERE ${whereClause.replace("create_time", "o.create_time")}
       GROUP BY COALESCE(o.brand_pro, o.brand, 'Khong ro')
       ORDER BY orders DESC
@@ -169,7 +170,7 @@ export const getChannelSalesSummary = unstable_cache(
         SUM(COALESCE(tien_hang, 0) * COALESCE(quantity, 0)) AS tien_hang,
         SUM(COALESCE(giam_gia, 0)) AS giam_gia,
         SUM(COALESCE(thanh_tien, 0)) AS thanh_tien
-      FROM orders
+      FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       GROUP BY COALESCE(kenh_ban, 'Khong ro')
       ORDER BY thanh_tien DESC
@@ -201,7 +202,7 @@ export const getTopProductsByQuantity = unstable_cache(
       SELECT
         COALESCE(name_pro, 'Khong ro') AS product,
         SUM(COALESCE(quantity, 0)) AS totalQuantity
-      FROM orders
+      FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       GROUP BY COALESCE(name_pro, 'Khong ro')
       ORDER BY totalQuantity DESC
@@ -240,7 +241,7 @@ export const getTopSalesByRevenue = unstable_cache(
         COALESCE(seller, 'Khong ro') AS seller,
         SUM(COALESCE(thanh_tien, 0)) AS totalRevenue,
         COUNT(DISTINCT order_ID) AS totalOrders
-      FROM orders
+      FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       GROUP BY COALESCE(seller, 'Khong ro')
       ORDER BY totalRevenue DESC

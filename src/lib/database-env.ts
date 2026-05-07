@@ -256,7 +256,24 @@ function resolveMysqlDbConfig({
   return resolvedConfig;
 }
 
-export function getPrimaryDbConfig(): MysqlDbConfig {
+function aliasResolvedConfig(
+  canonicalUrlEnv: string,
+  aliasUrlEnvs: string[],
+  label: string,
+  config: MysqlDbConfig,
+): MysqlDbConfig {
+  process.env[canonicalUrlEnv] = config.url;
+
+  for (const envName of aliasUrlEnvs) {
+    process.env[envName] = config.url;
+  }
+
+  configCache.set(`${label}:${canonicalUrlEnv}`, config);
+
+  return config;
+}
+
+function resolvePrimaryDbConfigBase(): MysqlDbConfig {
   return resolveMysqlDbConfig({
     canonicalUrlEnv: "DATABASE_URL",
     aliasUrlEnvs: ["CRM_DATABASE_URL"],
@@ -269,11 +286,7 @@ export function getPrimaryDbConfig(): MysqlDbConfig {
   });
 }
 
-export function ensurePrimaryDatabaseEnv(): string {
-  return getPrimaryDbConfig().url;
-}
-
-export function getSrxDbConfig(): MysqlDbConfig {
+function resolveSrxDbConfigBase(): MysqlDbConfig {
   return resolveMysqlDbConfig({
     canonicalUrlEnv: "DATABASE_URL2",
     aliasUrlEnvs: ["SRX_DATABASE_URL"],
@@ -284,6 +297,38 @@ export function getSrxDbConfig(): MysqlDbConfig {
     databaseEnvs: ["SRX_DB_NAME"],
     label: "SRX",
   });
+}
+
+export function getPrimaryDbConfig(): MysqlDbConfig {
+  try {
+    return aliasResolvedConfig("DATABASE_URL", ["CRM_DATABASE_URL"], "CRM", resolveSrxDbConfigBase());
+  } catch {
+    try {
+      return resolvePrimaryDbConfigBase();
+    } catch (primaryError) {
+      try {
+        return aliasResolvedConfig("DATABASE_URL", ["CRM_DATABASE_URL"], "CRM", resolveSrxDbConfigBase());
+      } catch {
+        throw primaryError;
+      }
+    }
+  }
+}
+
+export function ensurePrimaryDatabaseEnv(): string {
+  return getPrimaryDbConfig().url;
+}
+
+export function getSrxDbConfig(): MysqlDbConfig {
+  try {
+    return resolveSrxDbConfigBase();
+  } catch (srxError) {
+    try {
+      return aliasResolvedConfig("DATABASE_URL2", ["SRX_DATABASE_URL"], "SRX", resolvePrimaryDbConfigBase());
+    } catch {
+      throw srxError;
+    }
+  }
 }
 
 export function ensureSrxDatabaseEnv(): string {

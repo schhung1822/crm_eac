@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "generated/legacy-client"
 }
 
 datasource db {
@@ -132,6 +133,7 @@ model orders {
   quantity      BigInt?
 
   @@index([nc_order], map: "order_order_idx")
+  @@map("orders_eac")
 }
 
 model product {
@@ -150,6 +152,7 @@ model product {
   property   String?   @db.Text
 
   @@index([nc_order], map: "product_order_idx")
+  @@map("product_eac")
 }
 
 model token {
@@ -189,6 +192,7 @@ model user {
   update_time DateTime? @updatedAt @db.DateTime(0)
 
   @@index([nc_order], map: "user_order_idx")
+  @@map("user_admin")
 }
 
 model user_zaloOA {

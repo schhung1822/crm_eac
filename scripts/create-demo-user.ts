@@ -3,7 +3,7 @@
  * Run: npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/create-demo-user.ts
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../prisma/generated/legacy-client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();

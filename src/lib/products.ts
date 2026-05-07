@@ -2,6 +2,7 @@ import type { RowDataPacket } from "mysql2";
 
 import { productSchema, type Product } from "@/app/(main)/products/_components/schema";
 import { getDB } from "@/lib/db";
+import { legacyEacTables } from "@/lib/legacy-db";
 
 type ProductColumnRow = RowDataPacket & {
   Field: string;
@@ -35,7 +36,7 @@ function buildOrderBy(columns: Set<string>, candidates: string[], fallbackSql: s
 
 async function getProductColumns(): Promise<Set<string>> {
   const db = getDB();
-  const [rows] = await db.query<ProductColumnRow[]>("SHOW COLUMNS FROM `product`");
+  const [rows] = await db.query<ProductColumnRow[]>(`SHOW COLUMNS FROM ${legacyEacTables.product}`);
 
   return new Set(rows.map((row) => String(row.Field)));
 }
@@ -61,7 +62,7 @@ export async function getProducts(): Promise<Product[]> {
     `
     SELECT
       ${selectFields}
-    FROM \`product\`
+    FROM ${legacyEacTables.product}
     ORDER BY ${orderBy} ASC
     `,
   );

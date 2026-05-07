@@ -24,7 +24,7 @@ import {
   type SrxPaymentMethodMutationInput,
 } from "@/lib/srx-website.shared";
 
-import { Prisma } from "../../prisma/generated/srx-client";
+import { Prisma } from "../../prisma/generated/srx-app-client";
 
 function normalizeOptionalString(value: string | null | undefined): string {
   return String(value ?? "").trim();

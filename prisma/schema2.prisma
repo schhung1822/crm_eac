@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "generated/srx-client"
+  output   = "generated/srx-app-client"
 }
 
 datasource db {

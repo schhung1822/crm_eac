@@ -1,6 +1,7 @@
 // src/lib/channels.ts
 import { channelSchema, Channel } from "@/app/(main)/orders/_components/schema";
 import { getDB } from "@/lib/db";
+import { legacyEacTables } from "@/lib/legacy-db";
 
 export interface GetChannelsOptions {
   from?: Date;
@@ -34,6 +35,7 @@ export async function getChannels(options?: GetChannelsOptions): Promise<Channel
   const [rows] = await db.query<any[]>(
     `
     SELECT
+      id,
       order_ID,
       brand,
       create_time,
@@ -52,7 +54,7 @@ export async function getChannels(options?: GetChannelsOptions): Promise<Channel
       pro_ID,
       name_pro,
       brand_pro
-    FROM orders
+    FROM ${legacyEacTables.orders}
     ${whereClause}
     ORDER BY create_time DESC
     LIMIT ? OFFSET ?
@@ -62,6 +64,7 @@ export async function getChannels(options?: GetChannelsOptions): Promise<Channel
 
   return (rows ?? []).map((r) =>
     channelSchema.parse({
+      id: Number(r.id) || 0,
       order_ID: String(r.order_ID),
       brand: String(r.brand ?? ""),
       create_time: r.create_time ? new Date(r.create_time) : new Date(0),

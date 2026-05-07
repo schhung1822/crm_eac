@@ -28,7 +28,7 @@ import {
   type SrxProductVariantMutationInput,
 } from "@/lib/srx-products.shared";
 
-import type { Prisma } from "../../prisma/generated/srx-client";
+import type { Prisma } from "../../prisma/generated/srx-app-client";
 
 function normalizeOptionalString(value: string | null | undefined): string {
   return String(value ?? "").trim();

@@ -17,7 +17,7 @@ import {
   type SrxAffiliateManagementMutationInput,
 } from "@/lib/srx-affiliates.shared";
 
-import { Prisma } from "../../prisma/generated/srx-client";
+import { Prisma } from "../../prisma/generated/srx-app-client";
 
 const affiliateAccountInclude = Prisma.validator<Prisma.affiliate_accountsInclude>()({
   users: {

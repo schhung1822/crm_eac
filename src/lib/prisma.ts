@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../prisma/generated/legacy-client";
 
 import { ensurePrimaryDatabaseEnv } from "@/lib/database-env";
 
