@@ -13,6 +13,7 @@ import { ExportDialog, type ExportFormat, type DateRange } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { exportData, filterDataByDateRange } from "@/lib/export-utils";
+import { filterBySearchTerm } from "@/lib/search-utils";
 
 import { createDashboardColumns } from "./columns";
 import { Users } from "./schema";
@@ -25,17 +26,15 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
   const [pendingCustomerId, setPendingCustomerId] = React.useState<string | null>(null);
 
   const filteredData = React.useMemo(() => {
-    if (!searchTerm.trim()) return data;
-
-    const term = searchTerm.toLowerCase();
-    return data.filter(
-      (item) =>
-        item.full_name.toLowerCase().includes(term) ||
-        item.display_name.toLowerCase().includes(term) ||
-        item.email.toLowerCase().includes(term) ||
-        item.phone.toLowerCase().includes(term) ||
-        item.default_address.toLowerCase().includes(term),
-    );
+    return filterBySearchTerm(data, searchTerm, (item) => [
+      item.full_name,
+      item.display_name,
+      item.email,
+      item.phone,
+      item.default_address,
+      item.membership_tier,
+      item.status,
+    ]);
   }, [data, searchTerm]);
 
   const handleStatusChange = React.useCallback(async (customerId: string, status: Users["status"]) => {

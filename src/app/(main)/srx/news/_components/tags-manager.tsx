@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import { parseSrxNewsTag, type SrxNewsTag, type SrxNewsTagMutationInput } from "@/lib/srx-news.shared";
 
 import { TagFormDialog } from "./tag-form-dialog";
@@ -25,12 +26,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxNewsTag[] }) {
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredTags = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return tags;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return tags.filter((tag) => tag.name.toLowerCase().includes(term) || tag.slug.toLowerCase().includes(term));
+    return filterBySearchTerm(tags, searchTerm, (tag) => [tag.name, tag.slug]);
   }, [tags, searchTerm]);
 
   const handleSubmit = React.useCallback(
@@ -179,7 +175,11 @@ export function TagsManager({ initialTags }: { initialTags: SrxNewsTag[] }) {
     getRowId: (row) => row.id,
   });
 
-  const selectedTags = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedTags = React.useMemo(
+    () => filteredTags.filter((tag) => rowSelection[tag.id]),
+    [filteredTags, rowSelection],
+  );
   const selectedTagCount = selectedTags.length;
 
   async function handleBulkDelete() {

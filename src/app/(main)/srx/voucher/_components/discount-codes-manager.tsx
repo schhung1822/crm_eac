@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import {
   parseSrxDiscountCode,
   type SrxDiscountCode,
@@ -86,19 +87,14 @@ export function DiscountCodesManager({
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredDiscountCodes = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return discountCodes;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return discountCodes.filter(
-      (discountCode) =>
-        discountCode.code.toLowerCase().includes(term) ||
-        discountCode.name.toLowerCase().includes(term) ||
-        discountCode.description.toLowerCase().includes(term) ||
-        discountCode.product_names.some((name) => name.toLowerCase().includes(term)) ||
-        discountCode.category_names.some((name) => name.toLowerCase().includes(term)),
-    );
+    return filterBySearchTerm(discountCodes, searchTerm, (discountCode) => [
+      discountCode.code,
+      discountCode.name,
+      discountCode.description,
+      discountCode.status,
+      discountCode.product_names,
+      discountCode.category_names,
+    ]);
   }, [discountCodes, searchTerm]);
 
   const handleSubmit = React.useCallback(
@@ -316,7 +312,11 @@ export function DiscountCodesManager({
     getRowId: (row) => row.id,
   });
 
-  const selectedDiscountCodes = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedDiscountCodes = React.useMemo(
+    () => filteredDiscountCodes.filter((discountCode) => rowSelection[discountCode.id]),
+    [filteredDiscountCodes, rowSelection],
+  );
   const selectedDiscountCodeCount = selectedDiscountCodes.length;
 
   async function handleBulkDelete() {

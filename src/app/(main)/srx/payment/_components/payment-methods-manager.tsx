@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import {
   parseSrxPaymentMethod,
   type SrxPaymentMethod,
@@ -85,18 +86,13 @@ export function PaymentMethodsManager({ initialPaymentMethods }: { initialPaymen
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredPaymentMethods = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return paymentMethods;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return paymentMethods.filter(
-      (paymentMethod) =>
-        paymentMethod.code.toLowerCase().includes(term) ||
-        paymentMethod.name.toLowerCase().includes(term) ||
-        paymentMethod.description.toLowerCase().includes(term) ||
-        paymentMethod.provider.toLowerCase().includes(term),
-    );
+    return filterBySearchTerm(paymentMethods, searchTerm, (paymentMethod) => [
+      paymentMethod.code,
+      paymentMethod.name,
+      paymentMethod.description,
+      paymentMethod.provider,
+      paymentMethod.status,
+    ]);
   }, [paymentMethods, searchTerm]);
 
   const handleSubmit = React.useCallback(
@@ -301,7 +297,11 @@ export function PaymentMethodsManager({ initialPaymentMethods }: { initialPaymen
     getRowId: (row) => row.id,
   });
 
-  const selectedPaymentMethods = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedPaymentMethods = React.useMemo(
+    () => filteredPaymentMethods.filter((paymentMethod) => rowSelection[paymentMethod.id]),
+    [filteredPaymentMethods, rowSelection],
+  );
   const selectedPaymentMethodCount = selectedPaymentMethods.length;
 
   async function handleBulkDelete() {

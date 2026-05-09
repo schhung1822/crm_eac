@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { matchesSearchTerm } from "@/lib/search-utils";
 import { srxOrderPaymentStatusValues, srxOrderStatusValues, type SrxOrder } from "@/lib/srx-orders.shared";
 
 import {
@@ -35,14 +36,18 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
 
   const filteredOrders = React.useMemo(() => {
     return initialOrders.filter((order) => {
-      const term = searchTerm.trim().toLowerCase();
-      const matchesSearch =
-        !term ||
-        order.order_number.toLowerCase().includes(term) ||
-        order.customer_name.toLowerCase().includes(term) ||
-        order.customer_phone.toLowerCase().includes(term) ||
-        order.customer_email.toLowerCase().includes(term) ||
-        order.shipping_address.toLowerCase().includes(term);
+      const matchesSearch = matchesSearchTerm(searchTerm, [
+        order.order_number,
+        order.customer_name,
+        order.customer_phone,
+        order.customer_email,
+        order.shipping_recipient_name,
+        order.shipping_recipient_phone,
+        order.shipping_address,
+        order.order_status,
+        order.payment_status,
+        order.payment_method,
+      ]);
 
       const matchesOrderStatus = orderStatusFilter === "all" || order.order_status === orderStatusFilter;
       const matchesPaymentStatus = paymentStatusFilter === "all" || order.payment_status === paymentStatusFilter;

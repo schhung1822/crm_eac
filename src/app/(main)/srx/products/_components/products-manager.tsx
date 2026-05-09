@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 "use client";
 
 import * as React from "react";
@@ -17,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import type { SrxProduct } from "@/lib/srx-products.shared";
 
 import { ProductRowActions } from "./product-row-actions";
@@ -59,24 +59,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredProducts = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return products;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return products.filter((product) => {
-      const tagNames = product.tags.map((tag) => tag.name.toLowerCase()).join(" ");
-
-      return (
-        product.name.toLowerCase().includes(term) ||
-        product.slug.toLowerCase().includes(term) ||
-        product.product_code.toLowerCase().includes(term) ||
-        product.category_name.toLowerCase().includes(term) ||
-        product.brand_name.toLowerCase().includes(term) ||
-        product.status.toLowerCase().includes(term) ||
-        tagNames.includes(term)
-      );
-    });
+    return filterBySearchTerm(products, searchTerm, (product) => [
+      product.name,
+      product.slug,
+      product.product_code,
+      product.category_name,
+      product.brand_name,
+      product.status,
+      product.tags.map((tag) => tag.name),
+    ]);
   }, [products, searchTerm]);
 
   const deleteProductRequest = React.useCallback(async (productId: string) => {
@@ -246,7 +237,11 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
     getRowId: (row) => row.id,
   });
 
-  const selectedProducts = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedProducts = React.useMemo(
+    () => filteredProducts.filter((product) => rowSelection[product.id]),
+    [filteredProducts, rowSelection],
+  );
   const selectedProductCount = selectedProducts.length;
 
   async function handleBulkDelete() {

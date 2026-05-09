@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import type { SrxNewsPost } from "@/lib/srx-news.shared";
 
 import { PostRowActions } from "./post-row-actions";
@@ -46,22 +47,13 @@ export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: Sr
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredPosts = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return posts;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return posts.filter((post) => {
-      const tagNames = post.tags.map((tag) => tag.name.toLowerCase()).join(" ");
-
-      return (
-        post.title.toLowerCase().includes(term) ||
-        post.slug.toLowerCase().includes(term) ||
-        post.category_name.toLowerCase().includes(term) ||
-        post.status.toLowerCase().includes(term) ||
-        tagNames.includes(term)
-      );
-    });
+    return filterBySearchTerm(posts, searchTerm, (post) => [
+      post.title,
+      post.slug,
+      post.category_name,
+      post.status,
+      post.tags.map((tag) => tag.name),
+    ]);
   }, [posts, searchTerm]);
 
   const deletePostRequest = React.useCallback(async (postId: string) => {
@@ -222,7 +214,11 @@ export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: Sr
     getRowId: (row) => row.id,
   });
 
-  const selectedPosts = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedPosts = React.useMemo(
+    () => filteredPosts.filter((post) => rowSelection[post.id]),
+    [filteredPosts, rowSelection],
+  );
   const selectedPostCount = selectedPosts.length;
 
   async function handleBulkDelete() {

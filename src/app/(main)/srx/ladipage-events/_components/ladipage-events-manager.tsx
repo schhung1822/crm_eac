@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import type { SrxLadipageEvent } from "@/lib/srx-ladipage-events";
 
 import { LadipageEventRowActions } from "./ladipage-event-row-actions";
@@ -70,21 +71,14 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredEvents = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return events;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return events.filter((event) => {
-      return (
-        event.name.toLowerCase().includes(term) ||
-        event.slug.toLowerCase().includes(term) ||
-        event.eventName.toLowerCase().includes(term) ||
-        event.publicPath.toLowerCase().includes(term) ||
-        event.status.toLowerCase().includes(term) ||
-        event.templateStyle.toLowerCase().includes(term)
-      );
-    });
+    return filterBySearchTerm(events, searchTerm, (event) => [
+      event.name,
+      event.slug,
+      event.eventName,
+      event.publicPath,
+      event.status,
+      event.templateStyle,
+    ]);
   }, [events, searchTerm]);
 
   const deleteEventRequest = React.useCallback(async (eventId: string) => {
@@ -258,7 +252,11 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
     getRowId: (row) => row.id,
   });
 
-  const selectedEvents = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedEvents = React.useMemo(
+    () => filteredEvents.filter((event) => rowSelection[event.id]),
+    [filteredEvents, rowSelection],
+  );
   const selectedEventCount = selectedEvents.length;
 
   async function handleBulkDelete() {

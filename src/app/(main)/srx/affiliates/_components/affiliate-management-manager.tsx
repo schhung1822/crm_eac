@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { matchesSearchTerm } from "@/lib/search-utils";
 import {
   parseSrxAffiliateAccount,
   srxAffiliateAccountStatusValues,
@@ -50,20 +51,19 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
 
   const filteredAccounts = React.useMemo(() => {
     return accounts.filter((account) => {
-      const matchesSearch = searchTerm.trim()
-        ? [
-            account.user_name,
-            account.user_email,
-            account.user_phone,
-            account.affiliate_code,
-            account.bank_name,
-            account.application_contact_email,
-            account.application_contact_phone,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-        : true;
+      const matchesSearch = matchesSearchTerm(searchTerm, [
+        account.user_name,
+        account.user_email,
+        account.user_phone,
+        account.affiliate_code,
+        account.bank_name,
+        account.bank_account_holder,
+        account.bank_account_number,
+        account.application_contact_email,
+        account.application_contact_phone,
+        account.application_social_channel,
+        account.application_review_note,
+      ]);
 
       const matchesAccountStatus = accountStatusFilter === "all" || account.status === accountStatusFilter;
       const matchesApplicationStatus =

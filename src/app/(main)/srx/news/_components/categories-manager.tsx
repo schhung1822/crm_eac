@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import { parseSrxNewsCategory, type SrxNewsCategory, type SrxNewsCategoryMutationInput } from "@/lib/srx-news.shared";
 
 import { CategoryFormDialog } from "./category-form-dialog";
@@ -26,17 +27,11 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Sr
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredCategories = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return categories;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return categories.filter(
-      (category) =>
-        category.name.toLowerCase().includes(term) ||
-        category.slug.toLowerCase().includes(term) ||
-        category.description.toLowerCase().includes(term),
-    );
+    return filterBySearchTerm(categories, searchTerm, (category) => [
+      category.name,
+      category.slug,
+      category.description,
+    ]);
   }, [categories, searchTerm]);
 
   const handleSubmit = React.useCallback(
@@ -210,7 +205,11 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Sr
     getRowId: (row) => row.id,
   });
 
-  const selectedCategories = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedCategories = React.useMemo(
+    () => filteredCategories.filter((category) => rowSelection[category.id]),
+    [filteredCategories, rowSelection],
+  );
   const selectedCategoryCount = selectedCategories.length;
 
   async function handleBulkDelete() {

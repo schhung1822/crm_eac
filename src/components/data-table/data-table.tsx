@@ -182,8 +182,12 @@ export function DataTable<TData, TValue>({
   );
 
   // ---- Footer phân trang ----
-  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
-  const totalFiltered = table.getFilteredRowModel().rows.length;
+  const rowSelection = table.getState().rowSelection;
+  const visibleRowIds = new Set(allRows.map((row) => String(row.id)));
+  const selectedCount = Object.entries(rowSelection).filter(
+    ([rowId, isSelected]) => isSelected && visibleRowIds.has(rowId),
+  ).length;
+  const totalFiltered = allRows.length;
 
   const canPrev = safePageIndex > 0;
   const canNext = safePageIndex < pageCount - 1;

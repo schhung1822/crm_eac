@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { filterBySearchTerm } from "@/lib/search-utils";
 import { parseSrxBanner, type SrxBanner, type SrxBannerMutationInput } from "@/lib/srx-website.shared";
 
 import { BannerFormDialog } from "./banner-form-dialog";
@@ -54,18 +55,14 @@ export function BannersManager({ initialBanners }: { initialBanners: SrxBanner[]
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredBanners = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return banners;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return banners.filter(
-      (banner) =>
-        banner.title.toLowerCase().includes(term) ||
-        banner.slug.toLowerCase().includes(term) ||
-        banner.description.toLowerCase().includes(term) ||
-        banner.link_target.toLowerCase().includes(term),
-    );
+    return filterBySearchTerm(banners, searchTerm, (banner) => [
+      banner.title,
+      banner.slug,
+      banner.description,
+      banner.link_target,
+      banner.position,
+      banner.status,
+    ]);
   }, [banners, searchTerm]);
 
   const handleSubmit = React.useCallback(
@@ -265,7 +262,11 @@ export function BannersManager({ initialBanners }: { initialBanners: SrxBanner[]
     getRowId: (row) => row.id,
   });
 
-  const selectedBanners = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+  const rowSelection = table.getState().rowSelection;
+  const selectedBanners = React.useMemo(
+    () => filteredBanners.filter((banner) => rowSelection[banner.id]),
+    [filteredBanners, rowSelection],
+  );
   const selectedBannerCount = selectedBanners.length;
 
   async function handleBulkDelete() {

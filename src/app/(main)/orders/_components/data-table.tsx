@@ -17,6 +17,7 @@ import { exportData, filterDataByDateRange } from "@/lib/export-utils";
 // ⬇️ import thêm Stats + columns factory
 import { dashboardColumns as makeColumns, type Stats } from "./columns";
 import type { Channel } from "./schema";
+import { filterOrdersBySearchTerm } from "./search-utils";
 
 export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
   const [data, setData] = React.useState<Channel[]>(() => initialData);
@@ -37,26 +38,7 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
   const columns = React.useMemo(() => withDndColumn(makeColumns(stats)), [stats]);
   const [searchTerm, setSearchTerm] = React.useState("");
 
-  const filteredData = React.useMemo(() => {
-    if (!searchTerm.trim()) return data;
-
-    const term = searchTerm.toLowerCase();
-    return data.filter(
-      (item) =>
-        String(item.kenh_ban ?? "")
-          .toLowerCase()
-          .includes(term) ||
-        String(item.order_ID ?? "")
-          .toLowerCase()
-          .includes(term) ||
-        (item.phone ? String(item.phone).toLowerCase().includes(term) : false) ||
-        ("created_by" in item
-          ? String((item as any).created_by)
-              .toLowerCase()
-              .includes(term)
-          : false),
-    );
-  }, [data, searchTerm]);
+  const filteredData = React.useMemo(() => filterOrdersBySearchTerm(data, searchTerm), [data, searchTerm]);
 
   const table = useDataTableInstance({
     data: filteredData,
