@@ -1,10 +1,11 @@
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const SRX_SCHEMA_PATH = path.join("prisma", "schema2.prisma");
 const LEGACY_CLIENT_OUTPUT_PATH = path.join("prisma", "generated", "legacy-client");
 const SRX_CLIENT_OUTPUT_PATH = path.join("prisma", "generated", "srx-app-client");
+const PRISMA_CLI_ENTRY = require.resolve("prisma/build/index.js");
 
 function hasLocalQueryEngine(outputDir) {
   if (!fs.existsSync(outputDir)) {
@@ -48,9 +49,21 @@ function ensureEnvVar(name) {
   }
 }
 
+function runPrismaGenerate(args) {
+  execFileSync(process.execPath, [PRISMA_CLI_ENTRY, "generate", ...args], {
+    stdio: "inherit",
+    env: process.env,
+  });
+}
+
 console.log("Generating Prisma clients...");
 
 try {
+  if (process.env.SKIP_PRISMA_GENERATE === "1") {
+    console.warn("Skipping Prisma client generation because SKIP_PRISMA_GENERATE=1");
+    process.exit(0);
+  }
+
   ensureEnvVar("DATABASE_URL");
   ensureEnvVar("DATABASE_URL2");
 
@@ -58,12 +71,16 @@ try {
     throw new Error(`Missing Prisma schema: ${SRX_SCHEMA_PATH}`);
   }
 
-  execSync("prisma generate", { stdio: "inherit" });
-  execSync(`prisma generate --schema ${SRX_SCHEMA_PATH}`, { stdio: "inherit" });
+  runPrismaGenerate([]);
+  runPrismaGenerate(["--schema", SRX_SCHEMA_PATH]);
   normalizeGeneratedClientCopyEngine(LEGACY_CLIENT_OUTPUT_PATH);
   normalizeGeneratedClientCopyEngine(SRX_CLIENT_OUTPUT_PATH);
   console.log("Prisma clients generated successfully");
 } catch (error) {
   console.error("Failed to generate Prisma clients:", error.message);
+  console.error("Prisma generate on Linux needs outbound HTTPS access to binaries.prisma.sh and a working OpenSSL/CA setup.");
+  console.error("Verify DATABASE_URL/DATABASE_URL2, install openssl + ca-certificates, then run:");
+  console.error("  npx prisma generate");
+  console.error(`  npx prisma generate --schema ${SRX_SCHEMA_PATH}`);
   process.exit(1);
 }

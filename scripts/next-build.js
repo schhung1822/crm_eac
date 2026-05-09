@@ -130,14 +130,35 @@ async function writeDistManifest() {
 }
 
 function runStandaloneTypeCheck() {
+  if (process.env.SKIP_TYPESCRIPT_VALIDATION === "1") {
+    console.warn("Skipping TypeScript validation because SKIP_TYPESCRIPT_VALIDATION=1");
+    return;
+  }
+
+  const nodeArgs = [];
+
+  if (process.env.TSC_MAX_OLD_SPACE_SIZE) {
+    nodeArgs.push(`--max-old-space-size=${process.env.TSC_MAX_OLD_SPACE_SIZE}`);
+  }
+
   const result = spawnSync(
     process.execPath,
-    [require.resolve("typescript/bin/tsc"), "--noEmit", "--incremental", "false", "--pretty", "false"],
+    [...nodeArgs, require.resolve("typescript/bin/tsc"), "--noEmit", "--incremental", "false", "--pretty", "false"],
     {
       stdio: "inherit",
       env: process.env,
     },
   );
+
+  if (result.error) {
+    const error = new Error(`TypeScript validation failed to start: ${result.error.message}`);
+    error.cause = result.error;
+    throw error;
+  }
+
+  if (result.signal) {
+    throw new Error(`TypeScript validation was terminated by signal ${result.signal}`);
+  }
 
   if (result.status !== 0) {
     const error = new Error(`TypeScript validation failed with exit code ${result.status ?? "unknown"}`);
