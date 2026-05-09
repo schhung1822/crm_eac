@@ -59,11 +59,6 @@ function runPrismaGenerate(args) {
 console.log("Generating Prisma clients...");
 
 try {
-  if (process.env.SKIP_PRISMA_GENERATE === "1") {
-    console.warn("Skipping Prisma client generation because SKIP_PRISMA_GENERATE=1");
-    process.exit(0);
-  }
-
   ensureEnvVar("DATABASE_URL");
   ensureEnvVar("DATABASE_URL2");
 
@@ -80,7 +75,6 @@ try {
   console.error("Failed to generate Prisma clients:", error.message);
   console.error("Prisma generate on Linux needs outbound HTTPS access to binaries.prisma.sh and a working OpenSSL/CA setup.");
   console.error("Verify DATABASE_URL/DATABASE_URL2, install openssl + ca-certificates, then run:");
-  console.error("  npx prisma generate");
-  console.error(`  npx prisma generate --schema ${SRX_SCHEMA_PATH}`);
+  console.error("  npm run prisma:generate");
   process.exit(1);
 }

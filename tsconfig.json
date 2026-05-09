@@ -36,15 +36,10 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".next-build-runs/1777961736322-25288/types/**/*.ts",
-    ".next-build-runs/1777961736322-25288/dev/types/**/*.ts",
-    ".next-build-runs/1778119861758-24100/types/**/*.ts",
-    ".next-build-runs/1778119861758-24100/dev/types/**/*.ts",
-    ".next-build-runs/1778139374646-21548/types/**/*.ts",
-    ".next-build-runs/1778139374646-21548/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next-build-runs"
   ]
 }

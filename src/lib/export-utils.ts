@@ -1,9 +1,8 @@
 "use client";
 
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 
-export type ExportFormat = "csv" | "xlsx";
+export type ExportFormat = "csv";
 
 interface ExportOptions {
   filename?: string;
@@ -82,57 +81,10 @@ export function exportToCSV(options: ExportOptions): void {
 }
 
 /**
- * Export data to XLSX format
- */
-export function exportToXLSX(options: ExportOptions): void {
-  const { filename = "export", data, headers } = options;
-
-  if (!data || data.length === 0) {
-    console.warn("No data to export");
-    return;
-  }
-
-  // Transform data with headers
-  const transformedData = transformDataForExport(data, headers);
-
-  // Create workbook and worksheet
-  const worksheet = XLSX.utils.json_to_sheet(transformedData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-
-  // Auto-size columns
-  const maxWidth = 50;
-  const colWidths: number[] = [];
-
-  if (transformedData.length > 0) {
-    Object.keys(transformedData[0]).forEach((key, index) => {
-      const maxLength = Math.max(key.length, ...transformedData.map((row) => String(row[key] || "").length));
-      colWidths[index] = Math.min(maxLength + 2, maxWidth);
-    });
-
-    worksheet["!cols"] = colWidths.map((width) => ({ width }));
-  }
-
-  // Write and download file
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
-}
-
-/**
- * Main export function that delegates to CSV or XLSX
+ * Main export function for CSV export
  */
 export function exportData(options: ExportOptions): void {
-  const { format } = options;
-
-  switch (format) {
-    case "csv":
-      exportToCSV(options);
-      break;
-    case "xlsx":
-      exportToXLSX(options);
-      break;
-    default:
-      throw new Error(`Unsupported export format: ${format}`);
-  }
+  exportToCSV(options);
 }
 
 /**
