@@ -49,6 +49,7 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
           `${row.order_ID}-${row.pro_ID}-${row.create_time instanceof Date ? row.create_time.toISOString() : row.create_time}-${index}`,
       ),
   });
+  const tableRenderKey = `${searchTerm}|${filteredData.length}`;
 
   const handleExport = React.useCallback(
     (format: ExportFormat, dateRange: DateRange) => {
@@ -130,7 +131,7 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
         </div>
       </div>
       <div className="nice-scroll overflow-x-auto rounded-lg">
-        <DataTableNew dndEnabled table={table} columns={columns} onReorder={setData} />
+        <DataTableNew key={tableRenderKey} dndEnabled table={table} columns={columns} onReorder={setData} />
       </div>
 
       <ExportDialog

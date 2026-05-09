@@ -32,8 +32,6 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
       item.email,
       item.phone,
       item.default_address,
-      item.membership_tier,
-      item.status,
     ]);
   }, [data, searchTerm]);
 
@@ -81,6 +79,7 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
     columns,
     getRowId: (row) => row.id.toString(),
   });
+  const tableRenderKey = `${searchTerm}|${filteredData.length}`;
 
   const handleExport = React.useCallback(
     (format: ExportFormat, dateRange: DateRange) => {
@@ -162,7 +161,7 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
         </div>
       </div>
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTableNew dndEnabled table={table} columns={columns} onReorder={setData} />
+        <DataTableNew key={tableRenderKey} dndEnabled table={table} columns={columns} onReorder={setData} />
       </div>
 
       <ExportDialog

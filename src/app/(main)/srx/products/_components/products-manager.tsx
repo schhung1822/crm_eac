@@ -64,8 +64,6 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
       product.slug,
       product.product_code,
       product.category_name,
-      product.brand_name,
-      product.status,
       product.tags.map((tag) => tag.name),
     ]);
   }, [products, searchTerm]);
@@ -236,6 +234,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredProducts.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedProducts = React.useMemo(
@@ -321,6 +320,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
 
       <div className="nice-scroll overflow-hidden rounded-lg">
         <DataTable
+          key={tableRenderKey}
           table={table}
           columns={columns}
           tableClassName="min-w-[1680px]"

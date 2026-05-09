@@ -16,7 +16,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
-import { matchesSearchTerm } from "@/lib/search-utils";
 import { srxOrderPaymentStatusValues, srxOrderStatusValues, type SrxOrder } from "@/lib/srx-orders.shared";
 
 import {
@@ -29,25 +28,37 @@ import {
 } from "./order-presenters";
 import { OrderRowActions } from "./order-row-actions";
 
+function matchesOrderSearch(order: SrxOrder, term: string) {
+  return (
+    order.order_number.toLowerCase().includes(term) ||
+    order.customer_name.toLowerCase().includes(term) ||
+    order.customer_phone.toLowerCase().includes(term) ||
+    order.customer_email.toLowerCase().includes(term) ||
+    order.shipping_recipient_name.toLowerCase().includes(term) ||
+    order.shipping_recipient_phone.toLowerCase().includes(term) ||
+    order.shipping_address.toLowerCase().includes(term)
+  );
+}
+
 export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [orderStatusFilter, setOrderStatusFilter] = React.useState<string>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = React.useState<string>("all");
 
   const filteredOrders = React.useMemo(() => {
+    if (!searchTerm.trim()) {
+      return initialOrders.filter((order) => {
+        const matchesOrderStatus = orderStatusFilter === "all" || order.order_status === orderStatusFilter;
+        const matchesPaymentStatus = paymentStatusFilter === "all" || order.payment_status === paymentStatusFilter;
+
+        return matchesOrderStatus && matchesPaymentStatus;
+      });
+    }
+
+    const term = searchTerm.toLowerCase();
+
     return initialOrders.filter((order) => {
-      const matchesSearch = matchesSearchTerm(searchTerm, [
-        order.order_number,
-        order.customer_name,
-        order.customer_phone,
-        order.customer_email,
-        order.shipping_recipient_name,
-        order.shipping_recipient_phone,
-        order.shipping_address,
-        order.order_status,
-        order.payment_status,
-        order.payment_method,
-      ]);
+      const matchesSearch = matchesOrderSearch(order, term);
 
       const matchesOrderStatus = orderStatusFilter === "all" || order.order_status === orderStatusFilter;
       const matchesPaymentStatus = paymentStatusFilter === "all" || order.payment_status === paymentStatusFilter;
@@ -189,6 +200,8 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
     getRowId: (row) => row.id,
   });
 
+  const tableRenderKey = `${searchTerm}|${orderStatusFilter}|${paymentStatusFilter}|${filteredOrders.length}`;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -269,6 +282,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
 
       <div className="nice-scroll overflow-hidden rounded-lg">
         <DataTable
+          key={tableRenderKey}
           table={table}
           columns={columns}
           tableClassName="min-w-[1520px]"

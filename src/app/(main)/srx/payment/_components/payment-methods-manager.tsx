@@ -91,7 +91,6 @@ export function PaymentMethodsManager({ initialPaymentMethods }: { initialPaymen
       paymentMethod.name,
       paymentMethod.description,
       paymentMethod.provider,
-      paymentMethod.status,
     ]);
   }, [paymentMethods, searchTerm]);
 
@@ -296,6 +295,7 @@ export function PaymentMethodsManager({ initialPaymentMethods }: { initialPaymen
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredPaymentMethods.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedPaymentMethods = React.useMemo(
@@ -388,7 +388,7 @@ export function PaymentMethodsManager({ initialPaymentMethods }: { initialPaymen
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <PaymentMethodFormDialog

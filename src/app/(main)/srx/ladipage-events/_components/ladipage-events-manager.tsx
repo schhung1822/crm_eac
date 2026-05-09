@@ -251,6 +251,7 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredEvents.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedEvents = React.useMemo(
@@ -352,6 +353,7 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
       ) : (
         <div className="nice-scroll overflow-hidden rounded-lg">
           <DataTable
+            key={tableRenderKey}
             table={table}
             columns={columns}
             tableClassName="min-w-[1480px]"

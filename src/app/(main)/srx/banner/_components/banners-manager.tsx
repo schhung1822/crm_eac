@@ -60,8 +60,6 @@ export function BannersManager({ initialBanners }: { initialBanners: SrxBanner[]
       banner.slug,
       banner.description,
       banner.link_target,
-      banner.position,
-      banner.status,
     ]);
   }, [banners, searchTerm]);
 
@@ -261,6 +259,7 @@ export function BannersManager({ initialBanners }: { initialBanners: SrxBanner[]
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredBanners.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedBanners = React.useMemo(
@@ -349,7 +348,7 @@ export function BannersManager({ initialBanners }: { initialBanners: SrxBanner[]
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <BannerFormDialog

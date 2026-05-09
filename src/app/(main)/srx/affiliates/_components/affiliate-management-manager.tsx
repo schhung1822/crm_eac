@@ -57,12 +57,8 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
         account.user_phone,
         account.affiliate_code,
         account.bank_name,
-        account.bank_account_holder,
-        account.bank_account_number,
         account.application_contact_email,
         account.application_contact_phone,
-        account.application_social_channel,
-        account.application_review_note,
       ]);
 
       const matchesAccountStatus = accountStatusFilter === "all" || account.status === accountStatusFilter;
@@ -262,6 +258,7 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${accountStatusFilter}|${applicationStatusFilter}|${filteredAccounts.length}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -367,7 +364,7 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <AffiliateManagementDialog

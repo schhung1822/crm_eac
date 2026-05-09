@@ -83,8 +83,6 @@ export function AffiliateApplicationManager({
         application.social_channel,
         application.website_url,
         application.affiliate_code,
-        application.status,
-        application.review_note,
       ]);
 
       const matchesStatus = statusFilter === "all" || application.status === statusFilter;
@@ -269,6 +267,7 @@ export function AffiliateApplicationManager({
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${statusFilter}|${filteredApplications.length}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -350,7 +349,7 @@ export function AffiliateApplicationManager({
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <AffiliateApplicationReviewDialog

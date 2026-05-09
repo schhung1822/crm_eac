@@ -204,6 +204,7 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Sr
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredCategories.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedCategories = React.useMemo(
@@ -294,7 +295,7 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Sr
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <CategoryFormDialog

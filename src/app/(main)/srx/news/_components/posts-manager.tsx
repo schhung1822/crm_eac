@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 "use client";
 
 import * as React from "react";
@@ -15,9 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { filterBySearchTerm } from "@/lib/search-utils";
-import type { SrxNewsPost } from "@/lib/srx-news.shared";
+import type { SrxNewsCategory, SrxNewsPost } from "@/lib/srx-news.shared";
 
 import { PostRowActions } from "./post-row-actions";
 
@@ -41,20 +43,47 @@ function formatCount(value: number): string {
   return value.toLocaleString("vi-VN");
 }
 
-export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: SrxNewsPost[]; canCreatePost: boolean }) {
+export function PostsManager({
+  initialPosts,
+  initialCategories,
+  canCreatePost,
+}: {
+  initialPosts: SrxNewsPost[];
+  initialCategories: SrxNewsCategory[];
+  canCreatePost: boolean;
+}) {
   const [posts, setPosts] = React.useState<SrxNewsPost[]>(initialPosts);
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [categoryFilter, setCategoryFilter] = React.useState("all");
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
+  const categoryOptions = React.useMemo(
+    () =>
+      [...initialCategories].sort((left, right) => {
+        if (left.sort_order !== right.sort_order) {
+          return left.sort_order - right.sort_order;
+        }
+
+        return left.name.localeCompare(right.name, "vi");
+      }),
+    [initialCategories],
+  );
+
   const filteredPosts = React.useMemo(() => {
-    return filterBySearchTerm(posts, searchTerm, (post) => [
+    const searchFilteredPosts = filterBySearchTerm(posts, searchTerm, (post) => [
       post.title,
       post.slug,
       post.category_name,
       post.status,
       post.tags.map((tag) => tag.name),
     ]);
-  }, [posts, searchTerm]);
+
+    if (categoryFilter === "all") {
+      return searchFilteredPosts;
+    }
+
+    return searchFilteredPosts.filter((post) => post.category_id === categoryFilter);
+  }, [categoryFilter, posts, searchTerm]);
 
   const deletePostRequest = React.useCallback(async (postId: string) => {
     const response = await fetch(`/api/srx/news/posts/${postId}`, {
@@ -213,6 +242,7 @@ export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: Sr
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${categoryFilter}|${filteredPosts.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedPosts = React.useMemo(
@@ -269,14 +299,29 @@ export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: Sr
       </div>
 
       <div className="flex items-center justify-between gap-4">
-        <div className="relative max-w-sm flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <Input
-            className="pl-10"
-            placeholder="Tìm theo tiêu đề, slug, danh mục, thẻ..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+        <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative max-w-sm flex-1">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              className="pl-10"
+              placeholder="Tìm theo tiêu đề, slug, danh mục, thẻ..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter} disabled={categoryOptions.length === 0}>
+            <SelectTrigger className="w-full md:w-[240px]">
+              <SelectValue placeholder="Tất cả danh mục" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả danh mục</SelectItem>
+              {categoryOptions.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-3">
@@ -311,6 +356,7 @@ export function PostsManager({ initialPosts, canCreatePost }: { initialPosts: Sr
 
       <div className="nice-scroll overflow-hidden rounded-lg">
         <DataTable
+          key={tableRenderKey}
           table={table}
           columns={columns}
           tableClassName="min-w-[1560px]"

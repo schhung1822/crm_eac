@@ -230,6 +230,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredTags.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedTags = React.useMemo(
@@ -320,7 +321,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <TagFormDialog

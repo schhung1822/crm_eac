@@ -91,7 +91,6 @@ export function DiscountCodesManager({
       discountCode.code,
       discountCode.name,
       discountCode.description,
-      discountCode.status,
       discountCode.product_names,
       discountCode.category_names,
     ]);
@@ -311,6 +310,7 @@ export function DiscountCodesManager({
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${filteredDiscountCodes.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedDiscountCodes = React.useMemo(
@@ -401,7 +401,7 @@ export function DiscountCodesManager({
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <DiscountCodeFormDialog

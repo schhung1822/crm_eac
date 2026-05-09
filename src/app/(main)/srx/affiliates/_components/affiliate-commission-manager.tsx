@@ -62,11 +62,7 @@ export function AffiliateCommissionManager({ initialAccounts }: { initialAccount
       const matchesSearch = matchesSearchTerm(searchTerm, [
         account.user_name,
         account.user_email,
-        account.user_phone,
         account.affiliate_code,
-        account.status,
-        account.commission_type,
-        account.bank_name,
       ]);
       const matchesStatus = accountStatusFilter === "all" || account.status === accountStatusFilter;
       const matchesCommissionType = commissionTypeFilter === "all" || account.commission_type === commissionTypeFilter;
@@ -242,6 +238,7 @@ export function AffiliateCommissionManager({ initialAccounts }: { initialAccount
     columns,
     getRowId: (row) => row.id,
   });
+  const tableRenderKey = `${searchTerm}|${accountStatusFilter}|${commissionTypeFilter}|${filteredAccounts.length}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -343,7 +340,7 @@ export function AffiliateCommissionManager({ initialAccounts }: { initialAccount
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable table={table} columns={columns} />
+        <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
       <AffiliateCommissionDialog
