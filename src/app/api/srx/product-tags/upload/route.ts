@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 2048 * 2048;
 
 export async function POST(request: NextRequest) {
   try {
