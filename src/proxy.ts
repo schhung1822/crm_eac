@@ -3,7 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { verifyToken } from "@/lib/auth-token";
 import { canAccessPath, getDefaultRouteForRole, normalizeRole } from "@/lib/rbac";
 
-const PUBLIC_ROUTES = ["/auth/v2/login", "/api/auth/login", "/api/auth/me", "/api/auth/logout"];
+const PUBLIC_ROUTES = [
+  "/auth/v2/login",
+  "/api/auth/login",
+  "/api/auth/me",
+  "/api/auth/logout",
+  "/api/srx/lead-forms-web",
+  "/api/srx/orders_web",
+  "/api/srx/affiliate-applications-web",
+];
 const AUTH_ROUTES = ["/auth/v2/login"];
 
 export async function proxy(request: NextRequest) {

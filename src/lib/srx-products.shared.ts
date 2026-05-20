@@ -178,7 +178,7 @@ const optionalWeightStringSchema = z
   .refine((value) => value === "" || isValidNonNegativeNumber(value), "Khối lượng không hợp lệ");
 
 const srxProductVariantMutationSchema = z.object({
-  id: z.string().trim().regex(/^\d+$/).optional().default(""),
+  id: optionalNumericIdSchema,
   sku: z.string().trim().min(1).max(100),
   barcode: z.string().trim().max(100).optional().default(""),
   variant_name: z.string().trim().max(200).optional().default(""),
