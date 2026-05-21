@@ -218,6 +218,7 @@ export function NavMain({ indicators = {} }: NavMainProps) {
                 </a>
               </SidebarMenuButton>
               <Button
+                asChild
                 size="icon"
                 className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:opacity-0"
                 variant="outline"
