@@ -5,6 +5,13 @@ import "server-only";
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { prisma2 } from "@/lib/prisma2";
+import {
+  resolveNullableSiteAssetUrl,
+  resolveNullableSiteAssetUrlForStorage,
+  resolveSiteAssetUrl,
+  resolveSiteAssetUrlsForStorage,
+  resolveSiteAssetUrlForStorage,
+} from "@/lib/site-asset-url";
 import { getSrxDB } from "@/lib/srx-db";
 import { withSrxReadFallback } from "@/lib/srx-db-errors";
 import {
@@ -189,7 +196,7 @@ function normalizeProductVariants(variants: readonly SrxProductVariantMutationIn
     sku: variant.sku.trim(),
     barcode: variant.barcode.trim(),
     variant_name: variant.variant_name.trim(),
-    image_url: variant.image_url.trim(),
+    image_url: resolveSiteAssetUrlForStorage(variant.image_url),
     weight_grams: variant.weight_grams.trim(),
   }));
 
@@ -254,7 +261,7 @@ function mapCategory(
     name: category.name,
     slug: category.slug,
     description: normalizeOptionalString(category.description),
-    image_url: normalizeOptionalString(category.image_url),
+    image_url: resolveSiteAssetUrl(category.image_url),
     is_active: category.is_active,
     sort_order: category.sort_order,
     product_count: productCount,
@@ -269,7 +276,7 @@ function mapTag(tag: SrxProductTagRow): SrxProductTag {
     name: normalizeOptionalString(tag.name),
     slug: normalizeOptionalString(tag.slug),
     description: normalizeOptionalString(tag.description),
-    image_url: normalizeOptionalString(tag.image_url),
+    image_url: resolveSiteAssetUrl(tag.image_url),
     tag_groups: normalizeTagGroups(tag.tag_groups),
     product_count: Number(tag.product_count ?? 0) || 0,
     created_at: asDate(tag.created_at) ?? new Date(0),
@@ -323,7 +330,7 @@ function mapProductVariant(variant: {
     reserved_quantity: variant.reserved_quantity,
     low_stock_threshold: variant.low_stock_threshold,
     weight_grams: variant.weight_grams ? Number(variant.weight_grams.toString()) : null,
-    image_url: normalizeOptionalString(variant.image_url),
+    image_url: resolveSiteAssetUrl(variant.image_url),
     is_default: variant.is_default,
     status: variant.status,
     created_at: variant.created_at,
@@ -395,7 +402,7 @@ function mapProduct(product: {
 
   const galleryImages = product.product_images.map((image) => ({
     id: image.id.toString(),
-    image_url: image.image_url,
+    image_url: resolveSiteAssetUrl(image.image_url),
     alt_text: normalizeOptionalString(image.alt_text),
     sort_order: image.sort_order,
     is_primary: image.is_primary,
@@ -417,8 +424,8 @@ function mapProduct(product: {
     is_featured: product.is_featured,
     base_price: Number(product.base_price.toString()),
     sale_price: product.sale_price ? Number(product.sale_price.toString()) : null,
-    thumbnail_url: normalizeOptionalString(product.thumbnail_url),
-    info_img: normalizeOptionalString(product.info_img),
+    thumbnail_url: resolveSiteAssetUrl(product.thumbnail_url),
+    info_img: resolveSiteAssetUrl(product.info_img),
     rating_average: Number(product.rating_average.toString()),
     rating_count: product.rating_count,
     sold_count: product.sold_count,
@@ -577,7 +584,7 @@ async function syncProductVariants(
       stock_quantity: Number(variant.stock_quantity),
       low_stock_threshold: Number(variant.low_stock_threshold),
       weight_grams: variant.weight_grams ? variant.weight_grams : null,
-      image_url: normalizeNullableString(variant.image_url),
+      image_url: resolveNullableSiteAssetUrlForStorage(variant.image_url),
       is_default: variant.is_default,
       status: variant.status,
     };
@@ -854,6 +861,7 @@ export async function getSrxProductById(productId: string): Promise<SrxProduct |
 export async function createSrxProductCategory(input: SrxProductCategoryMutationInput): Promise<SrxProductCategory> {
   const payload = parseSrxProductCategoryInput(input);
   const slug = await ensureUniqueCategorySlug(slugify(payload.slug || payload.name));
+  const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
 
   const category = await prisma2.product_categories.create({
     data: {
@@ -861,7 +869,7 @@ export async function createSrxProductCategory(input: SrxProductCategoryMutation
       name: payload.name,
       slug,
       description: normalizeNullableString(payload.description),
-      image_url: normalizeNullableString(payload.image_url),
+      image_url: imageUrl,
       is_active: payload.is_active,
       sort_order: payload.sort_order,
     },
@@ -888,6 +896,7 @@ export async function updateSrxProductCategory(
 ): Promise<SrxProductCategory | null> {
   const payload = parseSrxProductCategoryInput(input);
   const numericId = BigInt(categoryId);
+  const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
 
   if (payload.parent_id && payload.parent_id === categoryId) {
     throw new Error("Danh mục cha không được trùng với chính danh mục hiện tại");
@@ -912,7 +921,7 @@ export async function updateSrxProductCategory(
       name: payload.name,
       slug,
       description: normalizeNullableString(payload.description),
-      image_url: normalizeNullableString(payload.image_url),
+      image_url: imageUrl,
       is_active: payload.is_active,
       sort_order: payload.sort_order,
     },
@@ -972,6 +981,7 @@ export async function deleteSrxProductCategory(categoryId: string): Promise<void
 export async function createSrxProductTag(input: SrxProductTagMutationInput): Promise<SrxProductTag> {
   const payload = parseSrxProductTagInput(input);
   const slug = await ensureUniqueTagSlug(slugify(payload.slug || payload.name));
+  const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
   const db = getSrxDB();
   const [result] = await db.execute<ResultSetHeader>(
     `
@@ -982,7 +992,7 @@ export async function createSrxProductTag(input: SrxProductTagMutationInput): Pr
       payload.name,
       slug,
       normalizeNullableString(payload.description),
-      normalizeNullableString(payload.image_url),
+      imageUrl,
       serializeTagGroups(payload.tag_groups),
     ],
   );
@@ -1002,6 +1012,7 @@ export async function updateSrxProductTag(
 ): Promise<SrxProductTag | null> {
   const payload = parseSrxProductTagInput(input);
   const numericId = BigInt(tagId);
+  const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
   const db = getSrxDB();
   const [existingRows] = await db.query<RowDataPacket[]>(
     `
@@ -1033,7 +1044,7 @@ export async function updateSrxProductTag(
       payload.name,
       slug,
       normalizeNullableString(payload.description),
-      normalizeNullableString(payload.image_url),
+      imageUrl,
       serializeTagGroups(payload.tag_groups),
       tagId,
     ],
@@ -1083,7 +1094,9 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
 
   const slug = await ensureUniqueProductSlug(slugify(payload.slug || payload.name));
   const tagIds = [...new Set(payload.tag_ids)].map((tagId) => BigInt(tagId));
-  const galleryImageUrls = normalizeGalleryImageUrls(payload.gallery_image_urls);
+  const thumbnailUrl = resolveSiteAssetUrlForStorage(payload.thumbnail_url);
+  const infoImageUrl = resolveSiteAssetUrlForStorage(payload.info_img);
+  const galleryImageUrls = normalizeGalleryImageUrls(resolveSiteAssetUrlsForStorage(payload.gallery_image_urls));
   const variants = payload.has_variants ? normalizeProductVariants(payload.variants) : [];
   const publishedAt = payload.status === "active" ? (parseOptionalDate(payload.published_at) ?? new Date()) : null;
 
@@ -1104,7 +1117,7 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
         is_featured: payload.is_featured,
         base_price: payload.base_price,
         sale_price: payload.sale_price || null,
-        thumbnail_url: normalizeNullableString(payload.thumbnail_url),
+        thumbnail_url: resolveNullableSiteAssetUrlForStorage(payload.thumbnail_url),
         published_at: publishedAt,
         product_tag_links: tagIds.length
           ? {
@@ -1124,10 +1137,10 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
       tx,
       createdProduct.id,
       payload.name,
-      normalizeOptionalString(payload.thumbnail_url),
+      thumbnailUrl,
       galleryImageUrls,
     );
-    await syncProductInfoImage(tx, createdProduct.id, payload.info_img);
+    await syncProductInfoImage(tx, createdProduct.id, infoImageUrl);
     await syncProductVariants(tx, createdProduct.id, variants);
 
     return tx.products.findUniqueOrThrow({
@@ -1158,7 +1171,7 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
   return mapProduct({
     ...product,
     status: product.status as (typeof srxProductStatusValues)[number],
-    info_img: normalizeNullableString(payload.info_img),
+    info_img: resolveNullableSiteAssetUrl(infoImageUrl),
   });
 }
 
@@ -1180,7 +1193,9 @@ export async function updateSrxProduct(productId: string, input: SrxProductMutat
 
   const slug = await ensureUniqueProductSlug(slugify(payload.slug || payload.name), numericId);
   const tagIds = [...new Set(payload.tag_ids)].map((tagId) => BigInt(tagId));
-  const galleryImageUrls = normalizeGalleryImageUrls(payload.gallery_image_urls);
+  const thumbnailUrl = resolveSiteAssetUrlForStorage(payload.thumbnail_url);
+  const infoImageUrl = resolveSiteAssetUrlForStorage(payload.info_img);
+  const galleryImageUrls = normalizeGalleryImageUrls(resolveSiteAssetUrlsForStorage(payload.gallery_image_urls));
   const variants = payload.has_variants ? normalizeProductVariants(payload.variants) : [];
   const publishedAt =
     payload.status === "active"
@@ -1213,7 +1228,7 @@ export async function updateSrxProduct(productId: string, input: SrxProductMutat
         is_featured: payload.is_featured,
         base_price: payload.base_price,
         sale_price: payload.sale_price || null,
-        thumbnail_url: normalizeNullableString(payload.thumbnail_url),
+        thumbnail_url: resolveNullableSiteAssetUrlForStorage(payload.thumbnail_url),
         published_at: publishedAt,
       },
     });
@@ -1231,10 +1246,10 @@ export async function updateSrxProduct(productId: string, input: SrxProductMutat
       tx,
       numericId,
       payload.name,
-      normalizeOptionalString(payload.thumbnail_url),
+      thumbnailUrl,
       galleryImageUrls,
     );
-    await syncProductInfoImage(tx, numericId, payload.info_img);
+    await syncProductInfoImage(tx, numericId, infoImageUrl);
     await syncProductVariants(tx, numericId, variants);
   });
 

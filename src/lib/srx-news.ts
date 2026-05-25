@@ -5,6 +5,12 @@ import "server-only";
 import { withSrxReadFallback } from "@/lib/srx-db-errors";
 import { prisma2 } from "@/lib/prisma2";
 import {
+  resolveHtmlAssetUrls,
+  resolveHtmlAssetUrlsForStorage,
+  resolveNullableSiteAssetUrlForStorage,
+  resolveSiteAssetUrl,
+} from "@/lib/site-asset-url";
+import {
   parseSrxNewsCategoryInput,
   parseSrxNewsPostInput,
   parseSrxNewsTagInput,
@@ -126,8 +132,8 @@ function mapPost(post: {
     title: post.title,
     slug: post.slug,
     excerpt: normalizeOptionalString(post.excerpt),
-    content: post.content,
-    featured_image_url: normalizeOptionalString(post.featured_image_url),
+    content: resolveHtmlAssetUrls(post.content),
+    featured_image_url: resolveSiteAssetUrl(post.featured_image_url),
     status: post.status,
     is_featured: post.is_featured,
     view_count: post.view_count,
@@ -460,6 +466,8 @@ export async function createSrxNewsPost(input: SrxNewsPostMutationInput): Promis
   const slug = await ensureUniquePostSlug(slugify(payload.slug || payload.title));
   const tagIds = [...new Set(payload.tag_ids)].map((tagId) => BigInt(tagId));
   const publishedAt = payload.status === "published" ? (parseOptionalDate(payload.published_at) ?? new Date()) : null;
+  const normalizedContent = resolveHtmlAssetUrlsForStorage(payload.content);
+  const featuredImageUrl = resolveNullableSiteAssetUrlForStorage(payload.featured_image_url);
 
   const post = await prisma2.posts.create({
     data: {
@@ -467,8 +475,8 @@ export async function createSrxNewsPost(input: SrxNewsPostMutationInput): Promis
       title: payload.title,
       slug,
       excerpt: normalizeNullableString(payload.excerpt),
-      content: payload.content,
-      featured_image_url: normalizeNullableString(payload.featured_image_url),
+      content: normalizedContent,
+      featured_image_url: featuredImageUrl,
       status: payload.status,
       is_featured: payload.is_featured,
       published_at: publishedAt,
@@ -503,6 +511,8 @@ export async function createSrxNewsPost(input: SrxNewsPostMutationInput): Promis
 export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutationInput): Promise<SrxNewsPost | null> {
   const payload = parseSrxNewsPostInput(input);
   const numericId = BigInt(postId);
+  const normalizedContent = resolveHtmlAssetUrlsForStorage(payload.content);
+  const featuredImageUrl = resolveNullableSiteAssetUrlForStorage(payload.featured_image_url);
   const existing = await prisma2.posts.findUnique({
     where: { id: numericId },
     select: { id: true, published_at: true },
@@ -535,8 +545,8 @@ export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutati
         title: payload.title,
         slug,
         excerpt: normalizeNullableString(payload.excerpt),
-        content: payload.content,
-        featured_image_url: normalizeNullableString(payload.featured_image_url),
+        content: normalizedContent,
+        featured_image_url: featuredImageUrl,
         status: payload.status,
         is_featured: payload.is_featured,
         published_at: publishedAt,

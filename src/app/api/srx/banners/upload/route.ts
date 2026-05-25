@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: "Đã tải banner lên",
-      url: `/upload/banner/${filename}`,
+      url: resolveSiteAssetUrl(`/upload/banner/${filename}`),
     });
   } catch (error) {
     return buildApiErrorResponse(error, "Không thể tải banner");

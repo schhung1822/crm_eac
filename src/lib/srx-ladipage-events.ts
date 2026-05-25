@@ -3,6 +3,12 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { defaultConfig } from "@/lib/form-template/defaultConfig";
 import type { FormTemplateConfig } from "@/lib/form-template/types";
+import {
+  resolveNullableSiteAssetUrl,
+  resolveNullableSiteAssetUrlForStorage,
+  resolveSiteAssetUrl,
+  resolveSiteAssetUrlForStorage,
+} from "@/lib/site-asset-url";
 import { getSrxDB } from "@/lib/srx-db";
 
 type SrxLadipageEventStatus = "draft" | "published" | "archived";
@@ -106,6 +112,36 @@ function toJsonString(config: FormTemplateConfig): string {
   return JSON.stringify(config);
 }
 
+function normalizeConfigAssetUrls(config: FormTemplateConfig): FormTemplateConfig {
+  return {
+    ...config,
+    header: {
+      ...config.header,
+      headingImageUrl: resolveSiteAssetUrl(config.header.headingImageUrl),
+    },
+    infoEvent: {
+      ...config.infoEvent,
+      logo1Url: resolveNullableSiteAssetUrl(config.infoEvent.logo1Url) ?? undefined,
+      logo2Url: resolveNullableSiteAssetUrl(config.infoEvent.logo2Url) ?? undefined,
+    },
+  };
+}
+
+function normalizeConfigAssetUrlsForStorage(config: FormTemplateConfig): FormTemplateConfig {
+  return {
+    ...config,
+    header: {
+      ...config.header,
+      headingImageUrl: resolveSiteAssetUrlForStorage(config.header.headingImageUrl),
+    },
+    infoEvent: {
+      ...config.infoEvent,
+      logo1Url: resolveNullableSiteAssetUrlForStorage(config.infoEvent.logo1Url) ?? undefined,
+      logo2Url: resolveNullableSiteAssetUrlForStorage(config.infoEvent.logo2Url) ?? undefined,
+    },
+  };
+}
+
 function isMissingLadipageEventsTableError(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ER_NO_SUCH_TABLE";
 }
@@ -119,6 +155,9 @@ function wrapMissingLadipageEventsTableError(error: unknown): never {
 }
 
 function mapLadipageEvent(row: LadipageEventRow): SrxLadipageEvent {
+  const config = normalizeConfigAssetUrls(toConfig(row.config_json) ?? defaultConfig);
+  const publishedConfig = toConfig(row.published_config_json);
+
   return {
     id: String(row.id),
     name: row.name,
@@ -131,8 +170,8 @@ function mapLadipageEvent(row: LadipageEventRow): SrxLadipageEvent {
     isActive: Boolean(row.is_active),
     templateStyle: row.template_style,
     sortOrder: row.sort_order,
-    config: toConfig(row.config_json) ?? defaultConfig,
-    publishedConfig: toConfig(row.published_config_json),
+    config,
+    publishedConfig: publishedConfig ? normalizeConfigAssetUrls(publishedConfig) : null,
     publishedAt: normalizeDate(row.published_at),
     lastSyncedAt: normalizeDate(row.last_synced_at),
     createdAt: normalizeDate(row.created_at) ?? new Date(),
@@ -243,7 +282,8 @@ export async function ensureDefaultSrxLadipageEvent(): Promise<void> {
 
     const now = new Date();
     const slug = "eac-checkin";
-    const configJson = toJsonString(defaultConfig);
+    const normalizedDefaultConfig = normalizeConfigAssetUrlsForStorage(defaultConfig);
+    const configJson = toJsonString(normalizedDefaultConfig);
 
     await getSrxDB().query(
       `INSERT INTO ladipage_events (
@@ -266,12 +306,12 @@ export async function ensureDefaultSrxLadipageEvent(): Promise<void> {
       [
         "EAC Check-in",
         slug,
-        normalizeEventName("EAC Check-in", defaultConfig),
+        normalizeEventName("EAC Check-in", normalizedDefaultConfig),
         "srx-event-site",
         `/t/${slug}`,
         "published",
         1,
-        defaultConfig.templateStyle ?? "default",
+        normalizedDefaultConfig.templateStyle ?? "default",
         0,
         configJson,
         configJson,
@@ -307,7 +347,8 @@ async function insertLadipageEvent(
   currentSlug: string,
 ): Promise<SrxLadipageEvent> {
   const now = new Date();
-  const configJson = toJsonString(config);
+  const normalizedConfig = normalizeConfigAssetUrlsForStorage(config);
+  const configJson = toJsonString(normalizedConfig);
 
   await getSrxDB().query(
     `INSERT INTO ladipage_events (
@@ -337,7 +378,7 @@ async function insertLadipageEvent(
       `/t/${slug}`,
       "published",
       1,
-      config.templateStyle ?? "default",
+      normalizedConfig.templateStyle ?? "default",
       0,
       configJson,
       configJson,
@@ -365,7 +406,8 @@ async function updateLadipageEvent(
   config: FormTemplateConfig,
 ): Promise<SrxLadipageEvent> {
   const now = new Date();
-  const configJson = toJsonString(config);
+  const normalizedConfig = normalizeConfigAssetUrlsForStorage(config);
+  const configJson = toJsonString(normalizedConfig);
   const currentDefaultPublicPath = `/t/${existingCurrent.slug}`;
   const nextPublicPath =
     !existingCurrent.publicPath || existingCurrent.publicPath === currentDefaultPublicPath
@@ -395,7 +437,7 @@ async function updateLadipageEvent(
       eventName,
       normalizeNullableString(existingCurrent.slug),
       nextPublicPath,
-      config.templateStyle ?? "default",
+      normalizedConfig.templateStyle ?? "default",
       configJson,
       configJson,
       "published",

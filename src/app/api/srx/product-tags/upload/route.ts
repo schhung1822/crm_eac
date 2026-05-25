@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 const MAX_FILE_SIZE = 10 * 2048 * 2048;
 
@@ -51,10 +52,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: "Đã tải ảnh thành phần lên",
-      url: `/upload/products/${filename}`,
+      url: resolveSiteAssetUrl(`/upload/products/${filename}`),
     });
   } catch (error) {
     return buildApiErrorResponse(error, "Không thể tải ảnh thành phần");
   }
 }
-

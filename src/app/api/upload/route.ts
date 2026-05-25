@@ -3,6 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer);
 
     // Return the public URL
-    const url = `/images/${filename}`;
+    const url = resolveSiteAssetUrl(`/images/${filename}`);
 
     return NextResponse.json({ url, success: true });
   } catch (error) {

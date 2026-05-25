@@ -4,6 +4,11 @@ import "server-only";
 
 import { prisma2 } from "@/lib/prisma2";
 import {
+  resolveNullableSiteAssetUrlForStorage,
+  resolveSiteAssetUrl,
+  resolveSiteAssetUrlForStorage,
+} from "@/lib/site-asset-url";
+import {
   parseSrxBannerInput,
   parseSrxDiscountCodeInput,
   parseSrxPaymentMethodInput,
@@ -336,8 +341,8 @@ function mapBanner(banner: {
     title: banner.title,
     slug: banner.slug,
     description: normalizeOptionalString(banner.description),
-    image_url: banner.image_url,
-    mobile_image_url: normalizeOptionalString(banner.mobile_image_url),
+    image_url: resolveSiteAssetUrl(banner.image_url),
+    mobile_image_url: resolveSiteAssetUrl(banner.mobile_image_url),
     alt_text: normalizeOptionalString(banner.alt_text),
     button_label: normalizeOptionalString(banner.button_label),
     link_type: banner.link_type,
@@ -380,7 +385,7 @@ function mapPaymentMethod(paymentMethod: {
     provider: normalizeOptionalString(paymentMethod.provider),
     method_type: paymentMethod.method_type,
     instructions: normalizeOptionalString(paymentMethod.instructions),
-    icon_url: normalizeOptionalString(paymentMethod.icon_url),
+    icon_url: resolveSiteAssetUrl(paymentMethod.icon_url),
     fee_type: paymentMethod.fee_type,
     fee_value: Number(paymentMethod.fee_value.toString()),
     min_order_amount: toNumber(paymentMethod.min_order_amount),
@@ -829,6 +834,8 @@ export async function createSrxBanner(input: SrxBannerMutationInput): Promise<Sr
     const payload = parseSrxBannerInput(input);
     const startsAt = parseOptionalDate(payload.starts_at);
     const endsAt = parseOptionalDate(payload.ends_at);
+    const imageUrl = resolveSiteAssetUrlForStorage(payload.image_url);
+    const mobileImageUrl = resolveNullableSiteAssetUrlForStorage(payload.mobile_image_url);
 
     validateDateRange(startsAt, endsAt);
 
@@ -838,8 +845,8 @@ export async function createSrxBanner(input: SrxBannerMutationInput): Promise<Sr
         title: payload.title,
         slug,
         description: normalizeNullableString(payload.description),
-        image_url: payload.image_url,
-        mobile_image_url: normalizeNullableString(payload.mobile_image_url),
+        image_url: imageUrl,
+        mobile_image_url: mobileImageUrl,
         alt_text: normalizeNullableString(payload.alt_text),
         button_label: normalizeNullableString(payload.button_label),
         link_type: payload.link_type,
@@ -869,6 +876,8 @@ export async function updateSrxBanner(bannerId: string, input: SrxBannerMutation
     const numericId = BigInt(bannerId);
     const startsAt = parseOptionalDate(payload.starts_at);
     const endsAt = parseOptionalDate(payload.ends_at);
+    const imageUrl = resolveSiteAssetUrlForStorage(payload.image_url);
+    const mobileImageUrl = resolveNullableSiteAssetUrlForStorage(payload.mobile_image_url);
 
     validateDateRange(startsAt, endsAt);
 
@@ -890,8 +899,8 @@ export async function updateSrxBanner(bannerId: string, input: SrxBannerMutation
         title: payload.title,
         slug,
         description: normalizeNullableString(payload.description),
-        image_url: payload.image_url,
-        mobile_image_url: normalizeNullableString(payload.mobile_image_url),
+        image_url: imageUrl,
+        mobile_image_url: mobileImageUrl,
         alt_text: normalizeNullableString(payload.alt_text),
         button_label: normalizeNullableString(payload.button_label),
         link_type: payload.link_type,
@@ -932,6 +941,7 @@ export async function createSrxPaymentMethod(input: SrxPaymentMethodMutationInpu
     const payload = parseSrxPaymentMethodInput(input);
     const normalizedCode = normalizeCodeToken(payload.code);
     const { feeValue, maxOrderAmount, minOrderAmount, parsedConfigJson } = validatePaymentMethodPayload(payload);
+    const iconUrl = resolveNullableSiteAssetUrlForStorage(payload.icon_url);
 
     await ensureUniquePaymentMethodCode(normalizedCode);
 
@@ -943,7 +953,7 @@ export async function createSrxPaymentMethod(input: SrxPaymentMethodMutationInpu
         provider: normalizeNullableString(payload.provider),
         method_type: payload.method_type,
         instructions: normalizeNullableString(payload.instructions),
-        icon_url: normalizeNullableString(payload.icon_url),
+        icon_url: iconUrl,
         fee_type: payload.fee_type,
         fee_value: feeValue,
         min_order_amount: minOrderAmount,
@@ -973,6 +983,7 @@ export async function updateSrxPaymentMethod(
     const numericId = BigInt(paymentMethodId);
     const normalizedCode = normalizeCodeToken(payload.code);
     const { feeValue, maxOrderAmount, minOrderAmount, parsedConfigJson } = validatePaymentMethodPayload(payload);
+    const iconUrl = resolveNullableSiteAssetUrlForStorage(payload.icon_url);
 
     const existing = await prisma2.payment_methods.findUnique({
       where: { id: numericId },
@@ -996,7 +1007,7 @@ export async function updateSrxPaymentMethod(
         provider: normalizeNullableString(payload.provider),
         method_type: payload.method_type,
         instructions: normalizeNullableString(payload.instructions),
-        icon_url: normalizeNullableString(payload.icon_url),
+        icon_url: iconUrl,
         fee_type: payload.fee_type,
         fee_value: feeValue,
         min_order_amount: minOrderAmount,

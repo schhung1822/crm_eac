@@ -20,6 +20,7 @@ import {
   ImageResize,
   ImageStyle,
   ImageToolbar,
+  ImageUpload,
   Italic,
   Link,
   List,
@@ -31,6 +32,7 @@ import {
   Table,
   TableToolbar,
   Underline,
+  type Editor,
   type EditorConfig,
 } from "ckeditor5";
 import viTranslations from "ckeditor5/translations/vi.js";
@@ -42,7 +44,62 @@ export type CkeditorContentEditorProps = {
   value: string;
 };
 
+type UploadAdapter = {
+  abort: () => void;
+  upload: () => Promise<{ default: string }>;
+};
+
+type UploadLoader = {
+  file: Promise<File | null>;
+};
+
+class NewsContentImageUploadAdapter implements UploadAdapter {
+  private readonly abortController = new AbortController();
+
+  constructor(private readonly loader: UploadLoader) {}
+
+  abort() {
+    this.abortController.abort();
+  }
+
+  async upload(): Promise<{ default: string }> {
+    const file = await this.loader.file;
+
+    if (!(file instanceof File)) {
+      throw new Error("Khong the doc file anh de tai len");
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/srx/news/upload", {
+      method: "POST",
+      body: formData,
+      signal: this.abortController.signal,
+    });
+
+    const result = (await response.json().catch(() => null)) as { message?: string; url?: string } | null;
+
+    if (!response.ok || !result?.url) {
+      throw new Error(result?.message ?? "Khong the tai anh trong noi dung bai viet");
+    }
+
+    return {
+      default: result.url,
+    };
+  }
+}
+
+function attachNewsContentUploadAdapter(editor: Editor) {
+  const fileRepository = editor.plugins.get("FileRepository") as {
+    createUploadAdapter?: (loader: UploadLoader) => UploadAdapter;
+  };
+
+  fileRepository.createUploadAdapter = (loader) => new NewsContentImageUploadAdapter(loader);
+}
+
 const baseConfig = {
+  extraPlugins: [attachNewsContentUploadAdapter],
   htmlSupport: {
     allow: [{ attributes: true, classes: true, name: /.*/, styles: true }],
   },
@@ -77,6 +134,7 @@ const baseConfig = {
     ImageResize,
     ImageStyle,
     ImageToolbar,
+    ImageUpload,
     Italic,
     Link,
     List,
