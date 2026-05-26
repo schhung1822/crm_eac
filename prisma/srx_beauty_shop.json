@@ -92,7 +92,7 @@
       "name": "VARCHAR(200)",
       "slug": "VARCHAR(220)",
       "product_code": "VARCHAR(50)",
-      "short_description": "VARCHAR(500)",
+      "short_description": "LONGTEXT",
       "description": "LONGTEXT",
       "usage_instructions": "TEXT",
       "ingredient_list": "TEXT",

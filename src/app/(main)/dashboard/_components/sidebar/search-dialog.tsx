@@ -3,7 +3,7 @@ import * as React from "react";
 
 import Link from "next/link";
 
-import { LayoutDashboard, Search, Calendar1, User } from "lucide-react";
+import { Calendar1, FolderOpen, LayoutDashboard, Search, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ const searchItems = [
   // { group: "Báo cáo", icon: ShoppingBag, label: "Trenđing", disabled: true, url: "/dashboard/trending" },
   // { group: "Báo cáo", icon: GraduationCap, label: "Zalo OA", disabled: true, url: "/dashboard/zaloOA" },
   { group: "Quản lý", icon: LayoutDashboard, label: "Ladipage sự kiện", disabled: true, url: "/srx/ladipage-events" },
+  { group: "Quản lý", icon: FolderOpen, label: "Thư viện ảnh", disabled: true, url: "/srx/media-library" },
   { group: "Quản lý", icon: Calendar1, label: "Thông tin sự kiện", disabled: true, url: "/events" },
   { group: "Quản lý", icon: User, label: "Zalo OA", disabled: true, url: "/zalo-oa" },
   { group: "Thông tin", label: "Thông báo dịch vụ", url: "/noti/service-notifications" },

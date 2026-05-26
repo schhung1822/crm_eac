@@ -661,7 +661,7 @@ model products {
   name                     String                     @db.VarChar(200)
   slug                     String                     @unique(map: "uq_products_slug") @db.VarChar(220)
   product_code             String                     @unique(map: "uq_products_product_code") @db.VarChar(50)
-  short_description        String?                    @db.VarChar(500)
+  short_description        String?                    @db.LongText
   description              String?                    @db.LongText
   usage_instructions       String?                    @db.Text
   ingredient_list          String?                    @db.Text

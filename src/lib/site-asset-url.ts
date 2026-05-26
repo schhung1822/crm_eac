@@ -18,16 +18,6 @@ function getNormalizedSiteUrl(): string | null {
   }
 }
 
-function getRequiredSiteUrl(): string {
-  const siteUrl = getNormalizedSiteUrl();
-
-  if (!siteUrl) {
-    throw new Error("NEXT_PUBLIC_SITE_URL chua duoc cau hinh hop le trong file .env");
-  }
-
-  return siteUrl;
-}
-
 function isAbsoluteUrl(value: string): boolean {
   return ABSOLUTE_URL_PATTERN.test(value) || value.startsWith("//");
 }
@@ -139,7 +129,14 @@ export function resolveSiteAssetUrlForStorage(value: string | null | undefined):
     return trimmedValue;
   }
 
-  return `${getRequiredSiteUrl()}${normalizeRelativeAssetPath(trimmedValue)}`;
+  const normalizedPath = normalizeRelativeAssetPath(trimmedValue);
+  const siteUrl = getNormalizedSiteUrl();
+
+  if (!siteUrl) {
+    return normalizedPath;
+  }
+
+  return `${siteUrl}${normalizedPath}`;
 }
 
 export function resolveNullableSiteAssetUrlForStorage(value: string | null | undefined): string | null {

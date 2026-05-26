@@ -14,7 +14,7 @@ const PUBLIC_ROUTES = [
 ];
 const AUTH_ROUTES = ["/auth/v2/login"];
 
-export async function proxy(request: NextRequest) {
+export async function appProxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("auth-token")?.value;
 
@@ -61,6 +61,6 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = {
+export const appProxyConfig = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.[^/]+$).*)"],
 };

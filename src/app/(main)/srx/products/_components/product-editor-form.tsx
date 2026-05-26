@@ -136,6 +136,38 @@ function getStatusLabel(status: ProductFormState["status"]): string {
   }
 }
 
+function getApiErrorMessage(result: unknown, fallbackMessage: string): string {
+  if (!result || typeof result !== "object") {
+    return fallbackMessage;
+  }
+
+  const message = "message" in result && typeof result.message === "string" ? result.message : "";
+
+  if ("issues" in result && Array.isArray(result.issues) && result.issues.length > 0) {
+    const issueSummary = result.issues
+      .map((issue) => {
+        if (!issue || typeof issue !== "object" || !("message" in issue) || typeof issue.message !== "string") {
+          return "";
+        }
+
+        const fieldPath =
+          "path" in issue && Array.isArray(issue.path) && issue.path.length > 0
+            ? issue.path.map((segment: unknown) => String(segment)).join(".")
+            : "";
+
+        return fieldPath ? `${fieldPath}: ${issue.message}` : issue.message;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    if (issueSummary) {
+      return message ? `${message}\n${issueSummary}` : issueSummary;
+    }
+  }
+
+  return message || fallbackMessage;
+}
+
 function buildFormState(product: SrxProduct | null): ProductFormState {
   if (!product) {
     return emptyFormState;
@@ -457,7 +489,8 @@ export function ProductEditorForm({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result?.message ?? "Không thể lưu sản phẩm");
+        console.error("Product save failed", result);
+        throw new Error(getApiErrorMessage(result, "Không thể lưu sản phẩm"));
       }
 
       toast.success(isEditing ? "Đã cập nhật sản phẩm" : "Đã tạo sản phẩm mới");

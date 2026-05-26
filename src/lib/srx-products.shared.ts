@@ -196,7 +196,7 @@ const srxProductMutationSchema = z.object({
   name: z.string().trim().min(3).max(200),
   slug: z.string().trim().max(220).optional().default(""),
   product_code: z.string().trim().min(1).max(50),
-  short_description: z.string().trim().max(500).optional().default(""),
+  short_description: z.string().trim().optional().default(""),
   description: z.string().optional().default(""),
   usage_instructions: z.string().trim().max(5000).optional().default(""),
   ingredient_list: z.string().trim().max(5000).optional().default(""),
