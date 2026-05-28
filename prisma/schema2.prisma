@@ -864,6 +864,7 @@ enum banners_position {
   category_sidebar
   popup
   header_strip
+  banner_product
 }
 
 enum ladipage_events_status {

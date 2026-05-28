@@ -31,6 +31,8 @@ function getPositionLabel(position: SrxBanner["position"]): string {
       return "Popup";
     case "header_strip":
       return "Thanh đầu trang";
+    case "banner_product":
+      return "Banner trang san pham";
     default:
       return position;
   }

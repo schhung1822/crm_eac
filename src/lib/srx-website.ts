@@ -13,8 +13,6 @@ import {
   parseSrxDiscountCodeInput,
   parseSrxPaymentMethodInput,
   srxBannerSchema,
-  srxBannerPositionValues,
-  srxBannerLinkTypeValues,
   srxDiscountCodeScopeValues,
   srxDiscountCodeSchema,
   srxDiscountCodeTypeValues,
@@ -325,14 +323,14 @@ function mapBanner(banner: {
   mobile_image_url: string | null;
   alt_text: string | null;
   button_label: string | null;
-  link_type: (typeof srxBannerLinkTypeValues)[number];
+  link_type: string;
   link_target: string | null;
-  position: (typeof srxBannerPositionValues)[number];
-  open_in_new_tab: boolean;
+  position: string;
+  open_in_new_tab: boolean | number;
   sort_order: number;
   starts_at: Date | null;
   ends_at: Date | null;
-  is_active: boolean;
+  is_active: boolean | number;
   created_at: Date;
   updated_at: Date;
 }): SrxBanner {
@@ -348,14 +346,95 @@ function mapBanner(banner: {
     link_type: banner.link_type,
     link_target: normalizeOptionalString(banner.link_target),
     position: banner.position,
-    open_in_new_tab: banner.open_in_new_tab,
+    open_in_new_tab: Boolean(banner.open_in_new_tab),
     sort_order: banner.sort_order,
     starts_at: banner.starts_at,
     ends_at: banner.ends_at,
-    is_active: banner.is_active,
+    is_active: Boolean(banner.is_active),
     created_at: banner.created_at,
     updated_at: banner.updated_at,
   });
+}
+
+type BannerQueryClient = Pick<typeof prisma2, "$executeRaw" | "$queryRaw">;
+
+type BannerRow = {
+  id: bigint;
+  title: string;
+  slug: string;
+  description: string | null;
+  image_url: string;
+  mobile_image_url: string | null;
+  alt_text: string | null;
+  button_label: string | null;
+  link_type: string;
+  link_target: string | null;
+  position: string;
+  open_in_new_tab: boolean | number;
+  sort_order: number;
+  starts_at: Date | null;
+  ends_at: Date | null;
+  is_active: boolean | number;
+  created_at: Date;
+  updated_at: Date;
+};
+
+async function getBannerByIdRaw(bannerId: bigint, client: BannerQueryClient = prisma2): Promise<BannerRow | null> {
+  const banners = await client.$queryRaw<BannerRow[]>(Prisma.sql`
+    SELECT
+      id,
+      title,
+      slug,
+      description,
+      image_url,
+      mobile_image_url,
+      alt_text,
+      button_label,
+      link_type,
+      link_target,
+      position,
+      open_in_new_tab,
+      sort_order,
+      starts_at,
+      ends_at,
+      is_active,
+      created_at,
+      updated_at
+    FROM banners
+    WHERE id = ${bannerId}
+    LIMIT 1
+  `);
+
+  return banners[0] ?? null;
+}
+
+async function getBannerBySlugRaw(slug: string, client: BannerQueryClient = prisma2): Promise<BannerRow | null> {
+  const banners = await client.$queryRaw<BannerRow[]>(Prisma.sql`
+    SELECT
+      id,
+      title,
+      slug,
+      description,
+      image_url,
+      mobile_image_url,
+      alt_text,
+      button_label,
+      link_type,
+      link_target,
+      position,
+      open_in_new_tab,
+      sort_order,
+      starts_at,
+      ends_at,
+      is_active,
+      created_at,
+      updated_at
+    FROM banners
+    WHERE slug = ${slug}
+    LIMIT 1
+  `);
+
+  return banners[0] ?? null;
 }
 
 function mapPaymentMethod(paymentMethod: {
@@ -509,17 +588,31 @@ export async function getSrxDiscountCodes(): Promise<SrxDiscountCode[]> {
 
 export async function getSrxBanners(): Promise<SrxBanner[]> {
   try {
-    const banners = await prisma2.banners.findMany({
-      orderBy: [{ sort_order: "asc" }, { created_at: "desc" }],
-    });
+    const banners = await prisma2.$queryRaw<BannerRow[]>(Prisma.sql`
+      SELECT
+        id,
+        title,
+        slug,
+        description,
+        image_url,
+        mobile_image_url,
+        alt_text,
+        button_label,
+        link_type,
+        link_target,
+        position,
+        open_in_new_tab,
+        sort_order,
+        starts_at,
+        ends_at,
+        is_active,
+        created_at,
+        updated_at
+      FROM banners
+      ORDER BY sort_order ASC, created_at DESC
+    `);
 
-    return banners.map((banner) =>
-      mapBanner({
-        ...banner,
-        link_type: banner.link_type as (typeof srxBannerLinkTypeValues)[number],
-        position: banner.position as (typeof srxBannerPositionValues)[number],
-      }),
-    );
+    return banners.map((banner) => mapBanner(banner));
   } catch (error) {
     if (isMissingWebsiteTableError(error)) {
       return [];
@@ -840,31 +933,52 @@ export async function createSrxBanner(input: SrxBannerMutationInput): Promise<Sr
     validateDateRange(startsAt, endsAt);
 
     const slug = await ensureUniqueBannerSlug(slugify(payload.slug || payload.title));
-    const banner = await prisma2.banners.create({
-      data: {
-        title: payload.title,
-        slug,
-        description: normalizeNullableString(payload.description),
-        image_url: imageUrl,
-        mobile_image_url: mobileImageUrl,
-        alt_text: normalizeNullableString(payload.alt_text),
-        button_label: normalizeNullableString(payload.button_label),
-        link_type: payload.link_type,
-        link_target: normalizeNullableString(payload.link_target),
-        position: payload.position,
-        open_in_new_tab: payload.open_in_new_tab,
-        sort_order: payload.sort_order,
-        starts_at: startsAt,
-        ends_at: endsAt,
-        is_active: payload.is_active,
-      },
+    const banner = await prisma2.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO banners (
+          title,
+          slug,
+          description,
+          image_url,
+          mobile_image_url,
+          alt_text,
+          button_label,
+          link_type,
+          link_target,
+          position,
+          open_in_new_tab,
+          sort_order,
+          starts_at,
+          ends_at,
+          is_active
+        )
+        VALUES (
+          ${payload.title},
+          ${slug},
+          ${normalizeNullableString(payload.description)},
+          ${imageUrl},
+          ${mobileImageUrl},
+          ${normalizeNullableString(payload.alt_text)},
+          ${normalizeNullableString(payload.button_label)},
+          ${payload.link_type},
+          ${normalizeNullableString(payload.link_target)},
+          ${payload.position},
+          ${payload.open_in_new_tab},
+          ${payload.sort_order},
+          ${startsAt},
+          ${endsAt},
+          ${payload.is_active}
+        )
+      `);
+
+      return getBannerBySlugRaw(slug, tx);
     });
 
-    return mapBanner({
-      ...banner,
-      link_type: banner.link_type as (typeof srxBannerLinkTypeValues)[number],
-      position: banner.position as (typeof srxBannerPositionValues)[number],
-    });
+    if (!banner) {
+      throw new Error("Khong the tao banner");
+    }
+
+    return mapBanner(banner);
   } catch (error) {
     wrapMissingTableError(error);
   }
@@ -881,44 +995,42 @@ export async function updateSrxBanner(bannerId: string, input: SrxBannerMutation
 
     validateDateRange(startsAt, endsAt);
 
-    const existing = await prisma2.banners.findUnique({
-      where: { id: numericId },
-      select: { id: true },
-    });
+    const existing = await getBannerByIdRaw(numericId);
 
     if (!existing) {
       return null;
     }
 
     const slug = await ensureUniqueBannerSlug(slugify(payload.slug || payload.title), numericId);
-    const banner = await prisma2.banners.update({
-      where: {
-        id: numericId,
-      },
-      data: {
-        title: payload.title,
-        slug,
-        description: normalizeNullableString(payload.description),
-        image_url: imageUrl,
-        mobile_image_url: mobileImageUrl,
-        alt_text: normalizeNullableString(payload.alt_text),
-        button_label: normalizeNullableString(payload.button_label),
-        link_type: payload.link_type,
-        link_target: normalizeNullableString(payload.link_target),
-        position: payload.position,
-        open_in_new_tab: payload.open_in_new_tab,
-        sort_order: payload.sort_order,
-        starts_at: startsAt,
-        ends_at: endsAt,
-        is_active: payload.is_active,
-      },
-    });
+    await prisma2.$executeRaw(Prisma.sql`
+      UPDATE banners
+      SET
+        title = ${payload.title},
+        slug = ${slug},
+        description = ${normalizeNullableString(payload.description)},
+        image_url = ${imageUrl},
+        mobile_image_url = ${mobileImageUrl},
+        alt_text = ${normalizeNullableString(payload.alt_text)},
+        button_label = ${normalizeNullableString(payload.button_label)},
+        link_type = ${payload.link_type},
+        link_target = ${normalizeNullableString(payload.link_target)},
+        position = ${payload.position},
+        open_in_new_tab = ${payload.open_in_new_tab},
+        sort_order = ${payload.sort_order},
+        starts_at = ${startsAt},
+        ends_at = ${endsAt},
+        is_active = ${payload.is_active},
+        updated_at = NOW()
+      WHERE id = ${numericId}
+    `);
 
-    return mapBanner({
-      ...banner,
-      link_type: banner.link_type as (typeof srxBannerLinkTypeValues)[number],
-      position: banner.position as (typeof srxBannerPositionValues)[number],
-    });
+    const banner = await getBannerByIdRaw(numericId);
+
+    if (!banner) {
+      return null;
+    }
+
+    return mapBanner(banner);
   } catch (error) {
     wrapMissingTableError(error);
   }
@@ -926,11 +1038,10 @@ export async function updateSrxBanner(bannerId: string, input: SrxBannerMutation
 
 export async function deleteSrxBanner(bannerId: string): Promise<void> {
   try {
-    await prisma2.banners.delete({
-      where: {
-        id: BigInt(bannerId),
-      },
-    });
+    await prisma2.$executeRaw(Prisma.sql`
+      DELETE FROM banners
+      WHERE id = ${BigInt(bannerId)}
+    `);
   } catch (error) {
     wrapMissingTableError(error);
   }

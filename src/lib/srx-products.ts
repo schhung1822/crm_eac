@@ -6,6 +6,8 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { prisma2 } from "@/lib/prisma2";
 import {
+  resolveHtmlAssetUrls,
+  resolveHtmlAssetUrlsForStorage,
   resolveNullableSiteAssetUrl,
   resolveNullableSiteAssetUrlForStorage,
   resolveSiteAssetUrl,
@@ -22,7 +24,6 @@ import {
   srxProductCategorySchema,
   srxProductSchema,
   srxProductStatusValues,
-  srxProductTagGroupValues,
   srxProductTagSchema,
   type SrxProduct,
   type SrxProductBrand,
@@ -30,6 +31,7 @@ import {
   type SrxProductCategoryMutationInput,
   type SrxProductMutationInput,
   type SrxProductTag,
+  type SrxProductTagOptionCatalog,
   type SrxProductTagMutationInput,
   type SrxProductVariant,
   type SrxProductVariantMutationInput,
@@ -49,6 +51,53 @@ function normalizeNullableString(value: string | null | undefined): string | nul
 function normalizeNullableBigInt(value: string | null | undefined): bigint | null {
   const trimmed = value?.trim() ?? "";
   return trimmed ? BigInt(trimmed) : null;
+}
+
+function normalizeNullableNumber(value: string | null | undefined): number | null {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const numericValue = Number(trimmed);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function normalizeStringArray(values: readonly (string | null | undefined)[]): string[] {
+  const normalizedValues: string[] = [];
+  const seen = new Set<string>();
+
+  for (const rawValue of values) {
+    const value = String(rawValue ?? "").trim();
+
+    if (!value || seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    normalizedValues.push(value);
+  }
+
+  return normalizedValues;
+}
+
+function sortOptionValues(values: readonly string[]): string[] {
+  return [...values].sort((left, right) => left.localeCompare(right, "vi"));
+}
+
+function normalizeDelimitedValues(value: string | null | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return normalizeStringArray(value.split(","));
+}
+
+function serializeDelimitedValues(values: readonly string[]): string | null {
+  const normalizedValues = normalizeStringArray(values);
+
+  return normalizedValues.length > 0 ? normalizedValues.join(",") : null;
 }
 
 function asDate(value: Date | string | null): Date | null {
@@ -89,7 +138,6 @@ function parseOptionalDate(value: string | null | undefined): Date | null {
   return date;
 }
 
-type SrxProductTagGroup = (typeof srxProductTagGroupValues)[number];
 type SrxProductVariantStatus = "active" | "inactive";
 
 type SrxProductTagRow = RowDataPacket & {
@@ -97,6 +145,9 @@ type SrxProductTagRow = RowDataPacket & {
   name: string | null;
   slug: string | null;
   description: string | null;
+  desc_long: string | null;
+  class_name: string | null;
+  stars: number | string | null;
   image_url: string | null;
   tag_groups: string | null;
   product_count: number | string | null;
@@ -108,7 +159,10 @@ type ProductInfoImageRow = RowDataPacket & {
   info_img: string | null;
 };
 
-const srxProductTagGroupSet = new Set<SrxProductTagGroup>(srxProductTagGroupValues);
+type ProductTagOptionRow = RowDataPacket & {
+  class_name: string | null;
+  tag_groups: string | null;
+};
 
 const srxProductTagsBaseQuery = `
   SELECT
@@ -116,6 +170,9 @@ const srxProductTagsBaseQuery = `
     t.name,
     t.slug,
     t.\`desc\` AS description,
+    t.desc_long,
+    t.\`class\` AS class_name,
+    t.stars,
     t.img AS image_url,
     t.\`Tags\` AS tag_groups,
     t.created_at,
@@ -132,26 +189,12 @@ const srxProductTagsBaseQuery = `
   ) tag_stats ON tag_stats.tag_id = t.id
 `;
 
-function normalizeTagGroups(value: string | null | undefined): SrxProductTagGroup[] {
-  if (!value) {
-    return [];
-  }
-
-  const selectedGroups = new Set(
-    value
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item): item is SrxProductTagGroup => srxProductTagGroupSet.has(item as SrxProductTagGroup)),
-  );
-
-  return srxProductTagGroupValues.filter((item) => selectedGroups.has(item));
+function normalizeTagGroups(value: string | null | undefined): string[] {
+  return normalizeDelimitedValues(value);
 }
 
-function serializeTagGroups(values: readonly SrxProductTagGroup[]): string | null {
-  const selectedGroups = new Set(values);
-  const orderedGroups = srxProductTagGroupValues.filter((item) => selectedGroups.has(item));
-
-  return orderedGroups.length > 0 ? orderedGroups.join(",") : null;
+function serializeTagGroups(values: readonly string[]): string | null {
+  return serializeDelimitedValues(values);
 }
 
 function normalizeGalleryImageUrls(values: string[]): string[] {
@@ -189,7 +232,9 @@ function validateVariantPricing(variant: SrxProductVariantMutationInput): void {
   }
 }
 
-function normalizeProductVariants(variants: readonly SrxProductVariantMutationInput[]): SrxProductVariantMutationInput[] {
+function normalizeProductVariants(
+  variants: readonly SrxProductVariantMutationInput[],
+): SrxProductVariantMutationInput[] {
   const normalizedVariants = variants.map((variant) => ({
     ...variant,
     id: variant.id.trim(),
@@ -276,6 +321,9 @@ function mapTag(tag: SrxProductTagRow): SrxProductTag {
     name: normalizeOptionalString(tag.name),
     slug: normalizeOptionalString(tag.slug),
     description: normalizeOptionalString(tag.description),
+    desc_long: resolveHtmlAssetUrls(tag.desc_long),
+    class: normalizeDelimitedValues(tag.class_name),
+    stars: normalizeNullableNumber(tag.stars === null ? null : String(tag.stars)),
     image_url: resolveSiteAssetUrl(tag.image_url),
     tag_groups: normalizeTagGroups(tag.tag_groups),
     product_count: Number(tag.product_count ?? 0) || 0,
@@ -559,7 +607,9 @@ async function syncProductVariants(
   });
 
   const existingVariantIds = new Set(existingVariants.map((variant) => variant.id.toString()));
-  const retainedVariantIds = variants.flatMap((variant) => (variant.id && existingVariantIds.has(variant.id) ? [BigInt(variant.id)] : []));
+  const retainedVariantIds = variants.flatMap((variant) =>
+    variant.id && existingVariantIds.has(variant.id) ? [BigInt(variant.id)] : [],
+  );
 
   await tx.product_variants.deleteMany({
     where: {
@@ -763,7 +813,25 @@ export async function getSrxProductTags(): Promise<SrxProductTag[]> {
   });
 }
 
-async function getSrxProductTagById(tagId: string): Promise<SrxProductTag | null> {
+export async function getSrxProductTagOptionCatalog(): Promise<SrxProductTagOptionCatalog> {
+  return withSrxReadFallback("product tag option catalog", { benefitOptions: [], classOptions: [] }, async () => {
+    const db = getSrxDB();
+    const [rows] = await db.query<ProductTagOptionRow[]>(`
+        SELECT
+          t.\`class\` AS class_name,
+          t.\`Tags\` AS tag_groups
+        FROM product_tags t
+        ORDER BY t.id ASC
+      `);
+
+    return {
+      benefitOptions: sortOptionValues(rows.flatMap((row) => normalizeTagGroups(row.tag_groups))),
+      classOptions: sortOptionValues(rows.flatMap((row) => normalizeDelimitedValues(row.class_name))),
+    };
+  });
+}
+
+export async function getSrxProductTagById(tagId: string): Promise<SrxProductTag | null> {
   const db = getSrxDB();
   const [rows] = await db.query<SrxProductTagRow[]>(
     `
@@ -982,16 +1050,21 @@ export async function createSrxProductTag(input: SrxProductTagMutationInput): Pr
   const payload = parseSrxProductTagInput(input);
   const slug = await ensureUniqueTagSlug(slugify(payload.slug || payload.name));
   const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
+  const normalizedDescLong = resolveHtmlAssetUrlsForStorage(payload.desc_long);
+  const stars = normalizeNullableNumber(payload.stars);
   const db = getSrxDB();
   const [result] = await db.execute<ResultSetHeader>(
     `
-      INSERT INTO product_tags (name, slug, \`desc\`, img, \`Tags\`)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO product_tags (name, slug, \`desc\`, desc_long, \`class\`, stars, img, \`Tags\`)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       payload.name,
       slug,
       normalizeNullableString(payload.description),
+      normalizedDescLong || null,
+      serializeDelimitedValues(payload.class),
+      stars,
       imageUrl,
       serializeTagGroups(payload.tag_groups),
     ],
@@ -1013,6 +1086,8 @@ export async function updateSrxProductTag(
   const payload = parseSrxProductTagInput(input);
   const numericId = BigInt(tagId);
   const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
+  const normalizedDescLong = resolveHtmlAssetUrlsForStorage(payload.desc_long);
+  const stars = normalizeNullableNumber(payload.stars);
   const db = getSrxDB();
   const [existingRows] = await db.query<RowDataPacket[]>(
     `
@@ -1036,6 +1111,9 @@ export async function updateSrxProductTag(
         name = ?,
         slug = ?,
         \`desc\` = ?,
+        desc_long = ?,
+        \`class\` = ?,
+        stars = ?,
         img = ?,
         \`Tags\` = ?
       WHERE id = ?
@@ -1044,6 +1122,9 @@ export async function updateSrxProductTag(
       payload.name,
       slug,
       normalizeNullableString(payload.description),
+      normalizedDescLong || null,
+      serializeDelimitedValues(payload.class),
+      stars,
       imageUrl,
       serializeTagGroups(payload.tag_groups),
       tagId,
@@ -1133,13 +1214,7 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
       },
     });
 
-    await syncProductGalleryImages(
-      tx,
-      createdProduct.id,
-      payload.name,
-      thumbnailUrl,
-      galleryImageUrls,
-    );
+    await syncProductGalleryImages(tx, createdProduct.id, payload.name, thumbnailUrl, galleryImageUrls);
     await syncProductInfoImage(tx, createdProduct.id, infoImageUrl);
     await syncProductVariants(tx, createdProduct.id, variants);
 
@@ -1242,13 +1317,7 @@ export async function updateSrxProduct(productId: string, input: SrxProductMutat
       });
     }
 
-    await syncProductGalleryImages(
-      tx,
-      numericId,
-      payload.name,
-      thumbnailUrl,
-      galleryImageUrls,
-    );
+    await syncProductGalleryImages(tx, numericId, payload.name, thumbnailUrl, galleryImageUrls);
     await syncProductInfoImage(tx, numericId, infoImageUrl);
     await syncProductVariants(tx, numericId, variants);
   });

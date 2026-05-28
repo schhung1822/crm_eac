@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { getSrxProductTags } from "@/lib/srx-products";
 
-import { TagsManager } from "../products/_components/tags-manager";
+import { TagsManager } from "./_components/tags-manager";
 
 export const metadata: Metadata = {
   title: "Từ điển thành phần",

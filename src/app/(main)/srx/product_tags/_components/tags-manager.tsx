@@ -2,6 +2,8 @@
 
 import * as React from "react";
 
+import Link from "next/link";
+
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,20 +16,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { filterBySearchTerm } from "@/lib/search-utils";
-import { parseSrxProductTag, type SrxProductTag, type SrxProductTagMutationInput } from "@/lib/srx-products.shared";
-
-import { TagFormDialog } from "./tag-form-dialog";
+import { type SrxProductTag } from "@/lib/srx-products.shared";
 
 function sortTags(tags: SrxProductTag[]): SrxProductTag[] {
   return [...tags].sort((left, right) => left.name.localeCompare(right.name, "vi"));
 }
 
+function stripHtml(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
   const [tags, setTags] = React.useState<SrxProductTag[]>(sortTags(initialTags));
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editingTag, setEditingTag] = React.useState<SrxProductTag | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
 
   const filteredTags = React.useMemo(() => {
@@ -35,47 +39,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       tag.name,
       tag.slug,
       tag.description,
+      stripHtml(tag.desc_long),
       tag.image_url,
+      tag.class,
       tag.tag_groups,
+      tag.stars?.toString() ?? "",
     ]);
   }, [tags, searchTerm]);
-
-  const handleSubmit = React.useCallback(
-    async (value: SrxProductTagMutationInput) => {
-      try {
-        setIsSubmitting(true);
-
-        const response = await fetch(editingTag ? `/api/srx/product-tags/${editingTag.id}` : "/api/srx/product-tags", {
-          method: editingTag ? "PATCH" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(value),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result?.message ?? "Không thể lưu thành phần");
-        }
-
-        const tag = parseSrxProductTag(result.tag);
-
-        setTags((current) =>
-          sortTags(editingTag ? current.map((item) => (item.id === editingTag.id ? tag : item)) : [...current, tag]),
-        );
-
-        toast.success(editingTag ? "Đã cập nhật thành phần" : "Đã tạo thành phần mới");
-        setFormOpen(false);
-        setEditingTag(null);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Không thể lưu thành phần");
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [editingTag],
-  );
 
   const deleteTagRequest = React.useCallback(async (tagId: string) => {
     const response = await fetch(`/api/srx/product-tags/${tagId}`, {
@@ -84,22 +54,22 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result?.message ?? "Không thể xóa thành phần");
+      throw new Error(result?.message ?? "Khong the xoa thanh phan");
     }
   }, []);
 
   const handleDelete = React.useCallback(
     async (tag: SrxProductTag) => {
-      if (!window.confirm(`Xóa thành phần "${tag.name}"?`)) {
+      if (!window.confirm(`Xoa thanh phan "${tag.name}"?`)) {
         return;
       }
 
       try {
         await deleteTagRequest(tag.id);
         setTags((current) => current.filter((item) => item.id !== tag.id));
-        toast.success("Đã xóa thành phần");
+        toast.success("Da xoa thanh phan");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Không thể xóa thành phần");
+        toast.error(error instanceof Error ? error.message : "Khong the xoa thanh phan");
       }
     },
     [deleteTagRequest],
@@ -114,7 +84,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
             <Checkbox
               checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
               onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-              aria-label="Chọn tất cả thành phần"
+              aria-label="Chon tat ca thanh phan"
             />
           </div>
         ),
@@ -123,7 +93,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
             <Checkbox
               checked={row.getIsSelected()}
               onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label={`Chọn thành phần ${row.original.name}`}
+              aria-label={`Chon thanh phan ${row.original.name}`}
             />
           </div>
         ),
@@ -132,18 +102,43 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       },
       {
         accessorKey: "name",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Thành phần" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Thanh phan" />,
         cell: ({ row }) => (
           <div className="space-y-1">
-            <div className="font-medium">{row.original.name}</div>
+            <Link className="font-medium" href={`/srx/product_tags/${row.original.id}/edit`}>
+              {row.original.name}
+            </Link>
             <div className="text-muted-foreground text-xs">{row.original.slug}</div>
           </div>
         ),
         enableSorting: false,
       },
       {
+        accessorKey: "class",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Phan loai" />,
+        cell: ({ row }) =>
+          row.original.class.length > 0 ? (
+            <div className="flex max-w-[320px] flex-wrap gap-1">
+              {row.original.class.map((value) => (
+                <Badge key={value} variant="outline" className="text-left leading-4 whitespace-normal">
+                  {value}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-muted-foreground text-sm">Chua co</span>
+          ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "stars",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Danh gia" />,
+        cell: ({ row }) => <span>{row.original.stars ?? "-"}</span>,
+        enableSorting: false,
+      },
+      {
         accessorKey: "tag_groups",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Phân nhóm" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Loi ich" />,
         cell: ({ row }) =>
           row.original.tag_groups.length > 0 ? (
             <div className="flex max-w-[320px] flex-wrap gap-1">
@@ -154,23 +149,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
               ))}
             </div>
           ) : (
-            <span className="text-muted-foreground text-sm">Chưa phân nhóm</span>
+            <span className="text-muted-foreground text-sm">Chua co</span>
           ),
         enableSorting: false,
       },
       {
-        accessorKey: "description",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Mô tả" />,
-        cell: ({ row }) => (
-          <div className="max-w-[320px]">
-            <div className="line-clamp-2 text-sm leading-5">{row.original.description || "Chưa có mô tả"}</div>
-          </div>
-        ),
-        enableSorting: false,
-      },
-      {
         accessorKey: "image_url",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Ảnh" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Anh" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <div className="bg-muted flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border">
@@ -181,22 +166,19 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
                 <span className="text-muted-foreground text-[10px]">No img</span>
               )}
             </div>
-            <div className="max-w-[220px]">
-              <div className="truncate text-sm">{row.original.image_url || "Chưa có ảnh"}</div>
-            </div>
           </div>
         ),
         enableSorting: false,
       },
       {
         accessorKey: "product_count",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Sản phẩm dùng thành phần" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="So san pham chua thanh phan" />,
         cell: ({ row }) => <span>{row.original.product_count}</span>,
         enableSorting: false,
       },
       {
         accessorKey: "created_at",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Ngày tạo" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Ngay tao" />,
         cell: ({ row }) => <span>{row.original.created_at.toLocaleDateString("vi-VN")}</span>,
         enableSorting: false,
       },
@@ -204,18 +186,11 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
         id: "actions",
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditingTag(row.original);
-                setFormOpen(true);
-              }}
-            >
-              Sửa
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/srx/product_tags/${row.original.id}/edit`}>Sua</Link>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => void handleDelete(row.original)}>
-              Xóa
+              Xoa
             </Button>
           </div>
         ),
@@ -244,7 +219,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       return;
     }
 
-    if (!window.confirm(`Xóa ${selectedTags.length} thành phần đã chọn?`)) {
+    if (!window.confirm(`Xoa ${selectedTags.length} thanh phan da chon?`)) {
       return;
     }
 
@@ -268,13 +243,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       table.resetRowSelection();
 
       if (failedCount === 0) {
-        toast.success(`Đã xóa ${deletedIds.length} thành phần`);
+        toast.success(`Da xoa ${deletedIds.length} thanh phan`);
         return;
       }
 
-      toast.error(`Đã xóa ${deletedIds.length}/${selectedTags.length} mục. ${failedCount} mục không thể xóa.`);
+      toast.error(`Da xoa ${deletedIds.length}/${selectedTags.length} muc. ${failedCount} muc khong the xoa.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể xóa các thành phần đã chọn");
+      toast.error(error instanceof Error ? error.message : "Khong the xoa thanh phan da chon");
     } finally {
       setIsBulkDeleting(false);
     }
@@ -283,10 +258,8 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Từ điển thành phần</h1>
-        <p className="text-muted-foreground">
-          Quản lý danh mục thành phần để gắn nhanh cho sản phẩm theo hoạt chất, công dụng hoặc nhóm chăm sóc da.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Tu dien thanh phan</h1>
+        <p className="text-muted-foreground">Quan ly thong tin cac thanh phan hien thi tren website.</p>
       </div>
 
       <div className="flex items-center justify-between gap-4">
@@ -294,7 +267,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
             className="pl-10"
-            placeholder="Tìm theo tên thành phần, slug, mô tả, ảnh hoặc phân nhóm..."
+            placeholder="Tim theo ten, slug, phan loai, loi ich..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
@@ -304,18 +277,15 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
           {selectedTagCount > 0 ? (
             <Button variant="destructive" onClick={() => void handleBulkDelete()} disabled={isBulkDeleting}>
               <Trash2 className="size-4" />
-              {isBulkDeleting ? "Đang xóa..." : `Xóa đã chọn (${selectedTagCount})`}
+              {isBulkDeleting ? "Dang xoa..." : `Xoa da chon (${selectedTagCount})`}
             </Button>
           ) : null}
 
-          <Button
-            onClick={() => {
-              setEditingTag(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            Thêm thành phần
+          <Button asChild>
+            <Link href="/srx/product_tags/new">
+              <Plus className="size-4" />
+              Them thanh phan
+            </Link>
           </Button>
         </div>
       </div>
@@ -323,14 +293,6 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       <div className="nice-scroll overflow-hidden rounded-lg">
         <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
-
-      <TagFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        initialValue={editingTag}
-        isSubmitting={isSubmitting}
-        onSubmit={handleSubmit}
-      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ export const srxBannerPositionValues = [
   "category_sidebar",
   "popup",
   "header_strip",
+  "banner_product",
 ] as const;
 export const srxBannerPositionSchema = z.enum(srxBannerPositionValues);
 

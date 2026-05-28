@@ -117,6 +117,8 @@ function getPositionLabel(value: BannerFormState["position"]): string {
       return "Popup";
     case "header_strip":
       return "Thanh đầu trang";
+    case "banner_product":
+      return "Banner trang sản phẩm";
     default:
       return value;
   }

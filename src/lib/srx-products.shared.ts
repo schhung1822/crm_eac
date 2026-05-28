@@ -60,8 +60,11 @@ export const srxProductTagSchema = z.object({
   name: z.string(),
   slug: z.string(),
   description: z.string(),
+  desc_long: z.string(),
+  class: z.array(z.string().trim().min(1).max(150)),
+  stars: z.number().nullable(),
   image_url: z.string(),
-  tag_groups: z.array(srxProductTagGroupSchema),
+  tag_groups: z.array(z.string().trim().min(1).max(150)),
   product_count: z.number(),
   created_at: z.coerce.date(),
 });
@@ -137,6 +140,10 @@ export const srxProductSchema = z.object({
 export type SrxProductBrand = z.infer<typeof srxProductBrandSchema>;
 export type SrxProductCategory = z.infer<typeof srxProductCategorySchema>;
 export type SrxProductTag = z.infer<typeof srxProductTagSchema>;
+export type SrxProductTagOptionCatalog = {
+  benefitOptions: string[];
+  classOptions: string[];
+};
 export type SrxProduct = z.infer<typeof srxProductSchema>;
 export type SrxProductImage = z.infer<typeof srxProductImageSchema>;
 export type SrxProductVariant = z.infer<typeof srxProductVariantSchema>;
@@ -151,12 +158,22 @@ const srxProductCategoryMutationSchema = z.object({
   sort_order: z.coerce.number().int().min(0).max(9999).optional().default(0),
 });
 
+const optionalStarsStringSchema = z
+  .string()
+  .trim()
+  .optional()
+  .default("")
+  .refine((value) => value === "" || isValidNonNegativeNumber(value), "Sá»‘ sao khÃ´ng há»£p lá»‡");
+
 const srxProductTagMutationSchema = z.object({
   name: z.string().trim().min(2).max(100),
   slug: z.string().trim().max(120).optional().default(""),
   description: z.string().trim().max(5000).optional().default(""),
+  desc_long: z.string().optional().default(""),
+  class: z.array(z.string().trim().min(1).max(150)).optional().default([]),
+  stars: optionalStarsStringSchema,
   image_url: z.string().trim().max(500).optional().default(""),
-  tag_groups: z.array(srxProductTagGroupSchema).optional().default([]),
+  tag_groups: z.array(z.string().trim().min(1).max(150)).optional().default([]),
 });
 
 const priceStringSchema = z.string().trim().refine(isValidNonNegativeNumber, "Giá không hợp lệ");
