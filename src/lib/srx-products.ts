@@ -2,7 +2,7 @@
 /* eslint-disable import/no-unresolved */
 import "server-only";
 
-import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import { escape, type ResultSetHeader, type RowDataPacket } from "mysql2";
 
 import { prisma2 } from "@/lib/prisma2";
 import {
@@ -100,6 +100,112 @@ function serializeDelimitedValues(values: readonly string[]): string | null {
   return normalizedValues.length > 0 ? normalizedValues.join(",") : null;
 }
 
+function mergeOptionValues(...collections: ReadonlyArray<readonly (string | null | undefined)[]>): string[] {
+  return normalizeStringArray(collections.flat());
+}
+
+function parseMysqlSetOptions(columnType: string | null | undefined): string[] {
+  const normalizedType = String(columnType ?? "").trim();
+  const match = /^set\((.*)\)$/i.exec(normalizedType);
+
+  if (!match) {
+    return [];
+  }
+
+  const values: string[] = [];
+  let currentValue = "";
+  let isInsideQuotedValue = false;
+  let isEscaping = false;
+
+  for (const character of match[1]) {
+    if (!isInsideQuotedValue) {
+      if (character === "'") {
+        isInsideQuotedValue = true;
+        currentValue = "";
+      }
+
+      continue;
+    }
+
+    if (isEscaping) {
+      currentValue += character;
+      isEscaping = false;
+      continue;
+    }
+
+    if (character === "\\") {
+      isEscaping = true;
+      continue;
+    }
+
+    if (character === "'") {
+      values.push(currentValue);
+      currentValue = "";
+      isInsideQuotedValue = false;
+      continue;
+    }
+
+    currentValue += character;
+  }
+
+  return normalizeStringArray(values);
+}
+
+function buildMysqlSetType(values: readonly string[]): string {
+  const normalizedValues = normalizeStringArray(values);
+
+  if (normalizedValues.length === 0) {
+    throw new Error("Khong the tao cot SET khong co lua chon");
+  }
+
+  return `SET(${normalizedValues.map((value) => escape(value)).join(",")})`;
+}
+
+async function getProductTagSetDefinitions(): Promise<ProductTagSetDefinitions> {
+  const db = getSrxDB();
+  const [rows] = await db.query<ProductTagSetColumnRow[]>(`
+    SHOW COLUMNS FROM product_tags
+    WHERE Field IN ('class', 'Tags')
+  `);
+
+  const definitions: ProductTagSetDefinitions = {
+    Tags: [],
+    class: [],
+  };
+
+  for (const row of rows) {
+    if (row.Field === "class" || row.Field === "Tags") {
+      definitions[row.Field] = parseMysqlSetOptions(row.Type);
+    }
+  }
+
+  return definitions;
+}
+
+async function ensureProductTagSetOptions(
+  classValues: readonly string[],
+  benefitValues: readonly string[],
+): Promise<void> {
+  const currentDefinitions = await getProductTagSetDefinitions();
+  const nextClassValues = mergeOptionValues(currentDefinitions.class, classValues);
+  const nextBenefitValues = mergeOptionValues(currentDefinitions.Tags, benefitValues);
+  const db = getSrxDB();
+
+  if (nextClassValues.length > 0 && nextClassValues.length !== currentDefinitions.class.length) {
+    await db.execute(`
+      ALTER TABLE product_tags
+      MODIFY COLUMN \`class\` ${buildMysqlSetType(nextClassValues)} NULL
+    `);
+  }
+
+  if (nextBenefitValues.length > 0 && nextBenefitValues.length !== currentDefinitions.Tags.length) {
+    await db.execute(`
+      ALTER TABLE product_tags
+      MODIFY COLUMN \`Tags\` ${buildMysqlSetType(nextBenefitValues)} NULL
+    `);
+  }
+}
+
 function asDate(value: Date | string | null): Date | null {
   if (!value) {
     return null;
@@ -162,6 +268,16 @@ type ProductInfoImageRow = RowDataPacket & {
 type ProductTagOptionRow = RowDataPacket & {
   class_name: string | null;
   tag_groups: string | null;
+};
+
+type ProductTagSetColumnRow = RowDataPacket & {
+  Field: string;
+  Type: string | null;
+};
+
+type ProductTagSetDefinitions = {
+  Tags: string[];
+  class: string[];
 };
 
 const srxProductTagsBaseQuery = `
@@ -816,6 +932,7 @@ export async function getSrxProductTags(): Promise<SrxProductTag[]> {
 export async function getSrxProductTagOptionCatalog(): Promise<SrxProductTagOptionCatalog> {
   return withSrxReadFallback("product tag option catalog", { benefitOptions: [], classOptions: [] }, async () => {
     const db = getSrxDB();
+    const setDefinitions = await getProductTagSetDefinitions();
     const [rows] = await db.query<ProductTagOptionRow[]>(`
         SELECT
           t.\`class\` AS class_name,
@@ -825,8 +942,12 @@ export async function getSrxProductTagOptionCatalog(): Promise<SrxProductTagOpti
       `);
 
     return {
-      benefitOptions: sortOptionValues(rows.flatMap((row) => normalizeTagGroups(row.tag_groups))),
-      classOptions: sortOptionValues(rows.flatMap((row) => normalizeDelimitedValues(row.class_name))),
+      benefitOptions: sortOptionValues(
+        mergeOptionValues(setDefinitions.Tags, ...rows.map((row) => normalizeTagGroups(row.tag_groups))),
+      ),
+      classOptions: sortOptionValues(
+        mergeOptionValues(setDefinitions.class, ...rows.map((row) => normalizeDelimitedValues(row.class_name))),
+      ),
     };
   });
 }
@@ -1052,6 +1173,7 @@ export async function createSrxProductTag(input: SrxProductTagMutationInput): Pr
   const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
   const normalizedDescLong = resolveHtmlAssetUrlsForStorage(payload.desc_long);
   const stars = normalizeNullableNumber(payload.stars);
+  await ensureProductTagSetOptions(payload.class, payload.tag_groups);
   const db = getSrxDB();
   const [result] = await db.execute<ResultSetHeader>(
     `
@@ -1088,6 +1210,7 @@ export async function updateSrxProductTag(
   const imageUrl = resolveNullableSiteAssetUrlForStorage(payload.image_url);
   const normalizedDescLong = resolveHtmlAssetUrlsForStorage(payload.desc_long);
   const stars = normalizeNullableNumber(payload.stars);
+  await ensureProductTagSetOptions(payload.class, payload.tag_groups);
   const db = getSrxDB();
   const [existingRows] = await db.query<RowDataPacket[]>(
     `

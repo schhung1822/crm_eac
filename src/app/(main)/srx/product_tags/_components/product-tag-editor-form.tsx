@@ -149,7 +149,6 @@ function getApiErrorMessage(result: unknown, fallbackMessage: string): string {
   return issueSummary || message || fallbackMessage;
 }
 
-// eslint-disable-next-line complexity
 export function ProductTagEditorForm({
   initialValue,
   optionCatalog,
@@ -288,7 +287,9 @@ export function ProductTagEditorForm({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">{isEditing ? "Sửa thành phần" : "Thêm thành phần"}</h1>
-            <p className="text-muted-foreground max-w-3xl">Quản lý thông tin các thành phần hiển thị trên website website</p>
+            <p className="text-muted-foreground max-w-3xl">
+              Quản lý thông tin các thành phần hiển thị trên website website
+            </p>
           </div>
 
           <Button variant="outline" asChild>
@@ -332,7 +333,7 @@ export function ProductTagEditorForm({
               </div>
 
               <div className="grid gap-2">
-                <Label>Mo ta chi tiet</Label>
+                <Label>Mô tả chi tiết</Label>
                 <CkeditorContentEditor
                   disabled={isSubmitting}
                   value={form.desc_long}

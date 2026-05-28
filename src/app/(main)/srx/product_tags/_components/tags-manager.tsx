@@ -54,22 +54,22 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result?.message ?? "Khong the xoa thanh phan");
+      throw new Error(result?.message ?? "không thể xóa thành phần");
     }
   }, []);
 
   const handleDelete = React.useCallback(
     async (tag: SrxProductTag) => {
-      if (!window.confirm(`Xoa thanh phan "${tag.name}"?`)) {
+      if (!window.confirm(`Xóa thành phần "${tag.name}"?`)) {
         return;
       }
 
       try {
         await deleteTagRequest(tag.id);
         setTags((current) => current.filter((item) => item.id !== tag.id));
-        toast.success("Da xoa thanh phan");
+        toast.success("Đã xóa thành phần");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Khong the xoa thanh phan");
+        toast.error(error instanceof Error ? error.message : "Không thể xóa thành phần");
       }
     },
     [deleteTagRequest],
@@ -84,7 +84,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
             <Checkbox
               checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
               onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-              aria-label="Chon tat ca thanh phan"
+              aria-label="chọn tất cả thành phần"
             />
           </div>
         ),
@@ -93,7 +93,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
             <Checkbox
               checked={row.getIsSelected()}
               onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label={`Chon thanh phan ${row.original.name}`}
+              aria-label={`Chọn thành phần ${row.original.name}`}
             />
           </div>
         ),
@@ -132,13 +132,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       },
       {
         accessorKey: "stars",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Danh gia" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Đánh giá" />,
         cell: ({ row }) => <span>{row.original.stars ?? "-"}</span>,
         enableSorting: false,
       },
       {
         accessorKey: "tag_groups",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Loi ich" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Lợi ích" />,
         cell: ({ row }) =>
           row.original.tag_groups.length > 0 ? (
             <div className="flex max-w-[320px] flex-wrap gap-1">
@@ -149,13 +149,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
               ))}
             </div>
           ) : (
-            <span className="text-muted-foreground text-sm">Chua co</span>
+            <span className="text-muted-foreground text-sm">Chưa có</span>
           ),
         enableSorting: false,
       },
       {
         accessorKey: "image_url",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Anh" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Ảnh" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-3">
             <div className="bg-muted flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border">
@@ -172,13 +172,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       },
       {
         accessorKey: "product_count",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="So san pham chua thanh phan" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Sản phẩm chứa thành phần" />,
         cell: ({ row }) => <span>{row.original.product_count}</span>,
         enableSorting: false,
       },
       {
         accessorKey: "created_at",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Ngay tao" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Ngày tạo" />,
         cell: ({ row }) => <span>{row.original.created_at.toLocaleDateString("vi-VN")}</span>,
         enableSorting: false,
       },
@@ -187,10 +187,10 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/srx/product_tags/${row.original.id}/edit`}>Sua</Link>
+              <Link href={`/srx/product_tags/${row.original.id}/edit`}>Sửa</Link>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => void handleDelete(row.original)}>
-              Xoa
+              Xóa
             </Button>
           </div>
         ),
@@ -219,7 +219,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       return;
     }
 
-    if (!window.confirm(`Xoa ${selectedTags.length} thanh phan da chon?`)) {
+    if (!window.confirm(`Xoa ${selectedTags.length} thành phần đã chọn?`)) {
       return;
     }
 
@@ -243,13 +243,13 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
       table.resetRowSelection();
 
       if (failedCount === 0) {
-        toast.success(`Da xoa ${deletedIds.length} thanh phan`);
+        toast.success(`Da xoa ${deletedIds.length} thành phần`);
         return;
       }
 
-      toast.error(`Da xoa ${deletedIds.length}/${selectedTags.length} muc. ${failedCount} muc khong the xoa.`);
+      toast.error(`Da xoa ${deletedIds.length}/${selectedTags.length} mục. ${failedCount} mục không thể xóa.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Khong the xoa thanh phan da chon");
+      toast.error(error instanceof Error ? error.message : "Không thể xóa thành phần đã chọn");
     } finally {
       setIsBulkDeleting(false);
     }
@@ -258,8 +258,8 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Tu dien thanh phan</h1>
-        <p className="text-muted-foreground">Quan ly thong tin cac thanh phan hien thi tren website.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Từ điển thành phần</h1>
+        <p className="text-muted-foreground">Quản lý thông tin các thành phần hiển thị trên website.</p>
       </div>
 
       <div className="flex items-center justify-between gap-4">
@@ -267,7 +267,7 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
             className="pl-10"
-            placeholder="Tim theo ten, slug, phan loai, loi ich..."
+            placeholder="Tìm theo tên, slug, phân loại, lợi ích..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
@@ -277,14 +277,14 @@ export function TagsManager({ initialTags }: { initialTags: SrxProductTag[] }) {
           {selectedTagCount > 0 ? (
             <Button variant="destructive" onClick={() => void handleBulkDelete()} disabled={isBulkDeleting}>
               <Trash2 className="size-4" />
-              {isBulkDeleting ? "Dang xoa..." : `Xoa da chon (${selectedTagCount})`}
+              {isBulkDeleting ? "Đang xóa..." : `Xóa đã chọn (${selectedTagCount})`}
             </Button>
           ) : null}
 
           <Button asChild>
             <Link href="/srx/product_tags/new">
               <Plus className="size-4" />
-              Them thanh phan
+              Thêm thành phần
             </Link>
           </Button>
         </div>

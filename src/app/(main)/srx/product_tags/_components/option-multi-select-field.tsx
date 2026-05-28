@@ -31,7 +31,7 @@ function buildSelectionSummary(selectedValues: readonly string[], placeholder: s
 
 export function OptionMultiSelectField({
   disabled = false,
-  emptyMessage = "Khong co lua chon phu hop.",
+  emptyMessage = "Không có lựa chọn nào phù hợp.",
   id,
   label,
   onCreate,
@@ -65,7 +65,7 @@ export function OptionMultiSelectField({
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={id}>{label}</Label>
-        <span className="text-muted-foreground text-xs">{selectedValues.length} da chon</span>
+        <span className="text-muted-foreground text-xs">{selectedValues.length} đã chọn</span>
       </div>
 
       <Popover
@@ -93,10 +93,10 @@ export function OptionMultiSelectField({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <PopoverContent className="nice-scroll w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command>
             <CommandInput placeholder={searchPlaceholder} value={searchValue} onValueChange={setSearchValue} />
-            <CommandList className="max-h-[280px]">
+            <CommandList className="nice-scroll max-h-[280px]">
               <CommandEmpty>{emptyMessage}</CommandEmpty>
               <CommandGroup>
                 {canCreate ? (
