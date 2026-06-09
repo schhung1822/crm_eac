@@ -111,6 +111,7 @@ export const srxProductSchema = z.object({
   description: z.string(),
   usage_instructions: z.string(),
   ingredient_list: z.string(),
+  benefit: z.string(),
   status: srxProductStatusSchema,
   has_variants: z.boolean(),
   is_featured: z.boolean(),
@@ -185,6 +186,21 @@ const optionalPriceStringSchema = z
   .default("")
   .refine((value) => value === "" || isValidNonNegativeNumber(value), "Giá khuyến mãi không hợp lệ");
 
+const productBenefitValueSchema = z
+  .string()
+  .trim()
+  .max(100)
+  .optional()
+  .default("")
+  .transform((value) =>
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(","),
+  )
+  .refine((value) => value === "" || /^([1-8](,[1-8])*)$/.test(value), "Lợi ích sản phẩm không hợp lệ");
+
 const quantityStringSchema = z.string().trim().refine(isValidNonNegativeInteger, "Số lượng không hợp lệ");
 
 const optionalWeightStringSchema = z
@@ -217,6 +233,7 @@ const srxProductMutationSchema = z.object({
   description: z.string().optional().default(""),
   usage_instructions: z.string().trim().max(5000).optional().default(""),
   ingredient_list: z.string().trim().max(5000).optional().default(""),
+  benefit: productBenefitValueSchema,
   category_id: optionalNumericIdSchema,
   brand_id: optionalNumericIdSchema,
   tag_ids: z.array(numericIdSchema).optional().default([]),

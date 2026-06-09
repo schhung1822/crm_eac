@@ -122,6 +122,25 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
         enableSorting: false,
       },
       {
+        accessorKey: "thumbnail_url",
+        header: () => <span>Ảnh</span>,
+        cell: ({ row }) => (
+          <div className="bg-muted flex size-14 items-center justify-center overflow-hidden rounded-md border">
+            {row.original.thumbnail_url ? (
+              <img
+                src={row.original.thumbnail_url}
+                alt={row.original.name}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <span className="text-muted-foreground text-xs">—</span>
+            )}
+          </div>
+        ),
+        enableSorting: false,
+      },
+      {
         accessorKey: "name",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Sản phẩm" />,
         cell: ({ row }) => (
@@ -141,16 +160,6 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
         accessorKey: "category_name",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Danh mục" />,
         cell: ({ row }) => <div className="min-w-[120px] whitespace-normal">{row.original.category_name || "—"}</div>,
-        enableSorting: false,
-      },
-      {
-        accessorKey: "tags",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Thành phần" />,
-        cell: ({ row }) => (
-          <div className="max-w-[320px] min-w-[220px] text-sm leading-6 whitespace-normal">
-            {row.original.tags.map((tag) => tag.name).join(", ") || "—"}
-          </div>
-        ),
         enableSorting: false,
       },
       {
@@ -295,7 +304,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
             className="pl-10"
-            placeholder="Tìm theo tên, mã, slug, danh mục, thành phần..."
+            placeholder="Tìm theo tên, mã, slug, danh mục..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
@@ -323,7 +332,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: SrxProdu
           key={tableRenderKey}
           table={table}
           columns={columns}
-          tableClassName="min-w-[1680px]"
+          tableClassName="min-w-[1520px]"
           headClassName="h-12 px-3 text-sm"
           rowClassName="[&>td]:border-border/70"
           cellClassName="px-3 py-4 align-top"

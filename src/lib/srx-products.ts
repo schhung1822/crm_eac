@@ -265,6 +265,11 @@ type ProductInfoImageRow = RowDataPacket & {
   info_img: string | null;
 };
 
+type ProductBenefitRow = RowDataPacket & {
+  id: string;
+  benefit: string | null;
+};
+
 type ProductTagOptionRow = RowDataPacket & {
   class_name: string | null;
   tag_groups: string | null;
@@ -466,6 +471,25 @@ async function getProductInfoImageMap(productIds: readonly bigint[]): Promise<Ma
   return new Map(rows.map((row) => [row.id, normalizeOptionalString(row.info_img)]));
 }
 
+async function getProductBenefitMap(productIds: readonly bigint[]): Promise<Map<string, string>> {
+  if (productIds.length === 0) {
+    return new Map();
+  }
+
+  const db = getSrxDB();
+  const placeholders = productIds.map(() => "?").join(", ");
+  const [rows] = await db.query<ProductBenefitRow[]>(
+    `
+      SELECT CAST(id AS CHAR) AS id, benefit
+      FROM products
+      WHERE id IN (${placeholders})
+    `,
+    productIds.map((productId) => productId.toString()),
+  );
+
+  return new Map(rows.map((row) => [row.id, normalizeOptionalString(row.benefit)]));
+}
+
 function mapProductVariant(variant: {
   id: bigint;
   sku: string;
@@ -513,6 +537,7 @@ function mapProduct(product: {
   description: string | null;
   usage_instructions: string | null;
   ingredient_list: string | null;
+  benefit: string | null;
   status: (typeof srxProductStatusValues)[number];
   has_variants: boolean;
   is_featured: boolean;
@@ -583,6 +608,7 @@ function mapProduct(product: {
     description: normalizeOptionalString(product.description),
     usage_instructions: normalizeOptionalString(product.usage_instructions),
     ingredient_list: normalizeOptionalString(product.ingredient_list),
+    benefit: normalizeOptionalString(product.benefit),
     status: product.status,
     has_variants: product.has_variants,
     is_featured: product.is_featured,
@@ -997,12 +1023,14 @@ export async function getSrxProducts(): Promise<SrxProduct[]> {
       },
     });
     const infoImageMap = await getProductInfoImageMap(products.map((product) => product.id));
+    const benefitMap = await getProductBenefitMap(products.map((product) => product.id));
 
     return products.map((product) =>
       mapProduct({
         ...product,
         status: product.status as (typeof srxProductStatusValues)[number],
         info_img: infoImageMap.get(product.id.toString()) ?? null,
+        benefit: benefitMap.get(product.id.toString()) ?? null,
       }),
     );
   });
@@ -1038,11 +1066,13 @@ export async function getSrxProductById(productId: string): Promise<SrxProduct |
       return null;
     }
     const infoImageMap = await getProductInfoImageMap([product.id]);
+    const benefitMap = await getProductBenefitMap([product.id]);
 
     return mapProduct({
       ...product,
       status: product.status as (typeof srxProductStatusValues)[number],
       info_img: infoImageMap.get(product.id.toString()) ?? null,
+      benefit: benefitMap.get(product.id.toString()) ?? null,
     });
   });
 }
@@ -1337,6 +1367,11 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
       },
     });
 
+    await tx.$executeRaw`
+      UPDATE products
+      SET benefit = ${normalizeNullableString(payload.benefit)}
+      WHERE id = ${createdProduct.id}
+    `;
     await syncProductGalleryImages(tx, createdProduct.id, payload.name, thumbnailUrl, galleryImageUrls);
     await syncProductInfoImage(tx, createdProduct.id, infoImageUrl);
     await syncProductVariants(tx, createdProduct.id, variants);
@@ -1370,6 +1405,7 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
     ...product,
     status: product.status as (typeof srxProductStatusValues)[number],
     info_img: resolveNullableSiteAssetUrl(infoImageUrl),
+    benefit: normalizeOptionalString(payload.benefit),
   });
 }
 
@@ -1430,6 +1466,11 @@ export async function updateSrxProduct(productId: string, input: SrxProductMutat
         published_at: publishedAt,
       },
     });
+    await tx.$executeRaw`
+      UPDATE products
+      SET benefit = ${normalizeNullableString(payload.benefit)}
+      WHERE id = ${numericId}
+    `;
 
     if (tagIds.length > 0) {
       await tx.product_tag_links.createMany({

@@ -4,6 +4,7 @@ import type { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 import { createToken, verifyToken, type JWTPayload } from "@/lib/auth-token";
+import { prisma } from "@/lib/prisma";
 import { normalizeRole } from "@/lib/rbac";
 
 const COOKIE_NAME = "auth-token";
@@ -78,9 +79,32 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
     return null;
   }
 
+  const userRecord = await prisma.user.findUnique({
+    where: {
+      id: payload.userId,
+    },
+    select: {
+      id: true,
+      user: true,
+      email: true,
+      name: true,
+      phone: true,
+      role: true,
+    },
+  });
+
+  if (!userRecord) {
+    return null;
+  }
+
   return {
-    ...payload,
-    role: normalizeRole(payload.role),
+    userId: userRecord.id,
+    username: userRecord.user ?? payload.username ?? "",
+    email: userRecord.email ?? payload.email ?? "",
+    role: normalizeRole(userRecord.role),
+    name: userRecord.name ?? undefined,
+    phone: userRecord.phone ?? undefined,
+    avatar: payload.avatar,
   };
 }
 

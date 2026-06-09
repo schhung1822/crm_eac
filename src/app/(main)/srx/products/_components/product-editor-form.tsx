@@ -42,6 +42,59 @@ import { ProductMediaFields } from "./product-media-fields";
 type ProductFormState = SrxProductMutationInput;
 type ProductVariantFormState = SrxProductVariantMutationInput;
 
+const productBenefitOptions = [
+  {
+    id: "1",
+    label: "Siêu cấp ẩm & Khóa dưỡng chất",
+    description: "Cấp nước, cấp ẩm đa tầng chuyên sâu, khóa ẩm, hạn chế mất nước biểu bì.",
+  },
+  {
+    id: "2",
+    label: "Phục hồi & Làm dịu da",
+    description: "Phục hồi da tổn thương, hạ nhiệt, làm dịu tức thì, êm dịu không bong tróc.",
+  },
+  {
+    id: "3",
+    label: "Tái tạo, Trẻ hóa & Căng bóng",
+    description:
+      "Tái tạo biểu bì/bề mặt, tăng sinh Collagen, trẻ hóa đa tầng, cải thiện bề mặt da căng bóng, mịn màng.",
+  },
+  {
+    id: "4",
+    label: "Củng cố hàng rào bảo vệ & Chống oxy hóa",
+    description: "Bảo vệ hàng rào tự nhiên, chống oxy hóa trước các tác nhân môi trường.",
+  },
+  {
+    id: "5",
+    label: "Dưỡng sáng & Mờ thâm",
+    description: "Sáng da sinh học, mờ thâm, giúp da trắng hồng.",
+  },
+  {
+    id: "6",
+    label: "Kháng khuẩn & Giảm mụn",
+    description: "Kháng khuẩn, hỗ trợ ngăn ngừa và giảm mụn.",
+  },
+  {
+    id: "7",
+    label: "Bảo vệ chống nắng",
+    description: "Chống nắng phổ rộng, bảo vệ toàn diện, kết cấu mỏng nhẹ thoáng khí.",
+  },
+  {
+    id: "8",
+    label: "An toàn, lành tính",
+    description: "Cam kết không chứa chất bào mòn, chất tẩy.",
+  },
+] as const;
+
+function normalizeProductBenefitIds(value: string): string[] {
+  const selectedIds = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return productBenefitOptions.map((option) => option.id).filter((optionId) => selectedIds.includes(optionId));
+}
+
 function createEmptyVariantState(index: number, productCode = "", basePrice = "0", salePrice = "", imageUrl = ""): ProductVariantFormState {
   const normalizedProductCode = productCode.trim().toUpperCase() || "SP";
   return {
@@ -68,6 +121,7 @@ const emptyFormState: ProductFormState = {
   description: "",
   usage_instructions: "",
   ingredient_list: "",
+  benefit: "",
   category_id: "",
   brand_id: "",
   tag_ids: [],
@@ -181,6 +235,7 @@ function buildFormState(product: SrxProduct | null): ProductFormState {
     description: product.description,
     usage_instructions: product.usage_instructions,
     ingredient_list: product.ingredient_list,
+    benefit: normalizeProductBenefitIds(product.benefit).join(","),
     category_id: product.category_id,
     brand_id: product.brand_id,
     tag_ids: product.tag_ids,
@@ -227,12 +282,28 @@ export function ProductEditorForm({
 
   const isEditing = initialValue !== null;
   const submitLabel = isSubmitting ? "Đang lưu..." : isEditing ? "Lưu thay đổi" : "Tạo sản phẩm";
+  const selectedBenefitIds = React.useMemo(() => normalizeProductBenefitIds(form.benefit), [form.benefit]);
 
   const handleTagChange = (tagId: string, checked: boolean) => {
     setForm((current) => ({
       ...current,
       tag_ids: checked ? [...current.tag_ids, tagId] : current.tag_ids.filter((item) => item !== tagId),
     }));
+  };
+
+  const handleBenefitChange = (benefitId: string, checked: boolean) => {
+    setForm((current) => {
+      const currentIds = normalizeProductBenefitIds(current.benefit);
+      const nextIds = checked ? [...currentIds, benefitId] : currentIds.filter((item) => item !== benefitId);
+      const normalizedIds = productBenefitOptions
+        .map((option) => option.id)
+        .filter((optionId) => nextIds.includes(optionId));
+
+      return {
+        ...current,
+        benefit: normalizedIds.join(","),
+      };
+    });
   };
 
   const handleVariantChange = (
@@ -574,26 +645,31 @@ export function ProductEditorForm({
                 />
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="product-usage">Hướng dẫn sử dụng</Label>
-                <Textarea
-                  id="product-usage"
-                  className="min-h-36"
-                  value={form.usage_instructions}
-                  onChange={(event) => setForm((current) => ({ ...current, usage_instructions: event.target.value }))}
-                  placeholder="Nhập hướng dẫn sử dụng"
-                />
-              </div>
+              <div className="grid gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Lợi ích sản phẩm</Label>
+                  <span className="text-muted-foreground text-xs">
+                    {selectedBenefitIds.length > 0 ? `${selectedBenefitIds.length} lợi ích được chọn` : "Chưa chọn"}
+                  </span>
+                </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="product-ingredients">Thành phần</Label>
-                <Textarea
-                  id="product-ingredients"
-                  className="min-h-36"
-                  value={form.ingredient_list}
-                  onChange={(event) => setForm((current) => ({ ...current, ingredient_list: event.target.value }))}
-                  placeholder="Nhập danh sách thành phần"
-                />
+                <div className="grid gap-2 rounded-md border p-4">
+                  {productBenefitOptions.map((option) => (
+                    <label key={option.id} className="flex items-start gap-3 rounded-md px-1 py-2">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={selectedBenefitIds.includes(option.id)}
+                        onCheckedChange={(checked) => handleBenefitChange(option.id, checked === true)}
+                      />
+                      <span className="grid gap-1 text-sm">
+                        <span className="font-medium">
+                          {option.id}. {option.label}
+                        </span>
+                        <span className="text-muted-foreground leading-5">{option.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {variantConfigurationSection}
