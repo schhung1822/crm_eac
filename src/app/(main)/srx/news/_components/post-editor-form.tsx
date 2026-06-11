@@ -49,6 +49,8 @@ const emptyFormState: PostFormState = {
   status: "draft",
   is_featured: false,
   published_at: "",
+  publish_to_facebook: false,
+  publish_to_zalo: false,
 };
 
 const editorLayoutStyle = {
@@ -126,6 +128,8 @@ function buildFormState(post: SrxNewsPost | null, categories: SrxNewsCategory[])
     status: post.status,
     is_featured: post.is_featured,
     published_at: toLocalDateTimeInput(post.published_at),
+    publish_to_facebook: Boolean(post.id_fb_post),
+    publish_to_zalo: Boolean(post.id_zalo_post),
   };
 }
 
@@ -352,6 +356,35 @@ export function PostEditorForm({
                 />
                 <span className="text-sm">Đánh dấu bài viết nổi bật</span>
               </label>
+
+              <div className="grid gap-3 rounded-md border p-3">
+                <div className="grid gap-1">
+                  <Label>Đăng lên kênh ngoài</Label>
+                  <p className="text-muted-foreground text-xs">
+                    Chỉ áp dụng cho bài viết text, hình ảnh và đường dẫn.
+                  </p>
+                </div>
+
+                <label className="flex min-h-10 items-center gap-3">
+                  <Checkbox
+                    checked={form.publish_to_facebook}
+                    onCheckedChange={(checked) =>
+                      setForm((current) => ({ ...current, publish_to_facebook: checked === true }))
+                    }
+                  />
+                  <span className="text-sm">Fanpage Facebook</span>
+                </label>
+
+                <label className="flex min-h-10 items-center gap-3">
+                  <Checkbox
+                    checked={form.publish_to_zalo}
+                    onCheckedChange={(checked) =>
+                      setForm((current) => ({ ...current, publish_to_zalo: checked === true }))
+                    }
+                  />
+                  <span className="text-sm">Zalo OA</span>
+                </label>
+              </div>
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between gap-3">

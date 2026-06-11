@@ -31,6 +31,8 @@ export const srxNewsPostTagSchema = z.object({
 
 export const srxNewsPostSchema = z.object({
   id: z.string(),
+  id_zalo_post: z.string(),
+  id_fb_post: z.string(),
   title: z.string(),
   slug: z.string(),
   excerpt: z.string(),
@@ -77,6 +79,8 @@ const srxNewsPostMutationSchema = z.object({
   status: srxNewsStatusSchema,
   is_featured: z.boolean().optional().default(false),
   published_at: z.string().trim().optional().default(""),
+  publish_to_facebook: z.boolean().optional().default(false),
+  publish_to_zalo: z.boolean().optional().default(false),
 });
 
 export type SrxNewsCategoryMutationInput = z.infer<typeof srxNewsCategoryMutationSchema>;

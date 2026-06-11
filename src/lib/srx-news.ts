@@ -4,6 +4,8 @@ import "server-only";
 
 import { withSrxReadFallback } from "@/lib/srx-db-errors";
 import { prisma2 } from "@/lib/prisma2";
+import { syncSrxNewsPostSocialChannels } from "@/lib/srx-news-social-posting";
+import { Prisma } from "../../prisma/generated/srx-app-client";
 import {
   resolveHtmlAssetUrls,
   resolveHtmlAssetUrlsForStorage,
@@ -106,6 +108,8 @@ function mapTag(tag: {
 
 function mapPost(post: {
   id: bigint;
+  id_zalo_post?: string | null;
+  id_fb_post?: string | null;
   title: string;
   slug: string;
   excerpt: string | null;
@@ -129,6 +133,8 @@ function mapPost(post: {
 
   return srxNewsPostSchema.parse({
     id: post.id.toString(),
+    id_zalo_post: normalizeOptionalString(post.id_zalo_post),
+    id_fb_post: normalizeOptionalString(post.id_fb_post),
     title: post.title,
     slug: post.slug,
     excerpt: normalizeOptionalString(post.excerpt),
@@ -214,6 +220,37 @@ async function ensureUniquePostSlug(baseSlug: string, excludeId?: bigint): Promi
   }
 }
 
+type PostSocialIds = {
+  id: bigint;
+  id_fb_post: string | null;
+  id_zalo_post: string | null;
+};
+
+async function getPostSocialIds(postId: bigint): Promise<PostSocialIds> {
+  const rows = await prisma2.$queryRaw<PostSocialIds[]>`
+    SELECT id, id_fb_post, id_zalo_post
+    FROM posts
+    WHERE id = ${postId}
+    LIMIT 1
+  `;
+
+  return rows[0] ?? { id: postId, id_fb_post: null, id_zalo_post: null };
+}
+
+async function getPostSocialIdMap(postIds: readonly bigint[]): Promise<Map<string, PostSocialIds>> {
+  if (postIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await prisma2.$queryRaw<PostSocialIds[]>`
+    SELECT id, id_fb_post, id_zalo_post
+    FROM posts
+    WHERE id IN (${Prisma.join(postIds)})
+  `;
+
+  return new Map(rows.map((row) => [row.id.toString(), row]));
+}
+
 export { parseSrxNewsCategoryInput, parseSrxNewsPostInput, parseSrxNewsTagInput };
 
 export async function getSrxNewsCategories(): Promise<SrxNewsCategory[]> {
@@ -264,12 +301,17 @@ export async function getSrxNewsPosts(): Promise<SrxNewsPost[]> {
       },
     });
 
-    return posts.map((post) =>
-      mapPost({
+    const socialIdMap = await getPostSocialIdMap(posts.map((post) => post.id));
+
+    return posts.map((post) => {
+      const socialIds = socialIdMap.get(post.id.toString());
+
+      return mapPost({
         ...post,
+        ...socialIds,
         status: post.status as (typeof srxNewsStatusValues)[number],
-      }),
-    );
+      });
+    });
   });
 }
 
@@ -293,8 +335,11 @@ export async function getSrxNewsPostById(postId: string): Promise<SrxNewsPost | 
       return null;
     }
 
+    const socialIds = await getPostSocialIds(post.id);
+
     return mapPost({
       ...post,
+      ...socialIds,
       status: post.status as (typeof srxNewsStatusValues)[number],
     });
   });
@@ -502,10 +547,21 @@ export async function createSrxNewsPost(input: SrxNewsPostMutationInput): Promis
     },
   });
 
-  return mapPost({
+  const mappedPost = mapPost({
     ...post,
     status: post.status as (typeof srxNewsStatusValues)[number],
   });
+
+  if (payload.publish_to_facebook || payload.publish_to_zalo) {
+    await syncSrxNewsPostSocialChannels({
+      payload,
+      post: mappedPost,
+    });
+
+    return (await getSrxNewsPostById(mappedPost.id)) ?? mappedPost;
+  }
+
+  return mappedPost;
 }
 
 export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutationInput): Promise<SrxNewsPost | null> {
@@ -522,6 +578,7 @@ export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutati
     return null;
   }
 
+  const existingSocialIds = await getPostSocialIds(numericId);
   const slug = await ensureUniquePostSlug(slugify(payload.slug || payload.title), numericId);
   const tagIds = [...new Set(payload.tag_ids)].map((tagId) => BigInt(tagId));
   const publishedAt =
@@ -563,13 +620,51 @@ export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutati
     }
   });
 
+  const post = await getSrxNewsPostById(postId);
+
+  if (!post) {
+    return null;
+  }
+
+  await syncSrxNewsPostSocialChannels({
+    existingFbPostId: existingSocialIds.id_fb_post,
+    existingZaloPostId: existingSocialIds.id_zalo_post,
+    payload,
+    post,
+  });
+
   return getSrxNewsPostById(postId);
 }
 
 export async function deleteSrxNewsPost(postId: string): Promise<void> {
+  const numericId = BigInt(postId);
+  const [post, socialIds] = await Promise.all([getSrxNewsPostById(postId), getPostSocialIds(numericId)]);
+
+  if (post && (socialIds.id_fb_post || socialIds.id_zalo_post)) {
+    await syncSrxNewsPostSocialChannels({
+      existingFbPostId: socialIds.id_fb_post,
+      existingZaloPostId: socialIds.id_zalo_post,
+      payload: {
+        title: post.title,
+        slug: post.slug,
+        excerpt: post.excerpt,
+        content: post.content,
+        featured_image_url: post.featured_image_url,
+        category_id: post.category_id,
+        tag_ids: post.tag_ids,
+        status: post.status,
+        is_featured: post.is_featured,
+        published_at: post.published_at?.toISOString() ?? "",
+        publish_to_facebook: false,
+        publish_to_zalo: false,
+      },
+      post,
+    });
+  }
+
   await prisma2.posts.delete({
     where: {
-      id: BigInt(postId),
+      id: numericId,
     },
   });
 }
