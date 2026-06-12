@@ -87,6 +87,47 @@ function toLocalDateTimeInput(value: Date | null): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function formatLocalDateTimeLabel(value: string): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
+function getSocialPublishTimingLabel(form: PostFormState): string {
+  const wantsSocialPublish = form.publish_to_facebook || form.publish_to_zalo;
+
+  if (!wantsSocialPublish) {
+    return "Chọn nền tảng muốn đăng thêm bài viết lên.";
+  }
+
+  if (form.status !== "published") {
+    return "Chỉ tự đăng khi trạng thái để là đang hiển thị.";
+  }
+
+  if (!form.published_at) {
+    return "Không chọn ngày xuất bản: bài sẽ được đăng lên nền tảng bạn chọn ngay sau khi lưu.";
+  }
+
+  const publishDate = new Date(form.published_at);
+
+  if (Number.isNaN(publishDate.getTime()) || publishDate.getTime() <= Date.now()) {
+    return "Ngày xuất bản không ở tương lai: bài sẽ đăng lên nền tảng bạn chọn ngay khi lưu.";
+  }
+
+  return `Đã đặt hẹn: bài sẽ được đăng lên lúc ${formatLocalDateTimeLabel(form.published_at)}.`;
+}
+
 function getStatusLabel(status: PostFormState["status"]): string {
   switch (status) {
     case "draft":
@@ -128,8 +169,8 @@ function buildFormState(post: SrxNewsPost | null, categories: SrxNewsCategory[])
     status: post.status,
     is_featured: post.is_featured,
     published_at: toLocalDateTimeInput(post.published_at),
-    publish_to_facebook: Boolean(post.id_fb_post),
-    publish_to_zalo: Boolean(post.id_zalo_post),
+    publish_to_facebook: post.social_publish_facebook || Boolean(post.id_fb_post),
+    publish_to_zalo: post.social_publish_zalo || Boolean(post.id_zalo_post),
   };
 }
 
@@ -147,6 +188,7 @@ export function PostEditorForm({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const isEditing = initialValue !== null;
+  const socialPublishTimingLabel = getSocialPublishTimingLabel(form);
   const submitLabel = isSubmitting ? "Đang lưu..." : isEditing ? "Lưu thay đổi" : "Tạo bài viết";
 
   const handleTagChange = (tagId: string, checked: boolean) => {
@@ -359,10 +401,11 @@ export function PostEditorForm({
 
               <div className="grid gap-3 rounded-md border p-3">
                 <div className="grid gap-1">
-                  <Label>Đăng lên kênh ngoài</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Chỉ áp dụng cho bài viết text, hình ảnh và đường dẫn.
-                  </p>
+                  <Label>Đăng lên nền tảng khác</Label>
+                </div>
+
+                <div className="bg-muted/40 text-muted-foreground rounded-md border px-3 py-2 text-xs">
+                  {socialPublishTimingLabel}
                 </div>
 
                 <label className="flex min-h-10 items-center gap-3">

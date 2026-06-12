@@ -2,7 +2,10 @@
 /* eslint-disable import/no-unresolved */
 import "server-only";
 
+import type { RowDataPacket } from "mysql2/promise";
+
 import { withSrxReadFallback } from "@/lib/srx-db-errors";
+import { getSrxDB } from "@/lib/srx-db";
 import { prisma2 } from "@/lib/prisma2";
 import { syncSrxNewsPostSocialChannels } from "@/lib/srx-news-social-posting";
 import { Prisma } from "../../prisma/generated/srx-app-client";
@@ -37,6 +40,9 @@ function normalizeNullableString(value: string | null | undefined): string | nul
   return trimmed ? trimmed : null;
 }
 
+const LOCAL_DATE_TIME_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/;
+const VIETNAM_TIME_OFFSET = "+07:00";
+
 function slugify(value: string): string {
   return (
     value
@@ -57,13 +63,71 @@ function parseOptionalDate(value: string | null | undefined): Date | null {
     return null;
   }
 
-  const date = new Date(trimmed);
+  const normalizedDateInput = LOCAL_DATE_TIME_INPUT_PATTERN.test(trimmed) ? `${trimmed}${VIETNAM_TIME_OFFSET}` : trimmed;
+  const date = new Date(normalizedDateInput);
 
   if (Number.isNaN(date.getTime())) {
     throw new Error("Ngày giờ không hợp lệ");
   }
 
   return date;
+}
+
+type ColumnRow = RowDataPacket & {
+  Field: string;
+};
+
+let ensurePostSocialScheduleColumnsPromise: Promise<void> | null = null;
+
+function isFutureDate(value: Date | null): boolean {
+  return value ? value.getTime() > Date.now() : false;
+}
+
+function shouldSyncSocialOnSave(
+  payload: SrxNewsPostMutationInput,
+  publishedAt: Date | null,
+  existingSocialIds?: PostSocialIds,
+): boolean {
+  const hasExistingSocialPost = Boolean(existingSocialIds?.id_fb_post || existingSocialIds?.id_zalo_post);
+
+  if (payload.status !== "published") {
+    return hasExistingSocialPost;
+  }
+
+  if (!isFutureDate(publishedAt)) {
+    return payload.publish_to_facebook || payload.publish_to_zalo || hasExistingSocialPost;
+  }
+
+  return (
+    (!payload.publish_to_facebook && Boolean(existingSocialIds?.id_fb_post)) ||
+    (!payload.publish_to_zalo && Boolean(existingSocialIds?.id_zalo_post))
+  );
+}
+
+async function ensurePostSocialScheduleColumns(): Promise<void> {
+  if (!ensurePostSocialScheduleColumnsPromise) {
+    ensurePostSocialScheduleColumnsPromise = (async () => {
+      const db = getSrxDB();
+      const [rows] = await db.query<ColumnRow[]>("SHOW COLUMNS FROM posts WHERE Field IN (?, ?)", [
+        "social_publish_facebook",
+        "social_publish_zalo",
+      ]);
+      const existingColumns = new Set(rows.map((row) => row.Field));
+
+      if (!existingColumns.has("social_publish_facebook")) {
+        await db.execute("ALTER TABLE posts ADD COLUMN social_publish_facebook TINYINT(1) NOT NULL DEFAULT 0 AFTER id_fb_post");
+      }
+
+      if (!existingColumns.has("social_publish_zalo")) {
+        await db.execute("ALTER TABLE posts ADD COLUMN social_publish_zalo TINYINT(1) NOT NULL DEFAULT 0 AFTER social_publish_facebook");
+      }
+    })().catch((error: unknown) => {
+      ensurePostSocialScheduleColumnsPromise = null;
+      throw error;
+    });
+  }
+
+  await ensurePostSocialScheduleColumnsPromise;
 }
 
 function mapCategory(category: {
@@ -110,6 +174,8 @@ function mapPost(post: {
   id: bigint;
   id_zalo_post?: string | null;
   id_fb_post?: string | null;
+  social_publish_facebook?: boolean | number | null;
+  social_publish_zalo?: boolean | number | null;
   title: string;
   slug: string;
   excerpt: string | null;
@@ -135,6 +201,8 @@ function mapPost(post: {
     id: post.id.toString(),
     id_zalo_post: normalizeOptionalString(post.id_zalo_post),
     id_fb_post: normalizeOptionalString(post.id_fb_post),
+    social_publish_facebook: Boolean(post.social_publish_facebook),
+    social_publish_zalo: Boolean(post.social_publish_zalo),
     title: post.title,
     slug: post.slug,
     excerpt: normalizeOptionalString(post.excerpt),
@@ -224,17 +292,47 @@ type PostSocialIds = {
   id: bigint;
   id_fb_post: string | null;
   id_zalo_post: string | null;
+  social_publish_facebook: boolean | number | null;
+  social_publish_zalo: boolean | number | null;
 };
 
+type DueSocialPostRow = RowDataPacket & PostSocialIds;
+
+export type SrxNewsSocialSchedulerResult = {
+  checked: number;
+  failed: Array<{ error: string; postId: string; title?: string }>;
+  published: Array<{ facebookPostId: string | null; postId: string; title: string; zaloPostId: string | null }>;
+};
+
+async function updatePostSocialScheduleFlags(
+  postId: string | bigint,
+  payload: Pick<SrxNewsPostMutationInput, "publish_to_facebook" | "publish_to_zalo">,
+): Promise<void> {
+  await ensurePostSocialScheduleColumns();
+  await prisma2.$executeRaw`
+    UPDATE posts
+    SET social_publish_facebook = ${payload.publish_to_facebook ? 1 : 0},
+        social_publish_zalo = ${payload.publish_to_zalo ? 1 : 0}
+    WHERE id = ${BigInt(postId)}
+  `;
+}
+
 async function getPostSocialIds(postId: bigint): Promise<PostSocialIds> {
+  await ensurePostSocialScheduleColumns();
   const rows = await prisma2.$queryRaw<PostSocialIds[]>`
-    SELECT id, id_fb_post, id_zalo_post
+    SELECT id, id_fb_post, id_zalo_post, social_publish_facebook, social_publish_zalo
     FROM posts
     WHERE id = ${postId}
     LIMIT 1
   `;
 
-  return rows[0] ?? { id: postId, id_fb_post: null, id_zalo_post: null };
+  return rows[0] ?? {
+    id: postId,
+    id_fb_post: null,
+    id_zalo_post: null,
+    social_publish_facebook: false,
+    social_publish_zalo: false,
+  };
 }
 
 async function getPostSocialIdMap(postIds: readonly bigint[]): Promise<Map<string, PostSocialIds>> {
@@ -242,8 +340,9 @@ async function getPostSocialIdMap(postIds: readonly bigint[]): Promise<Map<strin
     return new Map();
   }
 
+  await ensurePostSocialScheduleColumns();
   const rows = await prisma2.$queryRaw<PostSocialIds[]>`
-    SELECT id, id_fb_post, id_zalo_post
+    SELECT id, id_fb_post, id_zalo_post, social_publish_facebook, social_publish_zalo
     FROM posts
     WHERE id IN (${Prisma.join(postIds)})
   `;
@@ -546,13 +645,16 @@ export async function createSrxNewsPost(input: SrxNewsPostMutationInput): Promis
       },
     },
   });
+  await updatePostSocialScheduleFlags(post.id, payload);
 
   const mappedPost = mapPost({
     ...post,
+    social_publish_facebook: payload.publish_to_facebook,
+    social_publish_zalo: payload.publish_to_zalo,
     status: post.status as (typeof srxNewsStatusValues)[number],
   });
 
-  if (payload.publish_to_facebook || payload.publish_to_zalo) {
+  if (shouldSyncSocialOnSave(payload, publishedAt)) {
     await syncSrxNewsPostSocialChannels({
       payload,
       post: mappedPost,
@@ -619,6 +721,7 @@ export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutati
       });
     }
   });
+  await updatePostSocialScheduleFlags(numericId, payload);
 
   const post = await getSrxNewsPostById(postId);
 
@@ -626,14 +729,91 @@ export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutati
     return null;
   }
 
-  await syncSrxNewsPostSocialChannels({
-    existingFbPostId: existingSocialIds.id_fb_post,
-    existingZaloPostId: existingSocialIds.id_zalo_post,
-    payload,
-    post,
-  });
+  if (shouldSyncSocialOnSave(payload, publishedAt, existingSocialIds)) {
+    await syncSrxNewsPostSocialChannels({
+      existingFbPostId: existingSocialIds.id_fb_post,
+      existingZaloPostId: existingSocialIds.id_zalo_post,
+      payload,
+      post,
+    });
+  }
 
   return getSrxNewsPostById(postId);
+}
+
+export async function publishDueSrxNewsSocialPosts(limit = 20): Promise<SrxNewsSocialSchedulerResult> {
+  await ensurePostSocialScheduleColumns();
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+  const dueRows = await prisma2.$queryRaw<DueSocialPostRow[]>`
+    SELECT id, id_fb_post, id_zalo_post, social_publish_facebook, social_publish_zalo
+    FROM posts
+    WHERE status = 'published'
+      AND published_at IS NOT NULL
+      AND published_at <= ${new Date()}
+      AND (
+        (social_publish_facebook = 1 AND (id_fb_post IS NULL OR id_fb_post = ''))
+        OR (social_publish_zalo = 1 AND (id_zalo_post IS NULL OR id_zalo_post = ''))
+      )
+    ORDER BY published_at ASC, id ASC
+    LIMIT ${safeLimit}
+  `;
+
+  const result: SrxNewsSocialSchedulerResult = {
+    checked: dueRows.length,
+    failed: [],
+    published: [],
+  };
+
+  for (const row of dueRows) {
+    const postId = row.id.toString();
+    const post = await getSrxNewsPostById(postId);
+
+    if (!post) {
+      result.failed.push({ postId, error: "Khong tim thay bai viet" });
+      continue;
+    }
+
+    const payload: SrxNewsPostMutationInput = {
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      content: post.content,
+      featured_image_url: post.featured_image_url,
+      category_id: post.category_id,
+      tag_ids: post.tag_ids,
+      status: post.status,
+      is_featured: post.is_featured,
+      published_at: post.published_at?.toISOString() ?? "",
+      publish_to_facebook: Boolean(row.social_publish_facebook),
+      publish_to_zalo: Boolean(row.social_publish_zalo),
+    };
+
+    try {
+      const syncResult = await syncSrxNewsPostSocialChannels({
+        existingFbPostId: row.id_fb_post,
+        existingZaloPostId: row.id_zalo_post,
+        mode: "create-missing",
+        payload,
+        post,
+      });
+
+      result.published.push({
+        postId,
+        title: post.title,
+        facebookPostId: syncResult.facebookPostId,
+        zaloPostId: syncResult.zaloPostId,
+      });
+    } catch (error) {
+      result.failed.push({
+        postId,
+        title: post.title,
+        error: error instanceof Error ? error.message : "Khong the dang bai viet",
+      });
+    }
+  }
+
+  return result;
 }
 
 export async function deleteSrxNewsPost(postId: string): Promise<void> {

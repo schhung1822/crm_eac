@@ -33,6 +33,8 @@ export const srxNewsPostSchema = z.object({
   id: z.string(),
   id_zalo_post: z.string(),
   id_fb_post: z.string(),
+  social_publish_facebook: z.boolean(),
+  social_publish_zalo: z.boolean(),
   title: z.string(),
   slug: z.string(),
   excerpt: z.string(),

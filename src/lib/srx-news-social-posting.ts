@@ -8,6 +8,7 @@ import type { SrxNewsPost, SrxNewsPostMutationInput } from "@/lib/srx-news.share
 type SocialSyncInput = {
   existingFbPostId?: string | null;
   existingZaloPostId?: string | null;
+  mode?: "replace" | "create-missing";
   payload: SrxNewsPostMutationInput;
   post: SrxNewsPost;
 };
@@ -60,6 +61,10 @@ const HTML_TAG_PATTERN = /<[^>]+>/g;
 const HTML_IMAGE_PATTERN = /<img\b[^>]*\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
 const HTML_VIDEO_PATTERN = /<(video|source|iframe)\b|(?:src|href)\s*=\s*(?:"[^"]+\.(?:mp4|mov|m4v|webm)(?:[?#][^"]*)?"|'[^']+\.(?:mp4|mov|m4v|webm)(?:[?#][^']*)?')/i;
 const HTML_SPLIT_IMAGE_PATTERN = /<img\b[^>]*>/gi;
+const FACEBOOK_MESSAGE_LIMIT = 5000;
+const FACEBOOK_BOLD_UPPERCASE_START = 0x1d400;
+const FACEBOOK_BOLD_LOWERCASE_START = 0x1d41a;
+const FACEBOOK_BOLD_DIGIT_START = 0x1d7ce;
 
 function normalizeOptionalString(value: string | null | undefined): string {
   return String(value ?? "").trim();
@@ -89,7 +94,193 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'");
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x([\da-f]+);/gi, (_, codePoint: string) => String.fromCodePoint(Number.parseInt(codePoint, 16)))
+    .replace(/&#(\d+);/g, (_, codePoint: string) => String.fromCodePoint(Number.parseInt(codePoint, 10)));
+}
+
+function normalizeFacebookMessage(value: string): string {
+  return value
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function appendFacebookBlockBreak(parts: string[]): void {
+  const current = parts.join("");
+
+  if (!current.trim()) {
+    return;
+  }
+
+  if (current.endsWith("\n\n")) {
+    return;
+  }
+
+  if (current.endsWith("\n")) {
+    parts.push("\n");
+    return;
+  }
+
+  parts.push("\n\n");
+}
+
+function appendFacebookLineBreak(parts: string[]): void {
+  const current = parts.join("");
+
+  if (!current.trim() || current.endsWith("\n")) {
+    return;
+  }
+
+  parts.push("\n");
+}
+
+function appendFacebookText(parts: string[], value: string): void {
+  const normalizedValue = value.replace(/\s+/g, " ");
+
+  if (!normalizedValue.trim()) {
+    return;
+  }
+
+  const current = parts.join("");
+  const needsLeadingSpace =
+    current.length > 0 && !/[\s([{/"']$/.test(current) && !/^[\s.,;:!?%)]/.test(normalizedValue);
+
+  parts.push(`${needsLeadingSpace ? " " : ""}${normalizedValue.trim()}`);
+}
+
+function parseHtmlTagName(tag: string): string {
+  const match = /^<\/?\s*([a-z\d]+)/i.exec(tag);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function isClosingHtmlTag(tag: string): boolean {
+  return /^<\s*\//.test(tag);
+}
+
+function tokenizeHtml(html: string): string[] {
+  const tokens: string[] = [];
+  let cursor = 0;
+
+  while (cursor < html.length) {
+    const tagStart = html.indexOf("<", cursor);
+
+    if (tagStart === -1) {
+      tokens.push(html.slice(cursor));
+      break;
+    }
+
+    if (tagStart > cursor) {
+      tokens.push(html.slice(cursor, tagStart));
+    }
+
+    const tagEnd = html.indexOf(">", tagStart + 1);
+
+    if (tagEnd === -1) {
+      tokens.push(html.slice(tagStart));
+      break;
+    }
+
+    tokens.push(html.slice(tagStart, tagEnd + 1));
+    cursor = tagEnd + 1;
+  }
+
+  return tokens;
+}
+
+function toFacebookBoldCharacter(character: string): string {
+  const codePoint = character.codePointAt(0) ?? 0;
+
+  if (codePoint >= 65 && codePoint <= 90) {
+    return String.fromCodePoint(FACEBOOK_BOLD_UPPERCASE_START + codePoint - 65);
+  }
+
+  if (codePoint >= 97 && codePoint <= 122) {
+    return String.fromCodePoint(FACEBOOK_BOLD_LOWERCASE_START + codePoint - 97);
+  }
+
+  if (codePoint >= 48 && codePoint <= 57) {
+    return String.fromCodePoint(FACEBOOK_BOLD_DIGIT_START + codePoint - 48);
+  }
+
+  if (character === "Đ") {
+    return `${String.fromCodePoint(FACEBOOK_BOLD_UPPERCASE_START + 3)}\u0335`;
+  }
+
+  if (character === "đ") {
+    return `${String.fromCodePoint(FACEBOOK_BOLD_LOWERCASE_START + 3)}\u0335`;
+  }
+
+  return character;
+}
+
+function toFacebookBold(value: string): string {
+  return [...value.normalize("NFD")].map(toFacebookBoldCharacter).join("").normalize("NFC");
+}
+
+function handleFacebookListTag(parts: string[], isClosingTag: boolean): void {
+  if (isClosingTag) {
+    appendFacebookLineBreak(parts);
+    return;
+  }
+
+  appendFacebookLineBreak(parts);
+  appendFacebookText(parts, "- ");
+}
+
+function handleFacebookBlockTag(parts: string[], tagName: string, isClosingTag: boolean): void {
+  appendFacebookBlockBreak(parts);
+
+  if (!isClosingTag && tagName === "blockquote") {
+    appendFacebookText(parts, "> ");
+  }
+}
+
+function handleFacebookHtmlTag(parts: string[], tag: string, boldDepth: number): number {
+  const tagName = parseHtmlTagName(tag);
+  const isClosingTag = isClosingHtmlTag(tag);
+
+  if (["strong", "b"].includes(tagName)) {
+    return Math.max(0, boldDepth + (isClosingTag ? -1 : 1));
+  }
+
+  if (/^h[1-6]$/.test(tagName)) {
+    appendFacebookBlockBreak(parts);
+    return Math.max(0, boldDepth + (isClosingTag ? -1 : 1));
+  }
+
+  if (tagName === "br") {
+    appendFacebookLineBreak(parts);
+  } else if (["p", "div", "section", "article", "figure", "figcaption", "blockquote"].includes(tagName)) {
+    handleFacebookBlockTag(parts, tagName, isClosingTag);
+  } else if (["ul", "ol"].includes(tagName)) {
+    appendFacebookBlockBreak(parts);
+  } else if (tagName === "li") {
+    handleFacebookListTag(parts, isClosingTag);
+  }
+
+  return boldDepth;
+}
+
+function formatHtmlForFacebookMessage(html: string): string {
+  const parts: string[] = [];
+  let boldDepth = 0;
+  const safeHtml = html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "");
+
+  for (const token of tokenizeHtml(safeHtml)) {
+    if (token.startsWith("<")) {
+      boldDepth = handleFacebookHtmlTag(parts, token, boldDepth);
+    } else {
+      const text = decodeHtmlEntities(token);
+      appendFacebookText(parts, boldDepth > 0 ? toFacebookBold(text) : text);
+    }
+  }
+
+  return normalizeFacebookMessage(parts.join(""));
 }
 
 function hasVideoContent(content: string): boolean {
@@ -141,7 +332,14 @@ function buildPublicPostUrl(post: SrxNewsPost): string {
 }
 
 function buildPostMessage(post: SrxNewsPost): string {
-  return [post.title, normalizeOptionalString(post.excerpt), stripHtml(post.content)].filter(Boolean).join("\n\n").slice(0, 5000);
+  return [
+    toFacebookBold(post.title),
+    normalizeOptionalString(post.excerpt),
+    formatHtmlForFacebookMessage(post.content),
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, FACEBOOK_MESSAGE_LIMIT);
 }
 
 function readHtmlAttribute(tag: string, attributeName: string): string {
@@ -572,11 +770,13 @@ async function updatePostSocialIds(postId: string, socialIds: SocialSyncResult):
 export async function syncSrxNewsPostSocialChannels({
   existingFbPostId,
   existingZaloPostId,
+  mode = "replace",
   payload,
   post,
 }: SocialSyncInput): Promise<SocialSyncResult> {
-  const wantsFacebook = payload.publish_to_facebook === true;
-  const wantsZalo = payload.publish_to_zalo === true;
+  const canPublishSocial = payload.status === "published";
+  const wantsFacebook = canPublishSocial && payload.publish_to_facebook === true;
+  const wantsZalo = canPublishSocial && payload.publish_to_zalo === true;
 
   if ((wantsFacebook || wantsZalo) && hasVideoContent(post.content)) {
     throw new Error("Bài viết có video nên không thể đăng lên Facebook/Zalo OA");
@@ -584,13 +784,17 @@ export async function syncSrxNewsPostSocialChannels({
 
   let facebookPostId = normalizeOptionalString(existingFbPostId) || null;
   let zaloPostId = normalizeOptionalString(existingZaloPostId) || null;
+  const shouldReplaceExisting = mode === "replace";
 
   if (wantsFacebook) {
-    if (facebookPostId) {
+    if (facebookPostId && shouldReplaceExisting) {
       await deleteFacebookPost(facebookPostId);
+      facebookPostId = null;
     }
 
-    facebookPostId = await createFacebookPost(post);
+    if (!facebookPostId) {
+      facebookPostId = await createFacebookPost(post);
+    }
   } else if (facebookPostId) {
     await deleteFacebookPost(facebookPostId);
     facebookPostId = null;
@@ -599,7 +803,11 @@ export async function syncSrxNewsPostSocialChannels({
   await updatePostSocialIds(post.id, { facebookPostId, zaloPostId });
 
   if (wantsZalo) {
-    zaloPostId = zaloPostId ? await updateZaloArticle(post, zaloPostId) : await createZaloArticle(post);
+    if (zaloPostId && shouldReplaceExisting) {
+      zaloPostId = await updateZaloArticle(post, zaloPostId);
+    } else if (!zaloPostId) {
+      zaloPostId = await createZaloArticle(post);
+    }
   } else if (zaloPostId) {
     await deleteZaloArticle(zaloPostId);
     zaloPostId = null;

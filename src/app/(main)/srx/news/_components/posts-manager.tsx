@@ -43,6 +43,25 @@ function formatCount(value: number): string {
   return value.toLocaleString("vi-VN");
 }
 
+function getSocialChannelBadges(post: SrxNewsPost): Array<{ label: string; variant: "default" | "secondary" | "outline" }> {
+  const badges: Array<{ label: string; variant: "default" | "secondary" | "outline" }> = [];
+  const isScheduled = post.status === "published" && post.published_at !== null && post.published_at.getTime() > Date.now();
+
+  if (post.id_fb_post) {
+    badges.push({ label: "FB đã đăng", variant: "default" });
+  } else if (post.social_publish_facebook) {
+    badges.push({ label: isScheduled ? "FB hẹn giờ" : "FB chờ đăng", variant: "outline" });
+  }
+
+  if (post.id_zalo_post) {
+    badges.push({ label: "Zalo đã đăng", variant: "default" });
+  } else if (post.social_publish_zalo) {
+    badges.push({ label: isScheduled ? "Zalo hẹn giờ" : "Zalo chờ đăng", variant: "outline" });
+  }
+
+  return badges;
+}
+
 export function PostsManager({
   initialPosts,
   initialCategories,
@@ -202,6 +221,28 @@ export function PostsManager({
         accessorKey: "published_at",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Xuất bản" />,
         cell: ({ row }) => <span>{formatDate(row.original.published_at)}</span>,
+        enableSorting: false,
+      },
+      {
+        id: "social_publish",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Kênh ngoài" />,
+        cell: ({ row }) => {
+          const badges = getSocialChannelBadges(row.original);
+
+          if (badges.length === 0) {
+            return <span className="text-muted-foreground">-</span>;
+          }
+
+          return (
+            <div className="flex flex-wrap gap-1">
+              {badges.map((badge) => (
+                <Badge key={badge.label} variant={badge.variant}>
+                  {badge.label}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
         enableSorting: false,
       },
       {
