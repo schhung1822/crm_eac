@@ -3,7 +3,11 @@ import "server-only";
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 
 function getNormalizedSiteUrl(): string | null {
-  const rawValue = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const rawValue =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.SRX_PUBLIC_SITE_URL?.trim() ||
+    process.env.SITE_URL?.trim() ||
+    process.env.APP_URL?.trim();
 
   if (!rawValue) {
     return null;

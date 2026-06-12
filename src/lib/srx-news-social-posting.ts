@@ -47,6 +47,8 @@ type ZaloArticleBodyItem =
     }
   | {
       caption: string;
+      comment?: "show";
+      status?: "show";
       type: "image";
       url: string;
     };
@@ -306,6 +308,37 @@ function extractImageUrls(post: SrxNewsPost): string[] {
   return [...imageUrls];
 }
 
+function normalizePublicHttpUrl(value: string): string {
+  try {
+    const parsedUrl = new URL(value);
+    return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:" ? parsedUrl.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function getSocialImageUrls(post: SrxNewsPost): string[] {
+  return extractImageUrls(post).map(normalizePublicHttpUrl).filter(Boolean);
+}
+
+function appendLinkToMessage(message: string, link: string): string {
+  if (!link) {
+    return message;
+  }
+
+  const normalizedMessage = message.trim();
+
+  if (!normalizedMessage) {
+    return link;
+  }
+
+  if (normalizedMessage.includes(link)) {
+    return normalizedMessage;
+  }
+
+  return `${normalizedMessage}\n\nXem thêm: ${link}`;
+}
+
 function buildPublicPostUrl(post: SrxNewsPost): string {
   const template = process.env.SRX_PUBLIC_NEWS_URL_TEMPLATE?.trim();
 
@@ -384,6 +417,8 @@ function buildZaloArticleBody(post: SrxNewsPost, link: string): ZaloArticleBodyI
         type: "image",
         url: imageUrl,
         caption: readHtmlAttribute(imageTag, "alt") || post.title,
+        status: "show",
+        comment: "show",
       });
     }
 
@@ -487,12 +522,14 @@ function getZaloListEndpoint(): string {
 }
 
 function buildZaloArticlePayload(post: SrxNewsPost) {
-  const imageUrls = extractImageUrls(post);
+  const imageUrls = getSocialImageUrls(post);
   const link = buildPublicPostUrl(post);
   const description = normalizeOptionalString(post.excerpt) || stripHtml(post.content).slice(0, 250);
 
   return {
     type: "normal",
+    status: "show",
+    comment: "show",
     title: post.title,
     author: process.env.ZALO_OA_ARTICLE_AUTHOR?.trim() || "SRX",
     cover: imageUrls[0]
@@ -500,6 +537,7 @@ function buildZaloArticlePayload(post: SrxNewsPost) {
           cover_type: "photo",
           photo_url: imageUrls[0],
           status: "show",
+          comment: "show",
         }
       : undefined,
     description,
@@ -703,10 +741,25 @@ async function callFacebookFormApi(endpoint: string, params: Record<string, stri
 async function createFacebookPost(post: SrxNewsPost): Promise<string> {
   const { pageId } = getFacebookPageConfig();
   const graphBaseUrl = getFacebookGraphBaseUrl();
-  const imageUrls = extractImageUrls(post);
+  const imageUrls = getSocialImageUrls(post);
   const link = buildPublicPostUrl(post);
-  const message = buildPostMessage(post);
+  const message = appendLinkToMessage(buildPostMessage(post), link);
   const attachedMedia: Array<{ media_fbid: string }> = [];
+
+  if (imageUrls.length === 1) {
+    const photoResult = await callFacebookFormApi(`${graphBaseUrl}/${pageId}/photos`, {
+      url: imageUrls[0],
+      caption: message,
+      published: "true",
+    });
+    const photoPostId = normalizeOptionalString(photoResult.post_id ?? photoResult.id);
+
+    if (!photoPostId) {
+      throw new Error("Facebook không trả về post_id cho bài viết ảnh");
+    }
+
+    return photoPostId;
+  }
 
   for (const imageUrl of imageUrls) {
     const photoResult = await callFacebookFormApi(`${graphBaseUrl}/${pageId}/photos`, {
@@ -722,8 +775,7 @@ async function createFacebookPost(post: SrxNewsPost): Promise<string> {
 
   const feedResult = await callFacebookFormApi(`${graphBaseUrl}/${pageId}/feed`, {
     message,
-    ...(link ? { link } : {}),
-    ...(attachedMedia.length ? { attached_media: JSON.stringify(attachedMedia) } : {}),
+    ...(attachedMedia.length ? { attached_media: JSON.stringify(attachedMedia) } : link ? { link } : {}),
   });
   const postId = normalizeOptionalString(feedResult.id ?? feedResult.post_id);
 
