@@ -304,6 +304,21 @@ export type SrxNewsSocialSchedulerResult = {
   published: Array<{ facebookPostId: string | null; postId: string; title: string; zaloPostId: string | null }>;
 };
 
+export type SrxNewsSocialSchedulerStatus = {
+  appNow: string;
+  duePosts: Array<{
+    facebookPostId: string | null;
+    id: string;
+    publishFacebook: boolean;
+    publishZalo: boolean;
+    publishedAt: string | null;
+    title: string;
+    zaloPostId: string | null;
+  }>;
+  dueTotal: number;
+  scheduledTotal: number;
+};
+
 async function updatePostSocialScheduleFlags(
   postId: string | bigint,
   payload: Pick<SrxNewsPostMutationInput, "publish_to_facebook" | "publish_to_zalo">,
@@ -814,6 +829,65 @@ export async function publishDueSrxNewsSocialPosts(limit = 20): Promise<SrxNewsS
   }
 
   return result;
+}
+
+export async function getSrxNewsSocialSchedulerStatus(limit = 20): Promise<SrxNewsSocialSchedulerStatus> {
+  await ensurePostSocialScheduleColumns();
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+  const appNow = new Date();
+  const [scheduledRows, dueRows] = await Promise.all([
+    prisma2.$queryRaw<Array<RowDataPacket & { total: bigint | number }>>`
+      SELECT COUNT(*) AS total
+      FROM posts
+      WHERE status = 'published'
+        AND published_at IS NOT NULL
+        AND (
+          (social_publish_facebook = 1 AND (id_fb_post IS NULL OR id_fb_post = ''))
+          OR (social_publish_zalo = 1 AND (id_zalo_post IS NULL OR id_zalo_post = ''))
+        )
+    `,
+    prisma2.$queryRaw<
+      Array<
+        RowDataPacket & {
+          id: bigint;
+          id_fb_post: string | null;
+          id_zalo_post: string | null;
+          published_at: Date | null;
+          social_publish_facebook: boolean | number | null;
+          social_publish_zalo: boolean | number | null;
+          title: string;
+        }
+      >
+    >`
+      SELECT id, title, published_at, id_fb_post, id_zalo_post, social_publish_facebook, social_publish_zalo
+      FROM posts
+      WHERE status = 'published'
+        AND published_at IS NOT NULL
+        AND published_at <= ${appNow}
+        AND (
+          (social_publish_facebook = 1 AND (id_fb_post IS NULL OR id_fb_post = ''))
+          OR (social_publish_zalo = 1 AND (id_zalo_post IS NULL OR id_zalo_post = ''))
+        )
+      ORDER BY published_at ASC, id ASC
+      LIMIT ${safeLimit}
+    `,
+  ]);
+
+  return {
+    appNow: appNow.toISOString(),
+    scheduledTotal: Number(scheduledRows[0]?.total ?? 0),
+    dueTotal: dueRows.length,
+    duePosts: dueRows.map((row) => ({
+      id: row.id.toString(),
+      title: row.title,
+      publishedAt: row.published_at?.toISOString() ?? null,
+      publishFacebook: Boolean(row.social_publish_facebook),
+      publishZalo: Boolean(row.social_publish_zalo),
+      facebookPostId: normalizeOptionalString(row.id_fb_post) || null,
+      zaloPostId: normalizeOptionalString(row.id_zalo_post) || null,
+    })),
+  };
 }
 
 export async function deleteSrxNewsPost(postId: string): Promise<void> {

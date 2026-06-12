@@ -69,3 +69,43 @@ sudo journalctl -u srx-social-scheduler.service -n 100 --no-pager
 cd /var/www/crm-eac
 npm run srx:social-scheduler -- --limit=20
 ```
+
+## Debug when scheduled posts do not publish
+
+First check whether the timer is actually enabled:
+
+```bash
+systemctl list-timers srx-social-scheduler.timer
+sudo systemctl status srx-social-scheduler.timer
+sudo systemctl status srx-social-scheduler.service
+sudo journalctl -u srx-social-scheduler.service -n 100 --no-pager
+```
+
+Then run a safe status check. This does not publish anything:
+
+```bash
+cd /var/www/crm-eac
+npm run srx:social-scheduler -- --status --limit=20
+```
+
+Expected output:
+
+- `scheduledTotal > 0`: there are published posts waiting for Facebook/Zalo.
+- `dueTotal > 0`: there are posts whose `published_at` is already due and should publish on the next real run.
+- `dueTotal = 0`: no post currently matches the scheduler conditions.
+
+The scheduler only publishes rows matching all of these conditions:
+
+- `status = 'published'`
+- `published_at IS NOT NULL`
+- `published_at <= appNow`
+- `social_publish_facebook = 1` with empty `id_fb_post`, or `social_publish_zalo = 1` with empty `id_zalo_post`
+
+Run one real cycle manually:
+
+```bash
+cd /var/www/crm-eac
+npm run srx:social-scheduler -- --limit=20
+```
+
+If this publishes successfully but automatic publishing does not, the problem is systemd timer setup. If this returns failed posts, inspect the error message in the JSON output.

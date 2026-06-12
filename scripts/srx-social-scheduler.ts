@@ -1,5 +1,5 @@
 import { getSrxDB } from "@/lib/srx-db";
-import { publishDueSrxNewsSocialPosts } from "@/lib/srx-news";
+import { getSrxNewsSocialSchedulerStatus, publishDueSrxNewsSocialPosts } from "@/lib/srx-news";
 import type { RowDataPacket } from "mysql2/promise";
 
 const LOCK_NAME = "srx_news_social_scheduler";
@@ -14,6 +14,10 @@ function parseLimit(): number {
   const parsedLimit = Number(limitArg?.slice("--limit=".length) ?? process.env.SRX_SOCIAL_SCHEDULER_LIMIT ?? DEFAULT_LIMIT);
 
   return Number.isFinite(parsedLimit) ? parsedLimit : DEFAULT_LIMIT;
+}
+
+function isStatusMode(): boolean {
+  return process.argv.includes("--status") || process.argv.includes("--dry-run");
 }
 
 async function acquireLock(): Promise<boolean> {
@@ -38,6 +42,12 @@ async function main(): Promise<void> {
   }
 
   try {
+    if (isStatusMode()) {
+      const status = await getSrxNewsSocialSchedulerStatus(parseLimit());
+      console.log(JSON.stringify(status, null, 2));
+      return;
+    }
+
     const result = await publishDueSrxNewsSocialPosts(parseLimit());
 
     console.log(
