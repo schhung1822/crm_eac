@@ -212,7 +212,7 @@ export function NavMain({ indicators = {} }: NavMainProps) {
                 tooltip="Quick Create"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
               >
-                <a href="https://srx.eventhub.vn/" target="_blank" rel="noopener noreferrer">
+                <a href="https://srx.vn/" target="_blank" rel="noopener noreferrer">
                   <Globe />
                   <span>Mở website</span>
                 </a>
@@ -223,7 +223,7 @@ export function NavMain({ indicators = {} }: NavMainProps) {
                 className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:opacity-0"
                 variant="outline"
               >
-                <a href="https://srx.eventhub.vn/" target="_blank" rel="noopener noreferrer">
+                <a href="https://srx.vn/" target="_blank" rel="noopener noreferrer">
                   <Globe />
                   <span className="sr-only">Mở website</span>
                 </a>

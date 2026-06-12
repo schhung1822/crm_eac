@@ -353,12 +353,10 @@ export function MediaLibraryManager({ initialSnapshot }: { initialSnapshot: SrxM
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Thư viện ảnh</h1>
         </div>
       </div>
-
       <Card>
         <CardContent className="grid gap-4 pt-2">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -452,7 +450,7 @@ export function MediaLibraryManager({ initialSnapshot }: { initialSnapshot: SrxM
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xs:grid-cols-4 2xl:grid-cols-5">
               {filteredItems.map((item) => (
                 <Card key={item.id} className="overflow-hidden py-0">
                   <div className="bg-muted/40 aspect-square overflow-hidden">
@@ -469,8 +467,6 @@ export function MediaLibraryManager({ initialSnapshot }: { initialSnapshot: SrxM
                       <div className="line-clamp-2 font-medium break-all">{item.filename}</div>
                       <div className="text-muted-foreground text-xs">{item.modified_at.toLocaleString("vi-VN")}</div>
                     </div>
-
-                    <div className="text-muted-foreground line-clamp-2 text-xs break-all">{item.relative_path}</div>
 
                     <div className="flex flex-wrap gap-2">
                       <Button
