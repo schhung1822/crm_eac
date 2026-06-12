@@ -88,6 +88,8 @@ cd /var/www/crm-eac
 npm run srx:social-scheduler -- --status --limit=20
 ```
 
+If the command prints `Cannot find module 'server-only'`, pull the latest code and rebuild. The scheduler bootstrap includes a CLI-only shim for Next.js `server-only` imports.
+
 Expected output:
 
 - `scheduledTotal > 0`: there are published posts waiting for Facebook/Zalo.
