@@ -39,6 +39,7 @@ export type FooterConfig = {
   placeName: string;
   placeLine1: string;
   placeLine2: string;
+  template2FooterText?: string;
 };
 
 export type TemplateStyle = "default" | "starry";
@@ -59,6 +60,7 @@ export type InfoEventConfig = {
   bottomText: string;
   logo1Url?: string;
   logo2Url?: string;
+  logo3Url?: string;
 };
 
 export type TemplateFieldsConfig = {

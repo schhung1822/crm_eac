@@ -44,6 +44,7 @@ import { saveTemplateAction } from "./actions";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const EVENT_IMAGE_PLACEHOLDER = "/upload/events/...";
+const PUBLIC_LADIPAGE_BASE_URL = "https://srx.vn";
 
 const templateStyleLabels: Record<TemplateStyle, string> = {
   default: "Bong bóng Hồng",
@@ -152,41 +153,23 @@ async function uploadEventImage(file: File): Promise<string> {
   return String(result.url ?? "");
 }
 
-function normalizePublicPath(
-  currentTemplateSlug: string,
-  persistedPublicPath: string | undefined,
-  originalSlug: string,
-  currentSavedSlug: string,
-) {
-  const trimmedPublicPath = persistedPublicPath?.trim() ?? "";
-  const defaultPaths = new Set([`/t/${originalSlug}`, `/t/${currentSavedSlug}`, `/events/${originalSlug}`, `/events/${currentSavedSlug}`]);
-
-  if (!trimmedPublicPath || defaultPaths.has(trimmedPublicPath)) {
-    return `/events/${currentTemplateSlug}`;
-  }
-
-  if (/^https?:\/\//i.test(trimmedPublicPath)) {
-    return trimmedPublicPath;
-  }
-
-  return trimmedPublicPath.startsWith("/") ? trimmedPublicPath : `/${trimmedPublicPath}`;
+function normalizePublicPath(currentTemplateSlug: string) {
+  return `/events/${currentTemplateSlug}`;
 }
 
-function buildPublicUrl(pathOrUrl: string, publicBaseUrl?: string) {
-  const trimmedBaseUrl = publicBaseUrl?.trim() ?? "";
+function buildPublicUrl(pathOrUrl: string) {
   const trimmedPath = pathOrUrl.trim();
 
   if (!trimmedPath) {
     return "";
   }
 
-  if (/^https?:\/\//i.test(trimmedPath) || !trimmedBaseUrl) {
+  if (/^https?:\/\//i.test(trimmedPath)) {
     return trimmedPath;
   }
 
   try {
-    const baseUrl = trimmedBaseUrl.endsWith("/") ? trimmedBaseUrl : `${trimmedBaseUrl}/`;
-    return new URL(trimmedPath, baseUrl).toString();
+    return new URL(trimmedPath, `${PUBLIC_LADIPAGE_BASE_URL}/`).toString();
   } catch {
     return trimmedPath;
   }
@@ -341,7 +324,7 @@ function ImageUploadField({
               <img src={value} alt={label} className="h-full w-full object-contain" />
             </div>
           ) : (
-            <div className="text-muted-foreground flex aspect-[4/3] flex-col items-center justify-center gap-2 text-center text-xs">
+            <div className="text-muted-foreground flex aspect-[16/9] flex-col items-center justify-center gap-2 text-center text-xs">
               <ImageIcon className="size-6" />
               <span>Chưa có ảnh</span>
             </div>
@@ -529,7 +512,6 @@ function QuestionEditor({
   );
 }
 
-
 function AdditionalFieldEditor({
   title,
   field,
@@ -608,8 +590,6 @@ export default function AdminTemplateEditor({
   initialName,
   initialConfig,
   editorTitle,
-  publicBaseUrl,
-  publicPath,
   redirectToEditBasePath,
 }: {
   slug: string;
@@ -631,22 +611,13 @@ export default function AdminTemplateEditor({
   }, []);
 
   const resolvedPublicPath = React.useMemo(
-    () => normalizePublicPath(templateSlug, publicPath, slug, currentSlug),
-    [currentSlug, publicPath, slug, templateSlug],
+    () => normalizePublicPath(templateSlug),
+    [templateSlug],
   );
   const publicUrl = React.useMemo(
-    () => buildPublicUrl(resolvedPublicPath, publicBaseUrl),
-    [publicBaseUrl, resolvedPublicPath],
+    () => buildPublicUrl(resolvedPublicPath),
+    [resolvedPublicPath],
   );
-  const publicHost = React.useMemo(() => {
-    try {
-      return new URL(publicUrl).host;
-    } catch {
-      const trimmedBaseUrl = publicBaseUrl?.trim();
-      return trimmedBaseUrl && trimmedBaseUrl.length > 0 ? trimmedBaseUrl : "Chưa cấu hình domain";
-    }
-  }, [publicBaseUrl, publicUrl]);
-
   const visibleDefaultFieldsCount = React.useMemo(
     () => [config.fields.full_name, config.fields.phone, config.fields.email].filter((field) => field.enabled).length,
     [config.fields.email, config.fields.full_name, config.fields.phone],
@@ -665,10 +636,10 @@ export default function AdminTemplateEditor({
   }, [config.fields.email, config.fields.full_name, config.fields.phone, enabledQuestions]);
   const mediaCount = React.useMemo(
     () =>
-      [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url].filter((value) =>
+      [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url].filter((value) =>
         value?.trim(),
       ).length,
-    [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url],
+    [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url],
   );
   const themeSwatches = React.useMemo(
     () =>
@@ -801,8 +772,7 @@ export default function AdminTemplateEditor({
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{templateStyleLabels[currentTemplateStyle]}</Badge>
-              <Badge variant="outline">{publicHost}</Badge>
-              <Badge variant="outline">{resolvedPublicPath}</Badge>
+              <Badge variant="outline">srx.vn</Badge>
             </div>
           </div>
 
@@ -842,7 +812,7 @@ export default function AdminTemplateEditor({
                 </TabsTrigger>
                 <TabsTrigger value="footer" className="rounded-xl px-4 py-2.5">
                   <FileText className="size-4" />
-                  Thông tin & footer
+                  Thông tin
                 </TabsTrigger>
               </TabsList>
 
@@ -852,12 +822,12 @@ export default function AdminTemplateEditor({
                     <AccordionTrigger className="py-5 text-base">Nhận diện & xuất bản</AccordionTrigger>
                     <AccordionContent className="pb-5">
                       <SectionCard
-                        title="Thông tin chính"
-                        description="Tên sự kiện, slug và URL public là 3 điểm cần nhất khi triển khai landing page."
+                        title="Thông tin ladipage"
+                        description="Tên sự kiện, slug và template là các thông tin chính khi triển khai landing page."
                         icon={Globe}
                       >
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2 md:col-span-2">
+                        <div className="grid gap-4 lg:grid-cols-12">
+                          <div className="space-y-2 lg:col-span-8">
                             <Label>Tên sự kiện</Label>
                             <Input
                               value={config.behavior.eventName}
@@ -878,15 +848,7 @@ export default function AdminTemplateEditor({
                               placeholder="Ví dụ: Check in sự kiện EAC Summit"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Slug trang</Label>
-                            <Input
-                              value={templateSlug}
-                              onChange={(event) => setTemplateSlug(event.target.value)}
-                              placeholder="eac-checkin"
-                            />
-                          </div>
-                          <div className="space-y-2">
+                          <div className="space-y-2 lg:col-span-4">
                             <Label>Template Ladipage</Label>
                             <Select
                               value={currentTemplateStyle}
@@ -901,15 +863,15 @@ export default function AdminTemplateEditor({
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-2">
-                            <Label>Domain website hiển thị</Label>
-                            <Input value={publicHost} readOnly className="font-mono text-sm" />
+                          <div className="space-y-2 lg:col-span-4">
+                            <Label>Slug trang</Label>
+                            <Input
+                              value={templateSlug}
+                              onChange={(event) => setTemplateSlug(event.target.value)}
+                              placeholder="eac-checkin"
+                            />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Public path</Label>
-                            <Input value={resolvedPublicPath} readOnly className="font-mono text-sm" />
-                          </div>
-                          <div className="space-y-2 md:col-span-2">
+                          <div className="space-y-2 lg:col-span-8">
                             <Label>URL website hiển thị</Label>
                             <div className="flex flex-col gap-2 sm:flex-row">
                               <Input value={publicUrl} readOnly className="font-mono text-sm" />
@@ -1248,7 +1210,7 @@ export default function AdminTemplateEditor({
                             />
                           </div>
                           <div className="space-y-2 md:col-span-2">
-                            <Label>Organizer text</Label>
+                            <Label>Giới thiệu sự kiện</Label>
                             <Textarea
                               value={config.infoEvent.organizerText}
                               onChange={(event) =>
@@ -1282,7 +1244,7 @@ export default function AdminTemplateEditor({
                         description="Logo đối tác hoặc thương hiệu sẽ được hiển thị cạnh nhau ở khối thông tin sự kiện."
                         icon={ImageIcon}
                       >
-                        <div className="grid gap-5 xl:grid-cols-2">
+                        <div className="grid gap-5 xl:grid-cols-3">
                           <ImageUploadField
                             label="Logo 1"
                             value={config.infoEvent.logo1Url ?? ""}
@@ -1292,6 +1254,11 @@ export default function AdminTemplateEditor({
                             label="Logo 2"
                             value={config.infoEvent.logo2Url ?? ""}
                             onChange={(url) => update({ infoEvent: { ...config.infoEvent, logo2Url: url } })}
+                          />
+                          <ImageUploadField
+                            label="Logo 3"
+                            value={config.infoEvent.logo3Url ?? ""}
+                            onChange={(url) => update({ infoEvent: { ...config.infoEvent, logo3Url: url } })}
                           />
                         </div>
                       </SectionCard>
@@ -1306,18 +1273,29 @@ export default function AdminTemplateEditor({
                     <AccordionContent className="pb-5">
                       <div className="grid gap-5 xl:grid-cols-2">
                         <SectionCard
-                          title="Màu footer"
+                          title="Footer"
                           description="Gradient và màu chữ ở phần cuối landing page."
                           icon={Palette}
                         >
-                          <div className="grid gap-4">
+                          <div className="space-y-2">
+                            <Label>Thông tin footer</Label>
+                            <Textarea
+                              value={config.footer.template2FooterText ?? ""}
+                              onChange={(event) =>
+                                update({ footer: { ...config.footer, template2FooterText: event.target.value } })
+                              }
+                              placeholder="Ví dụ: Ban tổ chức sẽ liên hệ xác nhận thông tin tham dự trước sự kiện."
+                              rows={4}
+                            />
+                          </div>
+                          <div className="grid gap-4 mt-4">
                             <ColorInput
-                              label="Gradient bắt đầu"
+                              label="Màu Gradient bắt đầu"
                               value={config.footer.gradientFrom}
                               onChange={(value) => update({ footer: { ...config.footer, gradientFrom: value } })}
                             />
                             <ColorInput
-                              label="Gradient kết thúc"
+                              label="Màu Gradient kết thúc"
                               value={config.footer.gradientTo}
                               onChange={(value) => update({ footer: { ...config.footer, gradientTo: value } })}
                             />
@@ -1328,7 +1306,6 @@ export default function AdminTemplateEditor({
                             />
                           </div>
                         </SectionCard>
-
                         <SectionCard
                           title="Dress code"
                           description="Tiêu đề, mô tả và 4 chấm màu hiển thị ở cột trái footer."
@@ -1515,8 +1492,7 @@ export default function AdminTemplateEditor({
               <Card className="border-border/70 bg-background/95 overflow-hidden shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <ImageIcon className="size-4" />
-                    Live summary
+                    Thông tin nhanh
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1585,9 +1561,9 @@ export default function AdminTemplateEditor({
                     </div>
                   </div>
 
-                  {config.infoEvent.logo1Url || config.infoEvent.logo2Url ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      {[config.infoEvent.logo1Url, config.infoEvent.logo2Url].map((logo, index) => (
+                  {config.infoEvent.logo1Url || config.infoEvent.logo2Url || config.infoEvent.logo3Url ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {[config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url].map((logo, index) => (
                         <div
                           key={`logo-preview-${index + 1}`}
                           className="border-border/70 bg-muted/20 overflow-hidden rounded-2xl border"
@@ -1596,10 +1572,10 @@ export default function AdminTemplateEditor({
                             <img
                               src={logo}
                               alt={`Logo ${index + 1}`}
-                              className="aspect-[4/3] w-full object-contain p-3"
+                              className="aspect-[16/9] w-full object-contain p-3"
                             />
                           ) : (
-                            <div className="text-muted-foreground flex aspect-[4/3] items-center justify-center text-xs">
+                            <div className="text-muted-foreground flex aspect-[16/9] items-center justify-center text-xs">
                               Trống
                             </div>
                           )}

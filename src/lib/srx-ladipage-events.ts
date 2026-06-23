@@ -123,6 +123,7 @@ function normalizeConfigAssetUrls(config: FormTemplateConfig): FormTemplateConfi
       ...config.infoEvent,
       logo1Url: resolveNullableSiteAssetUrl(config.infoEvent.logo1Url) ?? undefined,
       logo2Url: resolveNullableSiteAssetUrl(config.infoEvent.logo2Url) ?? undefined,
+      logo3Url: resolveNullableSiteAssetUrl(config.infoEvent.logo3Url) ?? undefined,
     },
   };
 }
@@ -138,6 +139,7 @@ function normalizeConfigAssetUrlsForStorage(config: FormTemplateConfig): FormTem
       ...config.infoEvent,
       logo1Url: resolveNullableSiteAssetUrlForStorage(config.infoEvent.logo1Url) ?? undefined,
       logo2Url: resolveNullableSiteAssetUrlForStorage(config.infoEvent.logo2Url) ?? undefined,
+      logo3Url: resolveNullableSiteAssetUrlForStorage(config.infoEvent.logo3Url) ?? undefined,
     },
   };
 }

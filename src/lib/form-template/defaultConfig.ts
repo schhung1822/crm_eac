@@ -63,6 +63,7 @@ export function createBlankFormTemplateConfig(templateStyle: TemplateStyle = "de
       bottomText: "",
       logo1Url: "",
       logo2Url: "",
+      logo3Url: "",
     },
     fields: {
       full_name: { enabled: true, required: true, label: "Họ và tên", placeholder: "" },
@@ -91,6 +92,7 @@ export function createBlankFormTemplateConfig(templateStyle: TemplateStyle = "de
       placeName: "",
       placeLine1: "",
       placeLine2: "",
+      template2FooterText: "",
     },
     behavior: {
       readUserIdFromQueryKey: "userid",
