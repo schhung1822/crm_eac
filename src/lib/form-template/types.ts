@@ -68,7 +68,7 @@ export type TemplateFieldsConfig = {
   email: { enabled: boolean; required: boolean; label: string; placeholder: string };
 
   // hidden (toggle)
-  hidden: Record<HiddenFieldKey, { enabled: boolean }>;
+  hidden: Record<HiddenFieldKey, { enabled: boolean; label?: string; placeholder?: string; required?: boolean; visible?: boolean; type?: FieldType; options?: string[] }>;
 };
 
 export type FormTemplateConfig = {

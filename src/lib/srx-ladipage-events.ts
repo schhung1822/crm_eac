@@ -80,7 +80,7 @@ function normalizeEventName(name: string, config: FormTemplateConfig): string {
 
 function normalizePublicPath(slug: string, publicPath?: string | null): string {
   const trimmed = normalizeOptionalString(publicPath);
-  return trimmed || `/t/${slug}`;
+  return trimmed || `/events/${slug}`;
 }
 
 function normalizeDate(value: Date | string | null | undefined): Date | null {
@@ -308,7 +308,7 @@ export async function ensureDefaultSrxLadipageEvent(): Promise<void> {
         slug,
         normalizeEventName("EAC Check-in", normalizedDefaultConfig),
         "srx-event-site",
-        `/t/${slug}`,
+        `/events/${slug}`,
         "published",
         1,
         normalizedDefaultConfig.templateStyle ?? "default",
@@ -375,7 +375,7 @@ async function insertLadipageEvent(
       eventName,
       currentSlug || slug,
       "srx-event-site",
-      `/t/${slug}`,
+      `/events/${slug}`,
       "published",
       1,
       normalizedConfig.templateStyle ?? "default",
@@ -408,10 +408,10 @@ async function updateLadipageEvent(
   const now = new Date();
   const normalizedConfig = normalizeConfigAssetUrlsForStorage(config);
   const configJson = toJsonString(normalizedConfig);
-  const currentDefaultPublicPath = `/t/${existingCurrent.slug}`;
+  const currentDefaultPublicPath = `/events/${existingCurrent.slug}`;
   const nextPublicPath =
     !existingCurrent.publicPath || existingCurrent.publicPath === currentDefaultPublicPath
-      ? `/t/${nextSlug}`
+      ? `/events/${nextSlug}`
       : existingCurrent.publicPath;
 
   await getSrxDB().query(

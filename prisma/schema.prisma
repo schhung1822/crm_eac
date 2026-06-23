@@ -49,6 +49,10 @@ model checkin {
   nc_order    Decimal?  @db.Decimal(10, 2)
   phone       String?   @db.Text
   event_name  String?   @db.Text
+  event_slug  String?   @db.VarChar(180)
+  template_style String? @db.VarChar(50)
+  site_key    String?   @db.VarChar(80)
+  page_url    String?   @db.Text
   name        String?   @db.Text
   email       String?   @db.Text
   title_q1    String?   @db.Text
@@ -68,6 +72,7 @@ model checkin {
   fbc         String?   @db.Text
   submit_time DateTime? @db.DateTime(0)
   voucher     String?   @db.Text
+  custom_fields_json String? @db.LongText
 
   @@index([nc_order], map: "checkin_order_idx")
 }

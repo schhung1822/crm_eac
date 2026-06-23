@@ -64,9 +64,6 @@ const HTML_IMAGE_PATTERN = /<img\b[^>]*\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>
 const HTML_VIDEO_PATTERN = /<(video|source|iframe)\b|(?:src|href)\s*=\s*(?:"[^"]+\.(?:mp4|mov|m4v|webm)(?:[?#][^"]*)?"|'[^']+\.(?:mp4|mov|m4v|webm)(?:[?#][^']*)?')/i;
 const HTML_SPLIT_IMAGE_PATTERN = /<img\b[^>]*>/gi;
 const FACEBOOK_MESSAGE_LIMIT = 5000;
-const FACEBOOK_BOLD_UPPERCASE_START = 0x1d400;
-const FACEBOOK_BOLD_LOWERCASE_START = 0x1d41a;
-const FACEBOOK_BOLD_DIGIT_START = 0x1d7ce;
 
 function normalizeOptionalString(value: string | null | undefined): string {
   return String(value ?? "").trim();
@@ -192,36 +189,6 @@ function tokenizeHtml(html: string): string[] {
   return tokens;
 }
 
-function toFacebookBoldCharacter(character: string): string {
-  const codePoint = character.codePointAt(0) ?? 0;
-
-  if (codePoint >= 65 && codePoint <= 90) {
-    return String.fromCodePoint(FACEBOOK_BOLD_UPPERCASE_START + codePoint - 65);
-  }
-
-  if (codePoint >= 97 && codePoint <= 122) {
-    return String.fromCodePoint(FACEBOOK_BOLD_LOWERCASE_START + codePoint - 97);
-  }
-
-  if (codePoint >= 48 && codePoint <= 57) {
-    return String.fromCodePoint(FACEBOOK_BOLD_DIGIT_START + codePoint - 48);
-  }
-
-  if (character === "Đ") {
-    return `${String.fromCodePoint(FACEBOOK_BOLD_UPPERCASE_START + 3)}\u0335`;
-  }
-
-  if (character === "đ") {
-    return `${String.fromCodePoint(FACEBOOK_BOLD_LOWERCASE_START + 3)}\u0335`;
-  }
-
-  return character;
-}
-
-function toFacebookBold(value: string): string {
-  return [...value.normalize("NFD")].map(toFacebookBoldCharacter).join("").normalize("NFC");
-}
-
 function handleFacebookListTag(parts: string[], isClosingTag: boolean): void {
   if (isClosingTag) {
     appendFacebookLineBreak(parts);
@@ -240,17 +207,13 @@ function handleFacebookBlockTag(parts: string[], tagName: string, isClosingTag: 
   }
 }
 
-function handleFacebookHtmlTag(parts: string[], tag: string, boldDepth: number): number {
+function handleFacebookHtmlTag(parts: string[], tag: string): void {
   const tagName = parseHtmlTagName(tag);
   const isClosingTag = isClosingHtmlTag(tag);
 
-  if (["strong", "b"].includes(tagName)) {
-    return Math.max(0, boldDepth + (isClosingTag ? -1 : 1));
-  }
-
   if (/^h[1-6]$/.test(tagName)) {
     appendFacebookBlockBreak(parts);
-    return Math.max(0, boldDepth + (isClosingTag ? -1 : 1));
+    return;
   }
 
   if (tagName === "br") {
@@ -262,23 +225,20 @@ function handleFacebookHtmlTag(parts: string[], tag: string, boldDepth: number):
   } else if (tagName === "li") {
     handleFacebookListTag(parts, isClosingTag);
   }
-
-  return boldDepth;
 }
 
 function formatHtmlForFacebookMessage(html: string): string {
   const parts: string[] = [];
-  let boldDepth = 0;
   const safeHtml = html
     .replace(/<script\b[\s\S]*?<\/script>/gi, "")
     .replace(/<style\b[\s\S]*?<\/style>/gi, "");
 
   for (const token of tokenizeHtml(safeHtml)) {
     if (token.startsWith("<")) {
-      boldDepth = handleFacebookHtmlTag(parts, token, boldDepth);
+      handleFacebookHtmlTag(parts, token);
     } else {
       const text = decodeHtmlEntities(token);
-      appendFacebookText(parts, boldDepth > 0 ? toFacebookBold(text) : text);
+      appendFacebookText(parts, text);
     }
   }
 
@@ -366,7 +326,7 @@ function buildPublicPostUrl(post: SrxNewsPost): string {
 
 function buildPostMessage(post: SrxNewsPost): string {
   return [
-    toFacebookBold(post.title),
+    normalizeOptionalString(post.title),
     normalizeOptionalString(post.excerpt),
     formatHtmlForFacebookMessage(post.content),
   ]

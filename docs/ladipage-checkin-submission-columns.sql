@@ -1,0 +1,6 @@
+﻿ALTER TABLE checkin
+  ADD COLUMN IF NOT EXISTS event_slug VARCHAR(180) NULL AFTER event_name,
+  ADD COLUMN IF NOT EXISTS template_style VARCHAR(50) NULL AFTER event_slug,
+  ADD COLUMN IF NOT EXISTS site_key VARCHAR(80) NULL AFTER template_style,
+  ADD COLUMN IF NOT EXISTS page_url TEXT NULL AFTER site_key,
+  ADD COLUMN IF NOT EXISTS custom_fields_json LONGTEXT NULL AFTER voucher;

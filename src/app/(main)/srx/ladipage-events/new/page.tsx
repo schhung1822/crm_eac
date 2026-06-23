@@ -1,8 +1,8 @@
 import AdminTemplateEditor from "@/app/(admin)/admin/templates/[slug]/ui";
-import { defaultConfig } from "@/lib/form-template/defaultConfig";
+import { createBlankFormTemplateConfig } from "@/lib/form-template/defaultConfig";
 
 function createInitialConfig() {
-  return structuredClone(defaultConfig);
+  return createBlankFormTemplateConfig("default");
 }
 
 export default function Page() {

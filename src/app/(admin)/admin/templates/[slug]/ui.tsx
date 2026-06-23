@@ -37,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { templateThemePresets } from "@/lib/form-template/defaultConfig";
 import type { FieldType, FormTemplateConfig, HiddenFieldKey, TemplateStyle } from "@/lib/form-template/types";
 
 import { saveTemplateAction } from "./actions";
@@ -46,7 +47,7 @@ const EVENT_IMAGE_PLACEHOLDER = "/upload/events/...";
 
 const templateStyleLabels: Record<TemplateStyle, string> = {
   default: "Bong bóng Hồng",
-  starry: "Bầu trời sao",
+  starry: "Template 2 - Webinar red",
 };
 
 const questionTypeLabels: Record<FieldType, string> = {
@@ -57,6 +58,71 @@ const questionTypeLabels: Record<FieldType, string> = {
   textarea: "Textarea",
 };
 
+
+const templateEditorCopy: Record<TemplateStyle, {
+  heroTitle: string;
+  heroDescription: string;
+  heroImageLabel: string;
+  heroImageDescription: string;
+  eyebrowLabel: string;
+  titleLabel: string;
+  subtitleLabel: string;
+  infoTitle: string;
+  infoDescription: string;
+  infoTopLabel: string;
+  infoHeadlineLabel: string;
+  infoMottoLabel: string;
+  infoOrganizerLabel: string;
+  infoBottomLabel: string;
+  scheduleDescription: string;
+  locationDescription: string;
+  footerStyleTitle: string;
+  footerStyleDescription: string;
+  fieldHelp: string;
+}> = {
+  default: {
+    heroTitle: "Hero, heading va media",
+    heroDescription: "Template 1 dung anh heading, tieu de va phu de o phan dau landing page.",
+    heroImageLabel: "Anh heading",
+    heroImageDescription: "Anh hero/heading hien thi tren dau template 1.",
+    eyebrowLabel: "Dong mo ta tren tieu de",
+    titleLabel: "Tieu de chinh landing page",
+    subtitleLabel: "Phu de",
+    infoTitle: "Khoi gioi thieu",
+    infoDescription: "Cac text hien thi o khoi gioi thieu ben duoi form cua template 1.",
+    infoTopLabel: "Dong chu tren",
+    infoHeadlineLabel: "Headline",
+    infoMottoLabel: "Motto",
+    infoOrganizerLabel: "Organizer text",
+    infoBottomLabel: "Dong chu duoi",
+    scheduleDescription: "Ngay gio hien thi trong footer template 1.",
+    locationDescription: "Dia diem hien thi trong footer template 1.",
+    footerStyleTitle: "Footer va dress code",
+    footerStyleDescription: "Template 1 co footer gradient va cum dress code.",
+    fieldHelp: "Dung cau hoi bo sung neu can them du lieu ngoai cac field co ban.",
+  },
+  starry: {
+    heroTitle: "Banner webinar va thong tin nhanh",
+    heroDescription: "Template 2 dung banner doc, badge, tieu de, 3 o metadata va agenda ngan.",
+    heroImageLabel: "Banner dau trang",
+    heroImageDescription: "Anh banner dung full width o dau template 2, nen dung anh doc/mobile.",
+    eyebrowLabel: "Badge tren tieu de",
+    titleLabel: "Tieu de webinar",
+    subtitleLabel: "Nhan nho duoi tieu de form",
+    infoTitle: "Noi dung form va agenda",
+    infoDescription: "Template 2 dung headline cho tieu de form, motto/organizer/bottom cho mo ta va agenda neu chua bat cau hoi.",
+    infoTopLabel: "Badge phu",
+    infoHeadlineLabel: "Tieu de form",
+    infoMottoLabel: "Mo ta ngan",
+    infoOrganizerLabel: "Mo ta chuong trinh",
+    infoBottomLabel: "Ghi chu/xac nhan",
+    scheduleDescription: "Ngay gio hien thi trong 3 o metadata cua template 2.",
+    locationDescription: "Dia diem/hinh thuc hien thi trong metadata va footer template 2.",
+    footerStyleTitle: "Mau footer",
+    footerStyleDescription: "Template 2 uu tien nen toi/do, khong dung cum dress code.",
+    fieldHelp: "Voi template 2, hay bat field bo sung nhu Clinic, Khu vuc, Sale tu van neu can giong mau HTML.",
+  },
+};
 const hiddenFieldLabels: Record<HiddenFieldKey, string> = {
   city: "City",
   clinic: "Clinic",
@@ -93,10 +159,10 @@ function normalizePublicPath(
   currentSavedSlug: string,
 ) {
   const trimmedPublicPath = persistedPublicPath?.trim() ?? "";
-  const defaultPaths = new Set([`/t/${originalSlug}`, `/t/${currentSavedSlug}`]);
+  const defaultPaths = new Set([`/t/${originalSlug}`, `/t/${currentSavedSlug}`, `/events/${originalSlug}`, `/events/${currentSavedSlug}`]);
 
   if (!trimmedPublicPath || defaultPaths.has(trimmedPublicPath)) {
-    return `/t/${currentTemplateSlug}`;
+    return `/events/${currentTemplateSlug}`;
   }
 
   if (/^https?:\/\//i.test(trimmedPublicPath)) {
@@ -463,6 +529,80 @@ function QuestionEditor({
   );
 }
 
+
+function AdditionalFieldEditor({
+  title,
+  field,
+  onChange,
+}: {
+  title: string;
+  field: FormTemplateConfig["fields"]["hidden"][HiddenFieldKey];
+  onChange: (patch: Partial<FormTemplateConfig["fields"]["hidden"][HiddenFieldKey]>) => void;
+}) {
+  const fieldType = field.type ?? "text";
+
+  return (
+    <div className="border-border/70 bg-card rounded-2xl border p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="font-medium">{field.label || title}</h4>
+          <p className="text-muted-foreground text-xs leading-5">
+            Bat field de submit kem du lieu. Bat hien thi neu muon nguoi dung nhap tren form.
+          </p>
+        </div>
+        <Badge variant={field.enabled ? "default" : "secondary"}>{field.enabled ? "Dang bat" : "Dang tat"}</Badge>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <ToggleField label="Luu field nay" checked={field.enabled} onChange={(value) => onChange({ enabled: value })} />
+        <ToggleField label="Hien thi tren form" checked={Boolean(field.visible)} onChange={(value) => onChange({ visible: value })} />
+        <ToggleField label="Bat buoc nhap" checked={Boolean(field.required)} onChange={(value) => onChange({ required: value })} />
+        <div className="space-y-2">
+          <Label>Loai input</Label>
+          <Select value={fieldType} onValueChange={(type: FieldType) => onChange({ type })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="text">Text</SelectItem>
+              <SelectItem value="textarea">Textarea</SelectItem>
+              <SelectItem value="select">Dropdown</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="tel">So dien thoai</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Label</Label>
+          <Input value={field.label ?? ""} onChange={(event) => onChange({ label: event.target.value })} placeholder={title} />
+        </div>
+        <div className="space-y-2">
+          <Label>Placeholder</Label>
+          <Input value={field.placeholder ?? ""} onChange={(event) => onChange({ placeholder: event.target.value })} />
+        </div>
+      </div>
+
+      {fieldType === "select" ? (
+        <div className="mt-3 space-y-2">
+          <Label>Tuy chon dropdown</Label>
+          <Textarea
+            value={(field.options ?? []).join("\n")}
+            onChange={(event) =>
+              onChange({
+                options: event.target.value
+                  .split("\n")
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder={"Lua chon 1\nLua chon 2\nLua chon 3"}
+            rows={4}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 export default function AdminTemplateEditor({
   slug,
   initialName,
@@ -566,6 +706,25 @@ export default function AdminTemplateEditor({
     [config.fields.email, config.fields.full_name, config.fields.phone],
   );
   const currentTemplateStyle = config.templateStyle ?? "default";
+  const currentTemplateCopy = templateEditorCopy[currentTemplateStyle] ?? templateEditorCopy.default;
+
+  const applyTemplateStyle = React.useCallback(
+    (templateStyle: TemplateStyle) => {
+      const preset = templateThemePresets[templateStyle] ?? templateThemePresets.default;
+
+      update({
+        templateStyle,
+        theme: { ...preset.theme },
+        footer: {
+          ...config.footer,
+          gradientFrom: preset.footerFrom,
+          gradientTo: preset.footerTo,
+          textColor: "#ffffff",
+        },
+      });
+    },
+    [config.footer, update],
+  );
 
   const updateDefaultField = React.useCallback(
     (fieldKey: "full_name" | "phone" | "email", patch: Partial<DefaultFieldConfig>) => {
@@ -668,7 +827,7 @@ export default function AdminTemplateEditor({
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1600px] px-4 py-5 lg:px-6 lg:py-6">
+      <div className="mx-auto max-w-[1600px] px-4 py-2 lg:px-6 lg:py-6">
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0">
             <Tabs defaultValue="general" className="space-y-5">
@@ -728,17 +887,17 @@ export default function AdminTemplateEditor({
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Template</Label>
+                            <Label>Template Ladipage</Label>
                             <Select
                               value={currentTemplateStyle}
-                              onValueChange={(value: TemplateStyle) => update({ templateStyle: value })}
+                              onValueChange={(value: TemplateStyle) => applyTemplateStyle(value)}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Chọn template" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="default">Bong bóng Hồng</SelectItem>
-                                <SelectItem value="starry">Bầu trời sao</SelectItem>
+                                <SelectItem value="default">Template 1</SelectItem>
+                                <SelectItem value="starry">Template 2</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -888,7 +1047,7 @@ export default function AdminTemplateEditor({
                     <AccordionTrigger className="py-5 text-base">Trường mặc định</AccordionTrigger>
                     <AccordionContent className="pb-5">
                       <SectionCard
-                        title="Default fields"
+                        title="Trường mặc định"
                         description="Chỉnh label, placeholder và mức bắt buộc cho 3 field cơ bản của form."
                         icon={FormInput}
                       >
@@ -917,7 +1076,7 @@ export default function AdminTemplateEditor({
                     <AccordionTrigger className="py-5 text-base">Câu hỏi bổ sung</AccordionTrigger>
                     <AccordionContent className="pb-5">
                       <SectionCard
-                        title="Custom questions"
+                        title="Trường tùy chỉnh"
                         description="Tối đa 5 câu hỏi. Chỉ bật những câu thật sự cần để form gọn và dễ điền."
                         icon={MessageSquare}
                       >
@@ -1013,20 +1172,20 @@ export default function AdminTemplateEditor({
                                 Những field này không hiển thị ra UI nhưng vẫn có thể đi kèm dữ liệu submit.
                               </p>
                             </div>
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div className="grid gap-4 md:grid-cols-2">
                               {(["user_id", "city", "role", "clinic", "full_name_nv"] as HiddenFieldKey[]).map(
                                 (key) => (
-                                  <ToggleField
+                                  <AdditionalFieldEditor
                                     key={key}
-                                    label={hiddenFieldLabels[key]}
-                                    checked={config.fields.hidden[key].enabled}
-                                    onChange={(value) =>
+                                    title={hiddenFieldLabels[key]}
+                                    field={config.fields.hidden[key]}
+                                    onChange={(patch) =>
                                       update({
                                         fields: {
                                           ...config.fields,
                                           hidden: {
                                             ...config.fields.hidden,
-                                            [key]: { enabled: value },
+                                            [key]: { ...config.fields.hidden[key], ...patch },
                                           },
                                         },
                                       })
@@ -1471,29 +1630,6 @@ export default function AdminTemplateEditor({
                       </div>
                     </div>
                   ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/70 bg-background/95 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Globe className="size-4" />
-                    Dữ liệu đồng bộ
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="border-border/70 bg-muted/20 rounded-2xl border p-4">
-                    <div className="text-muted-foreground text-xs font-medium tracking-[0.16em] uppercase">
-                      Slug hiện tại
-                    </div>
-                    <div className="mt-2 font-mono text-sm">{templateSlug}</div>
-                  </div>
-                  <div className="border-border/70 bg-muted/20 rounded-2xl border p-4">
-                    <div className="text-muted-foreground text-xs font-medium tracking-[0.16em] uppercase">
-                      Public URL
-                    </div>
-                    <div className="mt-2 font-mono text-sm break-all">{publicUrl || "(chưa có URL)"}</div>
-                  </div>
                 </CardContent>
               </Card>
             </div>
