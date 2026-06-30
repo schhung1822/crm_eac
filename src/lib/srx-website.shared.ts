@@ -25,6 +25,9 @@ export const srxPaymentMethodTypeSchema = z.enum(srxPaymentMethodTypeValues);
 export const srxPaymentMethodFeeTypeValues = ["none", "fixed", "percentage"] as const;
 export const srxPaymentMethodFeeTypeSchema = z.enum(srxPaymentMethodFeeTypeValues);
 
+export const srxGiftRuleTypeValues = ["product_quantity", "order_subtotal"] as const;
+export const srxGiftRuleTypeSchema = z.enum(srxGiftRuleTypeValues);
+
 export const srxDiscountCodeSchema = z.object({
   id: z.string(),
   code: z.string(),
@@ -92,9 +95,39 @@ export const srxPaymentMethodSchema = z.object({
   updated_at: z.coerce.date(),
 });
 
+export const srxGiftRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  rule_type: srxGiftRuleTypeSchema,
+  product_id: z.string(),
+  product_name: z.string(),
+  variant_id: z.string(),
+  variant_name: z.string(),
+  min_quantity: z.number(),
+  min_subtotal: z.number(),
+  gift_product_id: z.string(),
+  gift_product_name: z.string(),
+  gift_variant_id: z.string(),
+  gift_sku: z.string(),
+  gift_name: z.string(),
+  gift_variant_name: z.string(),
+  gift_quantity: z.number(),
+  gift_img: z.string(),
+  limit_quantity: z.number().nullable(),
+  multiply_by_matched_quantity: z.boolean(),
+  priority: z.number(),
+  is_active: z.boolean(),
+  starts_at: z.coerce.date().nullable(),
+  ends_at: z.coerce.date().nullable(),
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date(),
+});
+
 export type SrxDiscountCode = z.infer<typeof srxDiscountCodeSchema>;
 export type SrxBanner = z.infer<typeof srxBannerSchema>;
 export type SrxPaymentMethod = z.infer<typeof srxPaymentMethodSchema>;
+export type SrxGiftRule = z.infer<typeof srxGiftRuleSchema>;
 
 const srxDiscountCodeMutationSchema = z.object({
   code: z.string().trim().min(3).max(50),
@@ -149,9 +182,33 @@ const srxPaymentMethodMutationSchema = z.object({
   config_json: z.string().trim().max(20000).optional().default(""),
 });
 
+const srxGiftRuleMutationSchema = z.object({
+  name: z.string().trim().min(3).max(150),
+  description: z.string().trim().max(500).optional().default(""),
+  rule_type: srxGiftRuleTypeSchema,
+  product_id: z.string().regex(/^\d+$/).optional().or(z.literal("")).default(""),
+  variant_id: z.string().regex(/^\d+$/).optional().or(z.literal("")).default(""),
+  min_quantity: z.coerce.number().int().min(1).max(999_999).optional().default(1),
+  min_subtotal: z.string().trim().max(40).optional().default("0"),
+  gift_product_id: z.string().regex(/^\d+$/).optional().or(z.literal("")).default(""),
+  gift_variant_id: z.string().regex(/^\d+$/).optional().or(z.literal("")).default(""),
+  gift_sku: z.string().trim().max(100).optional().default(""),
+  gift_name: z.string().trim().min(1).max(200),
+  gift_variant_name: z.string().trim().max(200).optional().default(""),
+  gift_quantity: z.coerce.number().int().min(1).max(999_999).optional().default(1),
+  gift_img: z.string().trim().max(1000).optional().default(""),
+  limit_quantity: z.string().trim().max(40).optional().default(""),
+  multiply_by_matched_quantity: z.boolean().optional().default(false),
+  priority: z.coerce.number().int().min(-9999).max(9999).optional().default(0),
+  starts_at: z.string().trim().optional().default(""),
+  ends_at: z.string().trim().optional().default(""),
+  is_active: z.boolean().optional().default(true),
+});
+
 export type SrxDiscountCodeMutationInput = z.infer<typeof srxDiscountCodeMutationSchema>;
 export type SrxBannerMutationInput = z.infer<typeof srxBannerMutationSchema>;
 export type SrxPaymentMethodMutationInput = z.infer<typeof srxPaymentMethodMutationSchema>;
+export type SrxGiftRuleMutationInput = z.infer<typeof srxGiftRuleMutationSchema>;
 
 export function parseSrxDiscountCode(input: unknown): SrxDiscountCode {
   return srxDiscountCodeSchema.parse(input);
@@ -165,6 +222,10 @@ export function parseSrxPaymentMethod(input: unknown): SrxPaymentMethod {
   return srxPaymentMethodSchema.parse(input);
 }
 
+export function parseSrxGiftRule(input: unknown): SrxGiftRule {
+  return srxGiftRuleSchema.parse(input);
+}
+
 export function parseSrxDiscountCodeInput(input: unknown): SrxDiscountCodeMutationInput {
   return srxDiscountCodeMutationSchema.parse(input);
 }
@@ -175,4 +236,8 @@ export function parseSrxBannerInput(input: unknown): SrxBannerMutationInput {
 
 export function parseSrxPaymentMethodInput(input: unknown): SrxPaymentMethodMutationInput {
   return srxPaymentMethodMutationSchema.parse(input);
+}
+
+export function parseSrxGiftRuleInput(input: unknown): SrxGiftRuleMutationInput {
+  return srxGiftRuleMutationSchema.parse(input);
 }

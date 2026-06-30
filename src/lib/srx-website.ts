@@ -11,11 +11,14 @@ import {
 import {
   parseSrxBannerInput,
   parseSrxDiscountCodeInput,
+  parseSrxGiftRuleInput,
   parseSrxPaymentMethodInput,
   srxBannerSchema,
   srxDiscountCodeScopeValues,
   srxDiscountCodeSchema,
   srxDiscountCodeTypeValues,
+  srxGiftRuleSchema,
+  srxGiftRuleTypeValues,
   srxPaymentMethodFeeTypeValues,
   srxPaymentMethodTypeValues,
   srxPaymentMethodSchema,
@@ -23,6 +26,8 @@ import {
   type SrxBannerMutationInput,
   type SrxDiscountCode,
   type SrxDiscountCodeMutationInput,
+  type SrxGiftRule,
+  type SrxGiftRuleMutationInput,
   type SrxPaymentMethod,
   type SrxPaymentMethodMutationInput,
 } from "@/lib/srx-website.shared";
@@ -111,6 +116,12 @@ function parseOptionalDecimalString(value: string | null | undefined, label: str
   }
 
   return trimmed;
+}
+
+function parseOptionalBigIntId(value: string | null | undefined): bigint | null {
+  const trimmed = value?.trim() ?? "";
+
+  return trimmed ? BigInt(trimmed) : null;
 }
 
 function parseOptionalUnsignedInt(value: string | null | undefined, label: string): number | null {
@@ -213,6 +224,44 @@ function validateDiscountCodePayload(payload: SrxDiscountCodeMutationInput): {
     productIds,
     startsAt,
     totalUsageLimit,
+  };
+}
+
+function validateGiftRulePayload(payload: SrxGiftRuleMutationInput): {
+  endsAt: Date | null;
+  giftProductId: bigint | null;
+  giftVariantId: bigint | null;
+  limitQuantity: number | null;
+  minSubtotal: string;
+  productId: bigint | null;
+  startsAt: Date | null;
+  variantId: bigint | null;
+} {
+  const startsAt = parseOptionalDate(payload.starts_at);
+  const endsAt = parseOptionalDate(payload.ends_at);
+  const minSubtotal = parseRequiredDecimalString(payload.min_subtotal || "0", "Gi\u00e1 tr\u1ecb \u0111\u01a1n t\u1ed1i thi\u1ec3u");
+  const limitQuantity = parseOptionalUnsignedInt(payload.limit_quantity, "Gi\u1edbi h\u1ea1n s\u1ed1 l\u01b0\u1ee3ng qu\u00e0");
+  const productId = parseOptionalBigIntId(payload.product_id);
+  const variantId = parseOptionalBigIntId(payload.variant_id);
+  const giftProductId = parseOptionalBigIntId(payload.gift_product_id);
+  const giftVariantId = parseOptionalBigIntId(payload.gift_variant_id);
+
+  validateDateRange(startsAt, endsAt);
+
+
+  if (payload.rule_type === "order_subtotal" && Number(minSubtotal) <= 0) {
+    throw new Error("Gi\u00e1 tr\u1ecb \u0111\u01a1n t\u1ed1i thi\u1ec3u ph\u1ea3i l\u1edbn h\u01a1n 0");
+  }
+
+  return {
+    endsAt,
+    giftProductId,
+    giftVariantId,
+    limitQuantity,
+    minSubtotal: payload.rule_type === "product_quantity" ? "0" : minSubtotal,
+    productId: payload.rule_type === "product_quantity" ? productId : null,
+    startsAt,
+    variantId: payload.rule_type === "product_quantity" && productId ? variantId : null,
   };
 }
 
@@ -477,6 +526,136 @@ function mapPaymentMethod(paymentMethod: {
   });
 }
 
+type GiftRuleQueryClient = Pick<typeof prisma2, "$executeRaw" | "$queryRaw">;
+
+type GiftRuleRow = {
+  id: bigint;
+  name: string;
+  description: string | null;
+  rule_type: (typeof srxGiftRuleTypeValues)[number];
+  product_id: bigint | null;
+  product_name: string | null;
+  variant_id: bigint | null;
+  variant_name: string | null;
+  min_quantity: bigint | number;
+  min_subtotal: { toString(): string } | number;
+  gift_product_id: bigint | null;
+  gift_product_name: string | null;
+  gift_variant_id: bigint | null;
+  gift_sku: string | null;
+  gift_name: string;
+  gift_variant_name: string | null;
+  gift_quantity: bigint | number;
+  gift_img: string | null;
+  limit_quantity: bigint | number | null;
+  multiply_by_matched_quantity: boolean | number;
+  priority: bigint | number;
+  is_active: boolean | number;
+  starts_at: Date | null;
+  ends_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+};
+
+function mapGiftRule(giftRule: GiftRuleRow): SrxGiftRule {
+  return srxGiftRuleSchema.parse({
+    id: giftRule.id.toString(),
+    name: giftRule.name,
+    description: normalizeOptionalString(giftRule.description),
+    rule_type: giftRule.rule_type,
+    product_id: giftRule.product_id?.toString() ?? "",
+    product_name: normalizeOptionalString(giftRule.product_name),
+    variant_id: giftRule.variant_id?.toString() ?? "",
+    variant_name: normalizeOptionalString(giftRule.variant_name),
+    min_quantity: Number(giftRule.min_quantity.toString()),
+    min_subtotal: Number(giftRule.min_subtotal.toString()),
+    gift_product_id: giftRule.gift_product_id?.toString() ?? "",
+    gift_product_name: normalizeOptionalString(giftRule.gift_product_name),
+    gift_variant_id: giftRule.gift_variant_id?.toString() ?? "",
+    gift_sku: normalizeOptionalString(giftRule.gift_sku),
+    gift_name: giftRule.gift_name,
+    gift_variant_name: normalizeOptionalString(giftRule.gift_variant_name),
+    gift_quantity: Number(giftRule.gift_quantity.toString()),
+    gift_img: resolveSiteAssetUrl(giftRule.gift_img),
+    limit_quantity: giftRule.limit_quantity === null ? null : Number(giftRule.limit_quantity.toString()),
+    multiply_by_matched_quantity: Boolean(giftRule.multiply_by_matched_quantity),
+    priority: Number(giftRule.priority.toString()),
+    is_active: Boolean(giftRule.is_active),
+    starts_at: giftRule.starts_at,
+    ends_at: giftRule.ends_at,
+    created_at: giftRule.created_at,
+    updated_at: giftRule.updated_at,
+  });
+}
+
+const giftRuleSelectSql = Prisma.sql`
+  SELECT
+    gr.id,
+    gr.name,
+    gr.description,
+    gr.rule_type,
+    gr.product_id,
+    condition_product.name AS product_name,
+    gr.variant_id,
+    condition_variant.variant_name AS variant_name,
+    gr.min_quantity,
+    gr.min_subtotal,
+    gr.gift_product_id,
+    gift_product.name AS gift_product_name,
+    gr.gift_variant_id,
+    gr.gift_sku,
+    gr.gift_name,
+    gr.gift_variant_name,
+    gr.gift_quantity,
+    gr.gift_img,
+    gr.limit_quantity,
+    gr.multiply_by_matched_quantity,
+    gr.priority,
+    gr.is_active,
+    gr.starts_at,
+    gr.ends_at,
+    gr.created_at,
+    gr.updated_at
+  FROM gift_rules gr
+  LEFT JOIN products condition_product ON condition_product.id = gr.product_id
+  LEFT JOIN product_variants condition_variant ON condition_variant.id = gr.variant_id
+  LEFT JOIN products gift_product ON gift_product.id = gr.gift_product_id
+`;
+
+async function getGiftRuleByIdRaw(giftRuleId: bigint, client: GiftRuleQueryClient = prisma2): Promise<GiftRuleRow | null> {
+  const giftRules = await client.$queryRaw<GiftRuleRow[]>(Prisma.sql`
+    ${giftRuleSelectSql}
+    WHERE gr.id = ${giftRuleId}
+    LIMIT 1
+  `);
+
+  return giftRules[0] ?? null;
+}
+
+async function getGiftRuleByNameRaw(name: string, client: GiftRuleQueryClient = prisma2): Promise<GiftRuleRow | null> {
+  const giftRules = await client.$queryRaw<GiftRuleRow[]>(Prisma.sql`
+    ${giftRuleSelectSql}
+    WHERE gr.name = ${name}
+    LIMIT 1
+  `);
+
+  return giftRules[0] ?? null;
+}
+
+async function ensureUniqueGiftRuleName(name: string, excludeId?: bigint): Promise<void> {
+  const rows = await prisma2.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+    SELECT id
+    FROM gift_rules
+    WHERE name = ${name}
+      ${excludeId === undefined ? Prisma.empty : Prisma.sql`AND id <> ${excludeId}`}
+    LIMIT 1
+  `);
+
+  if (rows.length > 0) {
+    throw new Error("T\u00ean ch\u01b0\u01a1ng tr\u00ecnh qu\u00e0 t\u1eb7ng \u0111\u00e3 t\u1ed3n t\u1ea1i");
+  }
+}
+
 async function ensureUniqueBannerSlug(baseSlug: string, excludeId?: bigint): Promise<string> {
   let candidate = baseSlug;
   let suffix = 2;
@@ -527,7 +706,168 @@ async function ensureUniquePaymentMethodCode(code: string, excludeId?: bigint): 
   }
 }
 
-export { parseSrxBannerInput, parseSrxDiscountCodeInput, parseSrxPaymentMethodInput };
+export { parseSrxBannerInput, parseSrxDiscountCodeInput, parseSrxGiftRuleInput, parseSrxPaymentMethodInput };
+
+export async function getSrxGiftRules(): Promise<SrxGiftRule[]> {
+  try {
+    const giftRules = await prisma2.$queryRaw<GiftRuleRow[]>(Prisma.sql`
+      ${giftRuleSelectSql}
+      ORDER BY gr.is_active DESC, gr.priority DESC, gr.created_at DESC
+    `);
+
+    return giftRules.map((giftRule) =>
+      mapGiftRule({
+        ...giftRule,
+        rule_type: giftRule.rule_type as (typeof srxGiftRuleTypeValues)[number],
+      }),
+    );
+  } catch (error) {
+    if (isMissingWebsiteTableError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+export async function createSrxGiftRule(input: SrxGiftRuleMutationInput): Promise<SrxGiftRule> {
+  try {
+    const payload = parseSrxGiftRuleInput(input);
+    const { endsAt, giftProductId, giftVariantId, limitQuantity, minSubtotal, productId, startsAt, variantId } =
+      validateGiftRulePayload(payload);
+    const giftImg = resolveNullableSiteAssetUrlForStorage(payload.gift_img);
+
+    await ensureUniqueGiftRuleName(payload.name);
+
+    const giftRule = await prisma2.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO gift_rules (
+          name,
+          description,
+          rule_type,
+          product_id,
+          variant_id,
+          min_quantity,
+          min_subtotal,
+          gift_product_id,
+          gift_variant_id,
+          gift_sku,
+          gift_name,
+          gift_variant_name,
+          gift_quantity,
+          gift_img,
+          limit_quantity,
+          multiply_by_matched_quantity,
+          priority,
+          starts_at,
+          ends_at,
+          is_active
+        )
+        VALUES (
+          ${payload.name},
+          ${normalizeNullableString(payload.description)},
+          ${payload.rule_type},
+          ${productId},
+          ${variantId},
+          ${payload.min_quantity},
+          ${minSubtotal},
+          ${giftProductId},
+          ${giftVariantId},
+          ${normalizeNullableString(payload.gift_sku)},
+          ${payload.gift_name},
+          ${normalizeNullableString(payload.gift_variant_name)},
+          ${payload.gift_quantity},
+          ${giftImg},
+          ${limitQuantity},
+          ${payload.multiply_by_matched_quantity},
+          ${payload.priority},
+          ${startsAt},
+          ${endsAt},
+          ${payload.is_active}
+        )
+      `);
+
+      return getGiftRuleByNameRaw(payload.name, tx);
+    });
+
+    if (!giftRule) {
+      throw new Error("Kh\u00f4ng th\u1ec3 t\u1ea1o ch\u01b0\u01a1ng tr\u00ecnh qu\u00e0 t\u1eb7ng");
+    }
+
+    return mapGiftRule(giftRule);
+  } catch (error) {
+    wrapMissingTableError(error);
+  }
+}
+
+export async function updateSrxGiftRule(
+  giftRuleId: string,
+  input: SrxGiftRuleMutationInput,
+): Promise<SrxGiftRule | null> {
+  try {
+    const payload = parseSrxGiftRuleInput(input);
+    const numericId = BigInt(giftRuleId);
+    const existing = await getGiftRuleByIdRaw(numericId);
+
+    if (!existing) {
+      return null;
+    }
+
+    const { endsAt, giftProductId, giftVariantId, limitQuantity, minSubtotal, productId, startsAt, variantId } =
+      validateGiftRulePayload(payload);
+    const giftImg = resolveNullableSiteAssetUrlForStorage(payload.gift_img);
+
+    await ensureUniqueGiftRuleName(payload.name, numericId);
+
+    await prisma2.$executeRaw(Prisma.sql`
+      UPDATE gift_rules
+      SET
+        name = ${payload.name},
+        description = ${normalizeNullableString(payload.description)},
+        rule_type = ${payload.rule_type},
+        product_id = ${productId},
+        variant_id = ${variantId},
+        min_quantity = ${payload.min_quantity},
+        min_subtotal = ${minSubtotal},
+        gift_product_id = ${giftProductId},
+        gift_variant_id = ${giftVariantId},
+        gift_sku = ${normalizeNullableString(payload.gift_sku)},
+        gift_name = ${payload.gift_name},
+        gift_variant_name = ${normalizeNullableString(payload.gift_variant_name)},
+        gift_quantity = ${payload.gift_quantity},
+        gift_img = ${giftImg},
+        limit_quantity = ${limitQuantity},
+        multiply_by_matched_quantity = ${payload.multiply_by_matched_quantity},
+        priority = ${payload.priority},
+        starts_at = ${startsAt},
+        ends_at = ${endsAt},
+        is_active = ${payload.is_active},
+        updated_at = NOW()
+      WHERE id = ${numericId}
+    `);
+
+    const giftRule = await getGiftRuleByIdRaw(numericId);
+
+    if (!giftRule) {
+      return null;
+    }
+
+    return mapGiftRule(giftRule);
+  } catch (error) {
+    wrapMissingTableError(error);
+  }
+}
+
+export async function deleteSrxGiftRule(giftRuleId: string): Promise<void> {
+  try {
+    await prisma2.$executeRaw(Prisma.sql`
+      DELETE FROM gift_rules
+      WHERE id = ${BigInt(giftRuleId)}
+    `);
+  } catch (error) {
+    wrapMissingTableError(error);
+  }
+}
 
 export async function getSrxDiscountCodes(): Promise<SrxDiscountCode[]> {
   try {
