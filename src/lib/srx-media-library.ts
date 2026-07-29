@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { convertImageBufferToWebp } from "@/lib/image-to-webp";
 import {
   parseSrxMediaLibraryItem,
   parseSrxMediaLibrarySnapshot,
@@ -127,7 +128,7 @@ async function createMediaItem(relativePath: string): Promise<SrxMediaLibraryIte
   const fileStats = await stat(absolutePath);
   const directoryName = path.posix.dirname(normalizedRelativePath);
   const directory = directoryName === "." ? "" : directoryName;
-  const topLevelDirectory = directory ? directory.split("/")[0] ?? "" : "";
+  const topLevelDirectory = directory ? (directory.split("/")[0] ?? "") : "";
 
   return parseSrxMediaLibraryItem({
     id: normalizedRelativePath,
@@ -141,7 +142,11 @@ async function createMediaItem(relativePath: string): Promise<SrxMediaLibraryIte
   });
 }
 
-async function walkDirectory(currentAbsolutePath: string, currentRelativePath: string, items: SrxMediaLibraryItem[]): Promise<void> {
+async function walkDirectory(
+  currentAbsolutePath: string,
+  currentRelativePath: string,
+  items: SrxMediaLibraryItem[],
+): Promise<void> {
   const entries = await readdir(currentAbsolutePath, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -198,10 +203,12 @@ export async function createSrxMediaLibraryItem({
   directory,
   originalFilename,
   buffer,
+  mimeType = "",
 }: {
   directory: string;
   originalFilename: string;
   buffer: Buffer;
+  mimeType?: string;
 }): Promise<SrxMediaLibraryItem> {
   await ensureUploadRoot();
 
@@ -210,8 +217,13 @@ export async function createSrxMediaLibraryItem({
 
   await mkdir(targetDirectoryPath, { recursive: true });
 
+  const { buffer: outputBuffer, extension } = await convertImageBufferToWebp(buffer, {
+    filename: originalFilename,
+    mimeType,
+  });
+
   const originalExtension = path.extname(originalFilename);
-  const safeExtension = normalizeExtension(originalExtension, ".png");
+  const safeExtension = normalizeExtension(extension, ".png");
   const originalBaseName = path.basename(originalFilename, originalExtension);
   const safeBaseName = makeSafeBaseName(originalBaseName) || "image";
 
@@ -226,7 +238,7 @@ export async function createSrxMediaLibraryItem({
   const relativePath = createRelativePath(normalizedDirectory, nextFilename);
   const absolutePath = resolveUploadFilePath(relativePath);
 
-  await writeFile(absolutePath, buffer);
+  await writeFile(absolutePath, outputBuffer);
 
   return createMediaItem(relativePath);
 }
@@ -253,7 +265,8 @@ export async function updateSrxMediaLibraryItem(input: SrxMediaLibraryUpdateInpu
   const rawNextExtension = path.extname(payload.next_filename);
   const currentExtension = normalizeExtension(path.extname(currentFilename), ".png");
   const nextExtension = normalizeExtension(rawNextExtension, currentExtension);
-  const nextBaseName = makeSafeBaseName(path.basename(payload.next_filename, rawNextExtension || currentExtension)) || "image";
+  const nextBaseName =
+    makeSafeBaseName(path.basename(payload.next_filename, rawNextExtension || currentExtension)) || "image";
   const nextFilename = `${nextBaseName}${nextExtension}`;
   const nextRelativePath = createRelativePath(nextDirectory, nextFilename);
   const nextAbsolutePath = resolveUploadFilePath(nextRelativePath);

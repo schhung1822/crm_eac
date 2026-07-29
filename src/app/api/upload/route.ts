@@ -3,6 +3,8 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 import { NextRequest, NextResponse } from "next/server";
+
+import { convertUploadedImageToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 export async function POST(request: NextRequest) {
@@ -19,10 +21,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File must be an image" }, { status: 400 });
     }
 
-    // Generate unique filename
+    // Convert to webp and generate unique filename
+    const { buffer, extension } = await convertUploadedImageToWebp(file);
     const timestamp = Date.now();
-    const extension = file.name.split(".").pop();
-    const filename = `${timestamp}-${Math.random().toString(36).substring(7)}.${extension}`;
+    const filename = `${timestamp}-${Math.random().toString(36).substring(7)}${extension}`;
 
     // Create images directory if it doesn't exist
     const uploadDir = path.join(process.cwd(), "public", "images");
@@ -30,9 +32,6 @@ export async function POST(request: NextRequest) {
       await mkdir(uploadDir, { recursive: true });
     }
 
-    // Convert file to buffer and save
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
     const filepath = path.join(uploadDir, filename);
 
     await writeFile(filepath, buffer);

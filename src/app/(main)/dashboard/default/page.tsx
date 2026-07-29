@@ -42,15 +42,55 @@ function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
 
-export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  const params = await searchParams;
-  const from = params.from ? new Date(params.from) : undefined;
-  const to = params.to ? new Date(params.to) : undefined;
+/** Không có filter trên URL => mặc định lọc theo tháng này. */
+function resolveDateRange(params: Record<string, string>): { from?: Date; to?: Date } {
+  const now = new Date();
+  const hasRangeParam = Boolean(params.from || params.to);
+
+  const from = params.from
+    ? new Date(params.from)
+    : hasRangeParam
+      ? undefined
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = params.to ? new Date(params.to) : hasRangeParam ? undefined : now;
 
   // Ensure toDate is end of day
   if (to) {
     to.setHours(23, 59, 59, 999);
   }
+
+  return { from, to };
+}
+
+/** Gom đơn theo ngày để dựng dữ liệu biểu đồ. */
+function buildChartData(
+  channels: Array<{ create_time: Date | string; thanh_tien?: unknown }>,
+): Array<{ date: string; orders: number; revenue: number }> {
+  const chartMap = new Map<string, { orders: number; revenue: number }>();
+
+  for (const channel of channels) {
+    const createdAt = channel.create_time instanceof Date ? channel.create_time : new Date(channel.create_time);
+
+    if (Number.isNaN(createdAt.getTime())) {
+      continue;
+    }
+
+    const key = createdAt.toISOString().slice(0, 10);
+    const bucket = chartMap.get(key) ?? { orders: 0, revenue: 0 };
+
+    bucket.orders += 1;
+    bucket.revenue += Number(channel.thanh_tien) || 0;
+    chartMap.set(key, bucket);
+  }
+
+  return [...chartMap.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, bucket]) => ({ date, orders: bucket.orders, revenue: bucket.revenue }));
+}
+
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const params = await searchParams;
+  const { from, to } = resolveDateRange(params);
 
   const [channelsResult, channelSummaryResult, statsResult] = await Promise.allSettled([
     getChannels({ from, to, limit: 10000 }),
@@ -72,25 +112,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
 
   const channels = channelsResult.status === "fulfilled" ? asArray(channelsResult.value) : [];
   const channelSummary =
-    channelSummaryResult.status === "fulfilled" ? normalizeChannelSummary(channelSummaryResult.value) : EMPTY_CHANNEL_SUMMARY;
+    channelSummaryResult.status === "fulfilled"
+      ? normalizeChannelSummary(channelSummaryResult.value)
+      : EMPTY_CHANNEL_SUMMARY;
   const stats = statsResult.status === "fulfilled" ? normalizeStats(statsResult.value) : EMPTY_STATS;
 
-  // Build chart data (group by date)
-  const chartMap: Record<string, { orders: number; revenue: number }> = {};
-  for (const c of channels) {
-    const d = c.create_time instanceof Date ? c.create_time : new Date(c.create_time);
-    if (Number.isNaN(d.getTime())) {
-      continue;
-    }
-    const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
-    chartMap[key] ??= { orders: 0, revenue: 0 };
-    chartMap[key].orders += 1;
-    chartMap[key].revenue += Number(c.thanh_tien) || 0;
-  }
-
-  const chartData = Object.keys(chartMap)
-    .sort()
-    .map((date) => ({ date, orders: chartMap[date].orders, revenue: chartMap[date].revenue }));
-
-  return <DefaultDashboardShell stats={stats} chartData={chartData} channelSummary={channelSummary} />;
+  return <DefaultDashboardShell stats={stats} chartData={buildChartData(channels)} channelSummary={channelSummary} />;
 }

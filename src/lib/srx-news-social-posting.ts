@@ -1,9 +1,11 @@
+/* eslint-disable complexity, max-lines, @typescript-eslint/prefer-nullish-coalescing -- URL/token social ghép từ nhiều nguồn tuỳ chọn: chuỗi rỗng phải rơi về nguồn kế tiếp nên dùng "||". */
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { prisma2 } from "@/lib/prisma2";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 import type { SrxNewsPost, SrxNewsPostMutationInput } from "@/lib/srx-news.shared";
+import { readSrxSocialIntegrationSettings } from "@/lib/srx-social-integration-settings";
 
 type SocialSyncInput = {
   existingFbPostId?: string | null;
@@ -61,7 +63,8 @@ type ZaloArticleSummary = {
 
 const HTML_TAG_PATTERN = /<[^>]+>/g;
 const HTML_IMAGE_PATTERN = /<img\b[^>]*\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
-const HTML_VIDEO_PATTERN = /<(video|source|iframe)\b|(?:src|href)\s*=\s*(?:"[^"]+\.(?:mp4|mov|m4v|webm)(?:[?#][^"]*)?"|'[^']+\.(?:mp4|mov|m4v|webm)(?:[?#][^']*)?')/i;
+const HTML_VIDEO_PATTERN =
+  /<(video|source|iframe)\b|(?:src|href)\s*=\s*(?:"[^"]+\.(?:mp4|mov|m4v|webm)(?:[?#][^"]*)?"|'[^']+\.(?:mp4|mov|m4v|webm)(?:[?#][^']*)?')/i;
 const HTML_SPLIT_IMAGE_PATTERN = /<img\b[^>]*>/gi;
 const FACEBOOK_MESSAGE_LIMIT = 5000;
 
@@ -229,9 +232,7 @@ function handleFacebookHtmlTag(parts: string[], tag: string): void {
 
 function formatHtmlForFacebookMessage(html: string): string {
   const parts: string[] = [];
-  const safeHtml = html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
-    .replace(/<style\b[\s\S]*?<\/style>/gi, "");
+  const safeHtml = html.replace(/<script\b[\s\S]*?<\/script>/gi, "").replace(/<style\b[\s\S]*?<\/style>/gi, "");
 
   for (const token of tokenizeHtml(safeHtml)) {
     if (token.startsWith("<")) {
@@ -349,15 +350,43 @@ function splitTextBlocksFromHtml(html: string): string[] {
     .replace(/<li\b[^>]*>/gi, "- ")
     .replace(HTML_TAG_PATTERN, " ")
     .split(/\n+/)
-    .map((line) => decodeHtmlEntities(line).replace(/[ \t]{2,}/g, " ").trim())
+    .map((line) =>
+      decodeHtmlEntities(line)
+        .replace(/[ \t]{2,}/g, " ")
+        .trim(),
+    )
     .filter(Boolean);
 
   return normalizedText;
 }
 
+function buildZaloImageBodyItem(url: string, caption: string): ZaloArticleBodyItem {
+  return {
+    type: "image",
+    url,
+    caption,
+    status: "show",
+    comment: "show",
+  };
+}
+
 function buildZaloArticleBody(post: SrxNewsPost, link: string): ZaloArticleBodyItem[] {
   const body: ZaloArticleBodyItem[] = [];
+  const addedImageUrls = new Set<string>();
   let cursor = 0;
+
+  function appendImage(imageUrl: string, caption: string): void {
+    const normalizedImageUrl = resolveSiteAssetUrl(imageUrl);
+
+    if (!normalizedImageUrl || addedImageUrls.has(normalizedImageUrl)) {
+      return;
+    }
+
+    addedImageUrls.add(normalizedImageUrl);
+    body.push(buildZaloImageBodyItem(normalizedImageUrl, caption || post.title));
+  }
+
+  appendImage(post.featured_image_url, post.title);
 
   for (const match of post.content.matchAll(HTML_SPLIT_IMAGE_PATTERN)) {
     const imageTag = match[0];
@@ -370,18 +399,7 @@ function buildZaloArticleBody(post: SrxNewsPost, link: string): ZaloArticleBodyI
       });
     }
 
-    const imageUrl = resolveSiteAssetUrl(readHtmlAttribute(imageTag, "src"));
-
-    if (imageUrl) {
-      body.push({
-        type: "image",
-        url: imageUrl,
-        caption: readHtmlAttribute(imageTag, "alt") || post.title,
-        status: "show",
-        comment: "show",
-      });
-    }
-
+    appendImage(readHtmlAttribute(imageTag, "src"), readHtmlAttribute(imageTag, "alt") || post.title);
     cursor = imageIndex + imageTag.length;
   }
 
@@ -390,6 +408,10 @@ function buildZaloArticleBody(post: SrxNewsPost, link: string): ZaloArticleBodyI
       type: "text",
       content: textBlock,
     });
+  }
+
+  for (const imageUrl of getSocialImageUrls(post)) {
+    appendImage(imageUrl, post.title);
   }
 
   if (link) {
@@ -408,7 +430,6 @@ function buildZaloArticleBody(post: SrxNewsPost, link: string): ZaloArticleBodyI
 
   return body;
 }
-
 async function readZaloAccessToken(): Promise<string> {
   const token = await prisma.token.findFirst({
     orderBy: {
@@ -433,11 +454,7 @@ async function readZaloAccessToken(): Promise<string> {
   return accessToken;
 }
 
-async function callJsonApi<TResponse>(
-  url: string,
-  init: RequestInit,
-  fallbackMessage: string,
-): Promise<TResponse> {
+async function callJsonApi<TResponse>(url: string, init: RequestInit, fallbackMessage: string): Promise<TResponse> {
   const response = await fetch(url, init);
   const result = (await response.json().catch(() => ({}))) as TResponse & {
     error?: { message?: string } | number;
@@ -463,25 +480,39 @@ function getZaloPostId(result: ZaloApiResponse): string {
   return normalizeOptionalString(result.data?.post_id ?? result.data?.id ?? result.post_id ?? result.id);
 }
 
-function getZaloEndpoint(kind: "create" | "delete" | "update"): string {
+async function getZaloEndpoint(kind: "create" | "delete" | "update"): Promise<string> {
+  const settings = await readSrxSocialIntegrationSettings();
   const envKey =
     kind === "create"
       ? "ZALO_OA_ARTICLE_CREATE_URL"
       : kind === "update"
         ? "ZALO_OA_ARTICLE_UPDATE_URL"
         : "ZALO_OA_ARTICLE_DELETE_URL";
+  const configuredUrl =
+    kind === "create"
+      ? settings.zaloArticleCreateUrl
+      : kind === "update"
+        ? settings.zaloArticleUpdateUrl
+        : settings.zaloArticleDeleteUrl;
 
   return (
-    process.env[envKey]?.trim() ??
+    process.env[envKey]?.trim() ||
+    configuredUrl ||
     `https://openapi.zalo.me/v2.0/article/${kind === "delete" ? "remove" : kind}`
   );
 }
 
-function getZaloListEndpoint(): string {
-  return process.env.ZALO_OA_ARTICLE_LIST_URL?.trim() ?? "https://openapi.zalo.me/v2.0/article/getlist";
+async function getZaloListEndpoint(): Promise<string> {
+  const settings = await readSrxSocialIntegrationSettings();
+  return (
+    process.env.ZALO_OA_ARTICLE_LIST_URL?.trim() ||
+    settings.zaloArticleListUrl ||
+    "https://openapi.zalo.me/v2.0/article/getlist"
+  );
 }
 
-function buildZaloArticlePayload(post: SrxNewsPost) {
+async function buildZaloArticlePayload(post: SrxNewsPost) {
+  const settings = await readSrxSocialIntegrationSettings();
   const imageUrls = getSocialImageUrls(post);
   const link = buildPublicPostUrl(post);
   const description = normalizeOptionalString(post.excerpt) || stripHtml(post.content).slice(0, 250);
@@ -491,7 +522,7 @@ function buildZaloArticlePayload(post: SrxNewsPost) {
     status: "show",
     comment: "show",
     title: post.title,
-    author: process.env.ZALO_OA_ARTICLE_AUTHOR?.trim() || "SRX",
+    author: process.env.ZALO_OA_ARTICLE_AUTHOR?.trim() || settings.zaloArticleAuthor || "SRX",
     cover: imageUrls[0]
       ? {
           cover_type: "photo",
@@ -535,7 +566,7 @@ function getZaloArticleId(article: ZaloArticleSummary): string {
 
 async function tryFindZaloArticleIdByTitle(title: string): Promise<string | null> {
   const accessToken = await readZaloAccessToken();
-  const listUrl = new URL(getZaloListEndpoint());
+  const listUrl = new URL(await getZaloListEndpoint());
   listUrl.searchParams.set("offset", "0");
   listUrl.searchParams.set("count", "50");
 
@@ -576,14 +607,14 @@ async function createZaloArticle(post: SrxNewsPost): Promise<string | null> {
 
   try {
     result = await callJsonApi<ZaloApiResponse>(
-      getZaloEndpoint("create"),
+      await getZaloEndpoint("create"),
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           access_token: accessToken,
         },
-        body: JSON.stringify(buildZaloArticlePayload(post)),
+        body: JSON.stringify(await buildZaloArticlePayload(post)),
       },
       "Không thể đăng bài viết lên Zalo OA",
     );
@@ -602,7 +633,7 @@ async function updateZaloArticle(post: SrxNewsPost, zaloPostId: string): Promise
 
   try {
     result = await callJsonApi<ZaloApiResponse>(
-      getZaloEndpoint("update"),
+      await getZaloEndpoint("update"),
       {
         method: "POST",
         headers: {
@@ -612,7 +643,7 @@ async function updateZaloArticle(post: SrxNewsPost, zaloPostId: string): Promise
         body: JSON.stringify({
           id: zaloPostId,
           post_id: zaloPostId,
-          ...buildZaloArticlePayload(post),
+          ...(await buildZaloArticlePayload(post)),
         }),
       },
       "Không thể cập nhật bài viết Zalo OA",
@@ -632,7 +663,7 @@ async function deleteZaloArticle(zaloPostId: string): Promise<void> {
 
   try {
     result = await callJsonApi<ZaloApiResponse>(
-      getZaloEndpoint("delete"),
+      await getZaloEndpoint("delete"),
       {
         method: "POST",
         headers: {
@@ -653,24 +684,26 @@ async function deleteZaloArticle(zaloPostId: string): Promise<void> {
   assertZaloSuccess(result, "Không thể xóa bài viết Zalo OA");
 }
 
-function getFacebookGraphBaseUrl(): string {
-  const graphVersion = process.env.FACEBOOK_GRAPH_API_VERSION?.trim() || "v20.0";
+async function getFacebookGraphBaseUrl(): Promise<string> {
+  const settings = await readSrxSocialIntegrationSettings();
+  const graphVersion = process.env.FACEBOOK_GRAPH_API_VERSION?.trim() || settings.facebookGraphApiVersion || "v20.0";
   return `https://graph.facebook.com/${graphVersion}`;
 }
 
-function getFacebookPageConfig(): { pageId: string; pageToken: string } {
-  const pageId = process.env.SRX_FACEBOOK_PAGE_ID?.trim() || "1149491654916679";
-  const pageToken = process.env.SRX_FACEBOOK_PAGE_ACCESS_TOKEN?.trim() ?? "";
+async function getFacebookPageConfig(): Promise<{ pageId: string; pageToken: string }> {
+  const settings = await readSrxSocialIntegrationSettings();
+  const pageId = process.env.SRX_FACEBOOK_PAGE_ID?.trim() || settings.facebookPageId || "1149491654916679";
+  const pageToken = process.env.SRX_FACEBOOK_PAGE_ACCESS_TOKEN?.trim() || settings.facebookPageAccessToken || "";
 
   if (!pageToken) {
-    throw new Error("Chưa cấu hình SRX_FACEBOOK_PAGE_ACCESS_TOKEN");
+    throw new Error("Chua cau hinh Facebook Page Access Token trong muc Tich hop API");
   }
 
   return { pageId, pageToken };
 }
 
 async function callFacebookFormApi(endpoint: string, params: Record<string, string>): Promise<FacebookApiResponse> {
-  const { pageToken } = getFacebookPageConfig();
+  const { pageToken } = await getFacebookPageConfig();
   const body = new URLSearchParams({
     ...params,
     access_token: pageToken,
@@ -699,8 +732,8 @@ async function callFacebookFormApi(endpoint: string, params: Record<string, stri
 }
 
 async function createFacebookPost(post: SrxNewsPost): Promise<string> {
-  const { pageId } = getFacebookPageConfig();
-  const graphBaseUrl = getFacebookGraphBaseUrl();
+  const { pageId } = await getFacebookPageConfig();
+  const graphBaseUrl = await getFacebookGraphBaseUrl();
   const imageUrls = getSocialImageUrls(post);
   const link = buildPublicPostUrl(post);
   const message = appendLinkToMessage(buildPostMessage(post), link);
@@ -747,7 +780,7 @@ async function createFacebookPost(post: SrxNewsPost): Promise<string> {
 }
 
 async function deleteFacebookPost(facebookPostId: string): Promise<void> {
-  const { pageToken } = getFacebookPageConfig();
+  const { pageToken } = await getFacebookPageConfig();
   const body = new URLSearchParams({
     access_token: pageToken,
   });
@@ -755,7 +788,7 @@ async function deleteFacebookPost(facebookPostId: string): Promise<void> {
 
   try {
     result = await callJsonApi<FacebookApiResponse>(
-      `${getFacebookGraphBaseUrl()}/${encodeURIComponent(facebookPostId)}`,
+      `${await getFacebookGraphBaseUrl()}/${encodeURIComponent(facebookPostId)}`,
       {
         method: "DELETE",
         body,

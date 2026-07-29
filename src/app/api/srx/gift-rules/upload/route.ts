@@ -7,15 +7,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { convertUploadedImageToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-function getSafeExtension(filename: string): string {
-  const extension = path.extname(filename).toLowerCase();
-
-  return extension || ".png";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,7 +35,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Ảnh vượt quá 10MB" }, { status: 400 });
     }
 
-    const filename = `${Date.now()}-${randomUUID()}${getSafeExtension(file.name)}`;
+    const { buffer, extension } = await convertUploadedImageToWebp(file);
+    const filename = `${Date.now()}-${randomUUID()}${extension}`;
     const uploadDir = path.join(process.cwd(), "public", "upload", "gift");
 
     if (!existsSync(uploadDir)) {
@@ -48,7 +44,6 @@ export async function POST(request: NextRequest) {
     }
 
     const filepath = path.join(uploadDir, filename);
-    const buffer = Buffer.from(await file.arrayBuffer());
 
     await writeFile(filepath, buffer);
 

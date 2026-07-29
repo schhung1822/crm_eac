@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { AiImageDialog } from "./ai-image-dialog";
+
 async function uploadFile(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
@@ -32,10 +34,13 @@ export function NewsFeaturedImageField({
   disabled,
   onChange,
   value,
+  aiContext,
 }: {
   disabled: boolean;
   onChange: (nextValue: string) => void;
   value: string;
+  /** Ngữ cảnh bài viết để nút tạo ảnh AI vẽ đúng chủ đề. */
+  aiContext?: { title: string; excerpt?: string; content?: string };
 }) {
   const inputReference = React.useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -64,7 +69,6 @@ export function NewsFeaturedImageField({
   return (
     <div className="grid gap-3">
       <div className="grid gap-2">
-        <Label htmlFor="news-image">Ảnh đại diện</Label>
         <Input
           id="news-image"
           value={value}
@@ -93,6 +97,16 @@ export function NewsFeaturedImageField({
           {isUploading ? "Đang tải..." : "Tải ảnh đại diện"}
         </Button>
 
+        {aiContext ? (
+          <AiImageDialog
+            title={aiContext.title}
+            excerpt={aiContext.excerpt}
+            content={aiContext.content}
+            onUseAsFeatured={onChange}
+            disabled={disabled || isUploading}
+          />
+        ) : null}
+
         {value ? (
           <Button type="button" variant="ghost" disabled={disabled || isUploading} onClick={() => onChange("")}>
             <Trash2 className="size-4" />
@@ -100,8 +114,6 @@ export function NewsFeaturedImageField({
           </Button>
         ) : null}
       </div>
-
-      <p className="text-muted-foreground text-xs">Ảnh sẽ được lưu trong thư mục `upload/ports`.</p>
 
       {value ? (
         <div className="overflow-hidden rounded-lg border">

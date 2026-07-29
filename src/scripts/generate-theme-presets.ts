@@ -90,7 +90,7 @@ const defaultPrimary = {
   dark: defaultDarkPrimaryMatch?.[1]?.trim() ?? "",
 };
 
-presets.unshift({ label: "Default", value: "default", primary: defaultPrimary });
+presets.unshift({ label: "Mặc định", value: "default", primary: defaultPrimary });
 
 const generatedBlock = `// --- generated:themePresets:start ---
 

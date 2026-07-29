@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { convertUploadedImageToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -48,20 +49,17 @@ export async function POST(request: NextRequest) {
       await mkdir(uploadDir, { recursive: true });
     }
 
-    const ext = path.extname(file.name) || ".png";
-    const rawBaseName = path.basename(file.name, ext);
+    const { buffer, extension } = await convertUploadedImageToWebp(file);
+    const rawBaseName = path.basename(file.name, path.extname(file.name));
     const baseName = makeSafeFilename(rawBaseName) || "image";
 
-    let filename = `${baseName}${ext}`;
+    let filename = `${baseName}${extension}`;
     let counter = 1;
 
     while (existsSync(path.join(uploadDir, filename))) {
-      filename = `${baseName}-${counter}${ext}`;
+      filename = `${baseName}-${counter}${extension}`;
       counter++;
     }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
 
     const filepath = path.join(uploadDir, filename);
 

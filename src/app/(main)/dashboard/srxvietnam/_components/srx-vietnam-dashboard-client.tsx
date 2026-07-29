@@ -216,13 +216,13 @@ function KpiCards({ summary }: Pick<SrxVietnamDashboardClientProps["data"], "sum
     {
       title: "Doanh thu",
       value: formatCurrency(summary.totalRevenue),
-      description: "Tổng doanh thu đơn hàng trong phạm vi lọc",
+      description: "Doanh thu đơn hoàn tất và đã thanh toán trong phạm vi lọc",
       icon: Wallet,
     },
     {
       title: "Đơn hàng",
       value: summary.totalOrders.toLocaleString("vi-VN"),
-      description: "Số đơn phát sinh từ website SRX",
+      description: "Số đơn hoàn tất và đã thanh toán từ website SRX",
       icon: ShoppingCart,
     },
     {
@@ -234,7 +234,7 @@ function KpiCards({ summary }: Pick<SrxVietnamDashboardClientProps["data"], "sum
     {
       title: "AOV",
       value: formatCurrency(summary.averageOrderValue),
-      description: "Giá trị trung bình trên mỗi đơn",
+      description: "Giá trị trung bình mỗi đơn hoàn tất và đã thanh toán",
       icon: BadgePercent,
     },
   ];
@@ -271,14 +271,16 @@ function OperationalMetrics({
         <CardHeader className="gap-2">
           <CardDescription>Tỷ lệ đơn từ tài khoản đã đăng nhập</CardDescription>
           <CardTitle className="text-xl">{formatPercent(summary.registeredOrderRate)}</CardTitle>
-          <p className="text-muted-foreground text-sm">Đo mức độ chuyển đổi từ khách lẻ sang khách có tài khoản.</p>
+          <p className="text-muted-foreground text-sm">
+            Tính trên đơn hoàn tất và đã thanh toán, đo mức chuyển đổi từ khách lẻ sang khách có tài khoản.
+          </p>
         </CardHeader>
       </Card>
       <Card className="border-dashed">
         <CardHeader className="gap-2">
           <CardDescription>Khách hàng thân thiết</CardDescription>
           <CardTitle className="text-xl">{summary.repeatCustomers.toLocaleString("vi-VN")}</CardTitle>
-          <p className="text-muted-foreground text-sm">Số khách quay lại mua trên 1 lần.</p>
+          <p className="text-muted-foreground text-sm">Số khách có trên 1 đơn hoàn tất và đã thanh toán.</p>
         </CardHeader>
       </Card>
       {operations.map((metric) => (
@@ -299,7 +301,9 @@ function PerformanceCard({ performance }: Pick<SrxVietnamDashboardClientProps["d
     <Card className="xl:col-span-2">
       <CardHeader>
         <CardTitle>Nhịp doanh thu và đơn hàng</CardTitle>
-        <CardDescription>Đọc nhanh xu hướng phát sinh doanh thu và số đơn theo ngày.</CardDescription>
+        <CardDescription>
+          Xu hướng doanh thu và số đơn theo ngày, chỉ tính đơn hoàn tất và đã thanh toán.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {performance.length === 0 ? (
@@ -360,7 +364,7 @@ function OrderStatusCard({ orderStatus }: Pick<SrxVietnamDashboardClientProps["d
     <Card>
       <CardHeader>
         <CardTitle>Trạng thái đơn hàng</CardTitle>
-        <CardDescription>Nhóm backlog đơn để ưu tiên xử lý vận hành.</CardDescription>
+        <CardDescription>Nhóm backlog trên toàn bộ đơn để ưu tiên xử lý vận hành.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {orderStatus.length === 0 ? (
@@ -488,7 +492,9 @@ function CustomerMixCard({ customerMix }: Pick<SrxVietnamDashboardClientProps["d
     <Card>
       <CardHeader>
         <CardTitle>Cơ cấu khách mua</CardTitle>
-        <CardDescription>Phân biệt đơn từ khách lẻ và khách đã có tài khoản.</CardDescription>
+        <CardDescription>
+          Phân biệt khách lẻ và khách có tài khoản trên các đơn hoàn tất và đã thanh toán.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {customerMix.length === 0 ? (

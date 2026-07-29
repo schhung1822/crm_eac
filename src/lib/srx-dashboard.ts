@@ -169,6 +169,9 @@ const orderStatusLabels: Record<string, string> = {
   refunded: "Hoàn tiền",
 };
 
+// Số liệu thống kê doanh thu chỉ tính đơn đã hoàn tất và đã thanh toán.
+const completedPaidOrderConditions = ["o.order_status = 'completed'", "o.payment_status = 'paid'"];
+
 const affiliateApplicationStatusLabels: Record<string, string> = {
   pending: "Chờ duyệt",
   approved: "Đã duyệt",
@@ -306,6 +309,8 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
     const db = getSrxDB();
 
     const ordersWhere = buildWhereClause([], "o.placed_at", range);
+    // Dùng cho các số liệu thống kê: chỉ đơn hoàn tất + đã thanh toán
+    const paidOrdersWhere = buildWhereClause([...completedPaidOrderConditions], "o.placed_at", range);
     const customerWhere = buildWhereClause(["u.deleted_at IS NULL"], "u.created_at", range);
     const applicationWhere = buildWhereClause([], "aa.created_at", range);
     const postWhere = buildWhereClause(["p.status = 'published'"], "COALESCE(p.published_at, p.created_at)", range);
@@ -317,9 +322,9 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
           COALESCE(SUM(o.grand_total), 0) AS total_revenue,
           COALESCE(SUM(CASE WHEN o.user_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS registered_orders
         FROM orders o
-        ${ordersWhere.clause}
+        ${paidOrdersWhere.clause}
       `,
-      ordersWhere.params,
+      paidOrdersWhere.params,
     );
 
     const [customerSummaryRows] = await db.query<CustomerSummaryRow[]>(
@@ -331,7 +336,11 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       customerWhere.params,
     );
 
-    const repeatWhere = buildWhereClause(["o.user_id IS NOT NULL"], "o.placed_at", range);
+    const repeatWhere = buildWhereClause(
+      ["o.user_id IS NOT NULL", ...completedPaidOrderConditions],
+      "o.placed_at",
+      range,
+    );
     const [repeatRows] = await db.query<RepeatCustomerRow[]>(
       `
         SELECT COUNT(*) AS repeat_customers
@@ -365,11 +374,11 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
           COUNT(*) AS orders,
           COALESCE(SUM(o.grand_total), 0) AS revenue
         FROM orders o
-        ${ordersWhere.clause}
+        ${paidOrdersWhere.clause}
         GROUP BY DATE_FORMAT(o.placed_at, '%Y-%m-%d')
         ORDER BY DATE_FORMAT(o.placed_at, '%Y-%m-%d') ASC
       `,
-      ordersWhere.params,
+      paidOrdersWhere.params,
     );
 
     const [dailyCustomerRows] = await db.query<DailyCountRow[]>(
@@ -422,11 +431,11 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
           COUNT(*) AS count,
           COALESCE(SUM(o.grand_total), 0) AS revenue
         FROM orders o
-        ${ordersWhere.clause}
+        ${paidOrdersWhere.clause}
         GROUP BY CASE WHEN o.user_id IS NULL THEN 'Khách lẻ' ELSE 'Thành viên' END
         ORDER BY count DESC, revenue DESC
       `,
-      ordersWhere.params,
+      paidOrdersWhere.params,
     );
 
     const [productCategoryRows] = await db.query<CountRow[]>(

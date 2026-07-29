@@ -62,19 +62,6 @@ function buildCard(payload: SrxOrdersWebPayload) {
     },
   ];
 
-  if (paymentUrl) {
-    cardElements.push(
-      { tag: "hr" },
-      {
-        tag: "div",
-        text: {
-          content: `**Thanh toán tiếp:**\n[${paymentUrl}](${paymentUrl})`,
-          tag: "lark_md",
-        },
-      },
-    );
-  }
-
   cardElements.push(
     { tag: "hr" },
     {

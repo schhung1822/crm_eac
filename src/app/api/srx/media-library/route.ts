@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       directory,
       originalFilename: file.name,
       buffer,
+      mimeType: file.type,
     });
 
     return NextResponse.json({

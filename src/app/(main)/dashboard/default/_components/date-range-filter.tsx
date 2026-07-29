@@ -24,18 +24,34 @@ function fromISO(s?: string | null) {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function endOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+// Mặc định (khi URL chưa có filter) là tháng này, khớp với server trong page.tsx
+function defaultRange(): Range {
+  const now = new Date();
+  return { from: startOfMonth(now), to: now };
+}
+
+function rangeFromParams(fromParam?: string | null, toParam?: string | null): Range {
+  if (!fromParam && !toParam) return defaultRange();
+  return { from: fromISO(fromParam), to: fromISO(toParam) };
+}
+
 export function DateRangeFilter() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
 
-  const [range, setRange] = React.useState<Range>(() => ({
-    from: fromISO(sp.get("from")),
-    to: fromISO(sp.get("to")),
-  }));
+  const [range, setRange] = React.useState<Range>(() => rangeFromParams(sp.get("from"), sp.get("to")));
 
   React.useEffect(() => {
-    setRange({ from: fromISO(sp.get("from")), to: fromISO(sp.get("to")) });
+    setRange(rangeFromParams(sp.get("from"), sp.get("to")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp.get("from"), sp.get("to")]);
 
@@ -59,29 +75,37 @@ export function DateRangeFilter() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  const quick = (mode: "7d" | "30d" | "90d" | "ytd" | "thisMonth") => {
+  const quick = (mode: "7d" | "30d" | "90d" | "ytd" | "thisMonth" | "lastMonth") => {
     const now = new Date();
-    const start = new Date(now);
+    let start = new Date(now);
+    let end = now;
 
     if (mode === "7d") start.setDate(now.getDate() - 7);
     if (mode === "30d") start.setDate(now.getDate() - 30);
     if (mode === "90d") start.setDate(now.getDate() - 90);
 
     if (mode === "thisMonth") {
-      start.setDate(1);
+      start = startOfMonth(now);
+    }
+
+    if (mode === "lastMonth") {
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      start = prevMonth;
+      end = endOfMonth(prevMonth);
     }
 
     if (mode === "ytd") {
       start.setMonth(0, 1);
     }
 
-    const r = { from: start, to: now };
+    const r = { from: start, to: end };
     setRange(r);
     apply(r);
   };
 
+  // Xoá filter trên URL => quay lại mặc định (tháng này)
   const clear = () => {
-    setRange({});
+    setRange(defaultRange());
     const params = new URLSearchParams(sp.toString());
     params.delete("from");
     params.delete("to");
@@ -135,11 +159,14 @@ export function DateRangeFilter() {
       <Button variant="outline" size="sm" onClick={() => quick("thisMonth")}>
         Tháng này
       </Button>
+      <Button variant="outline" size="sm" onClick={() => quick("lastMonth")}>
+        Tháng trước
+      </Button>
       <Button variant="outline" size="sm" onClick={() => quick("ytd")}>
         Năm này
       </Button>
 
-      {(range.from || range.to) && (
+      {(sp.get("from") ?? sp.get("to")) && (
         <Button variant="secondary" size="sm" onClick={clear}>
           Xóa
         </Button>

@@ -6,7 +6,7 @@ import * as React from "react";
 import Link from "next/link";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { EllipsisVertical, Plus, Search, Trash2 } from "lucide-react";
+import { EllipsisVertical, Eye, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table/data-table";
@@ -21,6 +21,7 @@ import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { filterBySearchTerm } from "@/lib/search-utils";
 import type { SrxNewsCategory, SrxNewsPost } from "@/lib/srx-news.shared";
 
+import { PostPreviewDialog } from "./post-preview-dialog";
 import { PostRowActions } from "./post-row-actions";
 
 const statusLabelMap: Record<SrxNewsPost["status"], string> = {
@@ -43,9 +44,12 @@ function formatCount(value: number): string {
   return value.toLocaleString("vi-VN");
 }
 
-function getSocialChannelBadges(post: SrxNewsPost): Array<{ label: string; variant: "default" | "secondary" | "outline" }> {
+function getSocialChannelBadges(
+  post: SrxNewsPost,
+): Array<{ label: string; variant: "default" | "secondary" | "outline" }> {
   const badges: Array<{ label: string; variant: "default" | "secondary" | "outline" }> = [];
-  const isScheduled = post.status === "published" && post.published_at !== null && post.published_at.getTime() > Date.now();
+  const isScheduled =
+    post.status === "published" && post.published_at !== null && post.published_at.getTime() > Date.now();
 
   if (post.id_fb_post) {
     badges.push({ label: "FB đã đăng", variant: "default" });

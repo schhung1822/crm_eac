@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BrainCircuit,
   Calendar1Icon,
   ChartBar,
   Gauge,
@@ -152,6 +153,11 @@ export const sidebarItems: NavGroup[] = [
     id: 4,
     label: "Khác",
     items: [
+      {
+        title: "Quản lý kết nối",
+        url: "/ai",
+        icon: BrainCircuit,
+      },
       {
         title: "Tài khoản",
         url: "/account",

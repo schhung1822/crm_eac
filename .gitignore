@@ -53,3 +53,4 @@ next-env.d.ts
 .next-webpack-clean/
 .github-export/
 .github-export.index.lock
+.data/

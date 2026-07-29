@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { convertUploadedImageToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Ảnh vượt quá 10MB" }, { status: 400 });
     }
 
-    const extension = path.extname(file.name) || ".png";
+    const { buffer, extension } = await convertUploadedImageToWebp(file);
     const filename = `${Date.now()}-${randomUUID()}${extension}`;
     const uploadDir = path.join(process.cwd(), "public", "upload", "banner");
 
@@ -42,8 +43,6 @@ export async function POST(request: NextRequest) {
       await mkdir(uploadDir, { recursive: true });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
     const filepath = path.join(uploadDir, filename);
 
     // filepath được ghép từ thư mục upload cố định của dự án và tên file tự sinh.
@@ -58,4 +57,3 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tải banner");
   }
 }
-

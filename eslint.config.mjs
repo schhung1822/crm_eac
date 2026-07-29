@@ -83,6 +83,9 @@ export default defineConfig([
         "error",
         {
           caseSensitive: true,
+          // Next.js tự alias các package đánh dấu ranh giới server/client,
+          // chúng không tồn tại trong node_modules nên resolver không thấy.
+          ignore: ["^server-only$", "^client-only$"],
         },
       ],
       "no-duplicate-imports": ["error", { includeExports: true }],

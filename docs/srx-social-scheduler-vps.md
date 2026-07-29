@@ -111,3 +111,30 @@ npm run srx:social-scheduler -- --limit=20
 ```
 
 If this publishes successfully but automatic publishing does not, the problem is systemd timer setup. If this returns failed posts, inspect the error message in the JSON output.
+
+## API scheduler endpoint
+
+The app also exposes an HTTP scheduler endpoint for cron services:
+
+```bash
+curl -X POST "https://your-crm-domain.com/api/srx/news/social-scheduler?limit=20" \
+  -H "Authorization: Bearer $SRX_SOCIAL_SCHEDULER_SECRET"
+```
+
+Run it every 1-5 minutes. Each call publishes posts that are already due. The API uses the same MySQL advisory lock, so overlapping calls are skipped safely.
+
+Status check without publishing:
+
+```bash
+curl "https://your-crm-domain.com/api/srx/news/social-scheduler?status=1&limit=20" \
+  -H "Authorization: Bearer $SRX_SOCIAL_SCHEDULER_SECRET"
+```
+
+Required environment variables:
+
+```bash
+SRX_SOCIAL_SCHEDULER_SECRET="replace-with-random-secret"
+SRX_SOCIAL_SCHEDULER_LIMIT="20"
+```
+
+`CRON_SECRET` can also be used instead of `SRX_SOCIAL_SCHEDULER_SECRET`.
