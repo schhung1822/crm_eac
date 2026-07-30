@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:webpack": "next dev --webpack",
+    "prebuild": "node scripts/prisma-generate.js",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
