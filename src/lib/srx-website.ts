@@ -1,5 +1,5 @@
 /* eslint-disable max-lines, no-underscore-dangle */
-/* eslint-disable import/no-unresolved */
+
 import "server-only";
 
 import { prisma2 } from "@/lib/prisma2";
@@ -24,6 +24,7 @@ import {
   srxPaymentMethodSchema,
   type SrxBanner,
   type SrxBannerMutationInput,
+  type SrxBannerPosition,
   type SrxDiscountCode,
   type SrxDiscountCodeMutationInput,
   type SrxGiftRule,
@@ -239,15 +240,20 @@ function validateGiftRulePayload(payload: SrxGiftRuleMutationInput): {
 } {
   const startsAt = parseOptionalDate(payload.starts_at);
   const endsAt = parseOptionalDate(payload.ends_at);
-  const minSubtotal = parseRequiredDecimalString(payload.min_subtotal || "0", "Gi\u00e1 tr\u1ecb \u0111\u01a1n t\u1ed1i thi\u1ec3u");
-  const limitQuantity = parseOptionalUnsignedInt(payload.limit_quantity, "Gi\u1edbi h\u1ea1n s\u1ed1 l\u01b0\u1ee3ng qu\u00e0");
+  const minSubtotal = parseRequiredDecimalString(
+    payload.min_subtotal || "0",
+    "Gi\u00e1 tr\u1ecb \u0111\u01a1n t\u1ed1i thi\u1ec3u",
+  );
+  const limitQuantity = parseOptionalUnsignedInt(
+    payload.limit_quantity,
+    "Gi\u1edbi h\u1ea1n s\u1ed1 l\u01b0\u1ee3ng qu\u00e0",
+  );
   const productId = parseOptionalBigIntId(payload.product_id);
   const variantId = parseOptionalBigIntId(payload.variant_id);
   const giftProductId = parseOptionalBigIntId(payload.gift_product_id);
   const giftVariantId = parseOptionalBigIntId(payload.gift_variant_id);
 
   validateDateRange(startsAt, endsAt);
-
 
   if (payload.rule_type === "order_subtotal" && Number(minSubtotal) <= 0) {
     throw new Error("Gi\u00e1 tr\u1ecb \u0111\u01a1n t\u1ed1i thi\u1ec3u ph\u1ea3i l\u1edbn h\u01a1n 0");
@@ -622,7 +628,10 @@ const giftRuleSelectSql = Prisma.sql`
   LEFT JOIN products gift_product ON gift_product.id = gr.gift_product_id
 `;
 
-async function getGiftRuleByIdRaw(giftRuleId: bigint, client: GiftRuleQueryClient = prisma2): Promise<GiftRuleRow | null> {
+async function getGiftRuleByIdRaw(
+  giftRuleId: bigint,
+  client: GiftRuleQueryClient = prisma2,
+): Promise<GiftRuleRow | null> {
   const giftRules = await client.$queryRaw<GiftRuleRow[]>(Prisma.sql`
     ${giftRuleSelectSql}
     WHERE gr.id = ${giftRuleId}
@@ -718,7 +727,7 @@ export async function getSrxGiftRules(): Promise<SrxGiftRule[]> {
     return giftRules.map((giftRule) =>
       mapGiftRule({
         ...giftRule,
-        rule_type: giftRule.rule_type as (typeof srxGiftRuleTypeValues)[number],
+        rule_type: giftRule.rule_type,
       }),
     );
   } catch (error) {
@@ -949,6 +958,50 @@ export async function getSrxBanners(): Promise<SrxBanner[]> {
         created_at,
         updated_at
       FROM banners
+      ORDER BY sort_order ASC, created_at DESC
+    `);
+
+    return banners.map((banner) => mapBanner(banner));
+  } catch (error) {
+    if (isMissingWebsiteTableError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Danh sách banner dành cho kênh public (website, Zalo Mini App): chỉ lấy banner
+ * đang bật và đang nằm trong khoảng thời gian hiển thị.
+ */
+export async function getSrxActiveBannersByPosition(position: SrxBannerPosition): Promise<SrxBanner[]> {
+  try {
+    const banners = await prisma2.$queryRaw<BannerRow[]>(Prisma.sql`
+      SELECT
+        id,
+        title,
+        slug,
+        description,
+        image_url,
+        mobile_image_url,
+        alt_text,
+        button_label,
+        link_type,
+        link_target,
+        position,
+        open_in_new_tab,
+        sort_order,
+        starts_at,
+        ends_at,
+        is_active,
+        created_at,
+        updated_at
+      FROM banners
+      WHERE position = ${position}
+        AND is_active = 1
+        AND (starts_at IS NULL OR starts_at <= NOW())
+        AND (ends_at IS NULL OR ends_at >= NOW())
       ORDER BY sort_order ASC, created_at DESC
     `);
 

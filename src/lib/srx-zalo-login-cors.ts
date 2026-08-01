@@ -23,16 +23,25 @@ export function getMiniAppAllowedOrigin(request: NextRequest): string {
   return requestOrigin && allowList.includes(requestOrigin) ? requestOrigin : allowList[0];
 }
 
-export function withMiniAppCors<T extends NextResponse | Response>(response: T, request: NextRequest): T {
+const DEFAULT_ALLOWED_METHODS = "POST, OPTIONS";
+
+export function withMiniAppCors<T extends NextResponse | Response>(
+  response: T,
+  request: NextRequest,
+  allowedMethods: string = DEFAULT_ALLOWED_METHODS,
+): T {
   response.headers.set("Access-Control-Allow-Origin", getMiniAppAllowedOrigin(request));
-  response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  response.headers.set("Access-Control-Allow-Methods", allowedMethods);
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   response.headers.set("Access-Control-Max-Age", "86400");
   response.headers.set("Vary", "Origin");
 
   return response;
 }
 
-export function handleMiniAppPreflight(request: NextRequest): Response {
-  return withMiniAppCors(new Response(null, { status: 204 }), request);
+export function handleMiniAppPreflight(
+  request: NextRequest,
+  allowedMethods: string = DEFAULT_ALLOWED_METHODS,
+): Response {
+  return withMiniAppCors(new Response(null, { status: 204 }), request, allowedMethods);
 }

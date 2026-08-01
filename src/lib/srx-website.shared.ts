@@ -126,6 +126,7 @@ export const srxGiftRuleSchema = z.object({
 
 export type SrxDiscountCode = z.infer<typeof srxDiscountCodeSchema>;
 export type SrxBanner = z.infer<typeof srxBannerSchema>;
+export type SrxBannerPosition = z.infer<typeof srxBannerPositionSchema>;
 export type SrxPaymentMethod = z.infer<typeof srxPaymentMethodSchema>;
 export type SrxGiftRule = z.infer<typeof srxGiftRuleSchema>;
 
