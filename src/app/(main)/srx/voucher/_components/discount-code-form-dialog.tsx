@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
+  srxDiscountCodeClassValues,
   srxDiscountCodeScopeValues,
   srxDiscountCodeTypeValues,
   type SrxDiscountCode,
@@ -45,6 +46,7 @@ const emptyFormState: DiscountCodeFormState = {
   total_usage_limit: "",
   per_user_limit: "",
   scope_type: "all_orders",
+  class: "public",
   starts_at: "",
   ends_at: "",
   is_active: true,
@@ -83,6 +85,7 @@ function buildFormState(discountCode: SrxDiscountCode | null): DiscountCodeFormS
     total_usage_limit: discountCode.total_usage_limit === null ? "" : String(discountCode.total_usage_limit),
     per_user_limit: discountCode.per_user_limit === null ? "" : String(discountCode.per_user_limit),
     scope_type: discountCode.scope_type,
+    class: discountCode.class,
     starts_at: toLocalDateTimeInput(discountCode.starts_at),
     ends_at: toLocalDateTimeInput(discountCode.ends_at),
     is_active: discountCode.is_active,
@@ -112,6 +115,17 @@ function getScopeLabel(value: DiscountCodeFormState["scope_type"]): string {
       return "Sản phẩm cụ thể";
     case "specific_categories":
       return "Danh mục cụ thể";
+    default:
+      return value;
+  }
+}
+
+function getClassLabel(value: DiscountCodeFormState["class"]): string {
+  switch (value) {
+    case "public":
+      return "Công khai";
+    case "private":
+      return "Riêng tư";
     default:
       return value;
   }
@@ -337,14 +351,35 @@ export function DiscountCodeFormDialog({
                   </Select>
                 </div>
 
-                <label className="flex items-center gap-3 rounded-md border px-3 py-2">
-                  <Checkbox
-                    checked={form.is_active}
-                    onCheckedChange={(checked) => setForm((current) => ({ ...current, is_active: checked === true }))}
-                  />
-                  <span className="text-sm">Đang hoạt động</span>
-                </label>
+                <div className="grid gap-2">
+                  <Label htmlFor="discount-class">Loại voucher</Label>
+                  <Select
+                    value={form.class}
+                    onValueChange={(value) =>
+                      setForm((current) => ({ ...current, class: value as DiscountCodeFormState["class"] }))
+                    }
+                  >
+                    <SelectTrigger id="discount-class">
+                      <SelectValue placeholder="Chọn loại voucher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {srxDiscountCodeClassValues.map((classValue) => (
+                        <SelectItem key={classValue} value={classValue}>
+                          {getClassLabel(classValue)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              <label className="flex items-center gap-3 rounded-md border px-3 py-2">
+                <Checkbox
+                  checked={form.is_active}
+                  onCheckedChange={(checked) => setForm((current) => ({ ...current, is_active: checked === true }))}
+                />
+                <span className="text-sm">Đang hoạt động</span>
+              </label>
 
               <div className={compactGridClass}>
                 <div className="grid gap-2">

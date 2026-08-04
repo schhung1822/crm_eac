@@ -4,7 +4,7 @@
 import * as React from "react";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table/data-table";
@@ -21,10 +21,10 @@ import {
   srxAffiliateAccountStatusValues,
   srxAffiliateApplicationStatusValues,
   type SrxAffiliateAccount,
-  type SrxAffiliateManagementMutationInput,
+  type SrxAffiliateUserOption,
 } from "@/lib/srx-affiliates.shared";
 
-import { AffiliateManagementDialog } from "./affiliate-management-dialog";
+import { AffiliateAccountFormDialog, type AffiliateAccountFormState } from "./affiliate-account-form-dialog";
 import {
   formatCurrency,
   formatDateTime,
@@ -32,19 +32,107 @@ import {
   getAffiliateAccountStatusVariant,
   getAffiliateApplicationStatusLabel,
   getAffiliateApplicationStatusVariant,
+  getAffiliateCommissionLabel,
+  getAffiliateCommissionTypeLabel,
 } from "./affiliate-presenters";
 
 function sortAffiliateAccounts(accounts: SrxAffiliateAccount[]): SrxAffiliateAccount[] {
   return [...accounts].sort((left, right) => right.created_at.getTime() - left.created_at.getTime());
 }
 
-export function AffiliateManagementManager({ initialAccounts }: { initialAccounts: SrxAffiliateAccount[] }) {
+function buildCreatePayload(value: AffiliateAccountFormState) {
+  return {
+    user_mode: value.user_mode,
+    user_id: value.user_id,
+    new_user_full_name: value.new_user_full_name,
+    new_user_email: value.new_user_email,
+    new_user_phone: value.new_user_phone,
+    new_user_password: value.new_user_password,
+    ...buildSharedPayload(value),
+  };
+}
+
+function buildUpdatePayload(value: AffiliateAccountFormState) {
+  return {
+    user_full_name: value.user_full_name,
+    user_email: value.user_email,
+    user_phone: value.user_phone,
+    ...buildSharedPayload(value),
+  };
+}
+
+function buildSharedPayload(value: AffiliateAccountFormState) {
+  return {
+    affiliate_code: value.affiliate_code,
+    status: value.status,
+    commission_type: value.commission_type,
+    commission_rate: value.commission_rate,
+    cookie_duration_days: value.cookie_duration_days,
+    application_status: value.application_status,
+    review_note: value.review_note,
+    legal_full_name: value.legal_full_name,
+    permanent_address: value.permanent_address,
+    national_id_number: value.national_id_number,
+    gender: value.gender,
+    contact_email: value.contact_email,
+    contact_phone: value.contact_phone,
+    social_channel: value.social_channel,
+    website_url: value.website_url,
+    facebook_url: value.facebook_url,
+    tiktok_url: value.tiktok_url,
+    promotion_plan: value.promotion_plan,
+    bank_account_holder: value.bank_account_holder,
+    bank_name: value.bank_name,
+    bank_branch: value.bank_branch,
+    bank_account_number: value.bank_account_number,
+  };
+}
+
+function resolveErrorMessage(result: { message?: string; issues?: Array<{ message?: string }> }): string {
+  const issueMessage = Array.isArray(result.issues) ? result.issues[0]?.message : null;
+
+  return issueMessage ?? result.message ?? "Không thể lưu affiliate";
+}
+
+async function submitAffiliateAccount(
+  editingAccountId: string | null,
+  value: AffiliateAccountFormState,
+): Promise<SrxAffiliateAccount> {
+  const response = await fetch(
+    editingAccountId ? `/api/srx/affiliate-accounts/${editingAccountId}` : "/api/srx/affiliate-accounts",
+    {
+      method: editingAccountId ? "PATCH" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(editingAccountId ? buildUpdatePayload(value) : buildCreatePayload(value)),
+    },
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(result));
+  }
+
+  return parseSrxAffiliateAccount(result.account);
+}
+
+export function AffiliateAccountsManager({
+  initialAccounts,
+  initialUserOptions,
+}: {
+  initialAccounts: SrxAffiliateAccount[];
+  initialUserOptions: SrxAffiliateUserOption[];
+}) {
   const [accounts, setAccounts] = React.useState<SrxAffiliateAccount[]>(sortAffiliateAccounts(initialAccounts));
+  const [userOptions, setUserOptions] = React.useState<SrxAffiliateUserOption[]>(initialUserOptions);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [accountStatusFilter, setAccountStatusFilter] = React.useState<"all" | SrxAffiliateAccount["status"]>("all");
   const [applicationStatusFilter, setApplicationStatusFilter] = React.useState<
     "all" | "missing" | NonNullable<SrxAffiliateAccount["application_status"]>
   >("all");
+  const [dialogMode, setDialogMode] = React.useState<"create" | "edit">("edit");
   const [editingAccount, setEditingAccount] = React.useState<SrxAffiliateAccount | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -57,8 +145,10 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
         account.user_phone,
         account.affiliate_code,
         account.bank_name,
+        account.bank_account_number,
         account.application_contact_email,
         account.application_contact_phone,
+        account.application_legal_full_name,
       ]);
 
       const matchesAccountStatus = accountStatusFilter === "all" || account.status === accountStatusFilter;
@@ -79,13 +169,10 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
         result.total += 1;
         result.totalPendingCommission += account.pending_commission_amount;
         result.totalApprovedCommission += account.approved_commission_amount;
+        result.totalOrders += account.total_orders;
 
         if (account.status === "active") {
           result.active += 1;
-        }
-
-        if (account.application_status === "pending") {
-          result.pendingApplications += 1;
         }
 
         return result;
@@ -93,7 +180,7 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
       {
         total: 0,
         active: 0,
-        pendingApplications: 0,
+        totalOrders: 0,
         totalPendingCommission: 0,
         totalApprovedCommission: 0,
       },
@@ -101,42 +188,35 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
   }, [accounts]);
 
   const handleSubmit = React.useCallback(
-    async (value: SrxAffiliateManagementMutationInput) => {
-      if (!editingAccount) {
-        return;
-      }
+    async (value: AffiliateAccountFormState) => {
+      const editingAccountId = dialogMode === "edit" && editingAccount ? editingAccount.id : null;
+      const isEditing = editingAccountId !== null;
 
       try {
         setIsSubmitting(true);
 
-        const response = await fetch(`/api/srx/affiliate-accounts/${editingAccount.id}/management`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(value),
-        });
+        const account = await submitAffiliateAccount(editingAccountId, value);
 
-        const result = await response.json();
+        setAccounts((current) =>
+          sortAffiliateAccounts(
+            isEditing ? current.map((item) => (item.id === account.id ? account : item)) : [...current, account],
+          ),
+        );
 
-        if (!response.ok) {
-          throw new Error(result?.message ?? "Không thể cập nhật affiliate");
+        if (!isEditing) {
+          setUserOptions((current) => current.filter((user) => user.id !== account.user_id));
         }
 
-        const account = parseSrxAffiliateAccount(result.account);
-        setAccounts((current) =>
-          sortAffiliateAccounts(current.map((item) => (item.id === account.id ? account : item))),
-        );
         setDialogOpen(false);
         setEditingAccount(null);
-        toast.success("Đã cập nhật affiliate");
+        toast.success(isEditing ? "Đã cập nhật affiliate" : "Đã tạo affiliate mới");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Không thể cập nhật affiliate");
+        toast.error(error instanceof Error ? error.message : "Không thể lưu affiliate");
       } finally {
         setIsSubmitting(false);
       }
     },
-    [editingAccount],
+    [dialogMode, editingAccount],
   );
 
   const columns = React.useMemo<ColumnDef<SrxAffiliateAccount>[]>(
@@ -148,7 +228,9 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
           <div className="space-y-1">
             <div className="font-medium">{row.original.user_name}</div>
             <div className="text-muted-foreground text-xs">{row.original.user_email}</div>
-            <div className="text-muted-foreground text-xs">Mã: {row.original.affiliate_code}</div>
+            <div className="text-muted-foreground text-xs">
+              {row.original.user_phone ? `${row.original.user_phone} · ` : ""}Mã: {row.original.affiliate_code}
+            </div>
           </div>
         ),
         enableSorting: false,
@@ -157,27 +239,26 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Trạng thái" />,
         cell: ({ row }) => (
-          <div className="space-y-2">
+          <div className="flex flex-col items-start gap-1">
             <Badge variant={getAffiliateAccountStatusVariant(row.original.status)}>
               {getAffiliateAccountStatusLabel(row.original.status)}
             </Badge>
-            <div className="text-muted-foreground text-xs">
-              Duyệt lúc: {row.original.approved_at ? formatDateTime(row.original.approved_at) : "—"}
-            </div>
+            <Badge variant={getAffiliateApplicationStatusVariant(row.original.application_status)}>
+              {getAffiliateApplicationStatusLabel(row.original.application_status)}
+            </Badge>
           </div>
         ),
         enableSorting: false,
       },
       {
-        accessorKey: "application_status",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Hồ sơ" />,
+        accessorKey: "commission_rate",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Hoa hồng" />,
         cell: ({ row }) => (
-          <div className="space-y-2">
-            <Badge variant={getAffiliateApplicationStatusVariant(row.original.application_status)}>
-              {getAffiliateApplicationStatusLabel(row.original.application_status)}
-            </Badge>
-            <div className="text-muted-foreground line-clamp-2 text-xs">
-              {row.original.application_review_note || row.original.application_social_channel || "Không có ghi chú"}
+          <div className="text-sm">
+            <div className="font-medium">{getAffiliateCommissionLabel(row.original)}</div>
+            <div className="text-muted-foreground text-xs">
+              {getAffiliateCommissionTypeLabel(row.original.commission_type)} · cookie{" "}
+              {row.original.cookie_duration_days} ngày
             </div>
           </div>
         ),
@@ -188,10 +269,12 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
         header: ({ column }) => <DataTableColumnHeader column={column} title="Hiệu suất" />,
         cell: ({ row }) => (
           <div className="text-sm">
-            <div>Click: {row.original.total_clicks}</div>
-            <div>Đơn: {row.original.total_orders}</div>
+            <div>
+              {row.original.total_clicks} click · {row.original.total_orders} đơn
+            </div>
             <div className="text-muted-foreground text-xs">
-              Link hoạt động: {row.original.active_link_count}/{row.original.link_count}
+              Link: {row.original.active_link_count}/{row.original.link_count} · Đơn ghi nhận:{" "}
+              {row.original.referral_count}
             </div>
           </div>
         ),
@@ -199,7 +282,7 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
       },
       {
         accessorKey: "pending_commission_amount",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Hoa hồng" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Số dư hoa hồng" />,
         cell: ({ row }) => (
           <div className="text-sm">
             <div>Chờ duyệt: {formatCurrency(row.original.pending_commission_amount)}</div>
@@ -218,8 +301,8 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
           <div className="space-y-1 text-sm">
             <div>{row.original.bank_name || "Chưa cấu hình"}</div>
             <div className="text-muted-foreground text-xs">
-              {row.original.bank_account_holder || "—"}{" "}
-              {row.original.bank_account_number ? `· ${row.original.bank_account_number}` : ""}
+              {row.original.bank_account_holder || "—"}
+              {row.original.bank_account_number ? ` · ${row.original.bank_account_number}` : ""}
             </div>
           </div>
         ),
@@ -228,7 +311,7 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
       {
         accessorKey: "updated_at",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Cập nhật" />,
-        cell: ({ row }) => <span>{formatDateTime(row.original.updated_at)}</span>,
+        cell: ({ row }) => <span className="text-sm">{formatDateTime(row.original.updated_at)}</span>,
         enableSorting: false,
       },
       {
@@ -239,11 +322,12 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
               variant="ghost"
               size="sm"
               onClick={() => {
+                setDialogMode("edit");
                 setEditingAccount(row.original);
                 setDialogOpen(true);
               }}
             >
-              Cập nhật
+              Chỉnh sửa
             </Button>
           </div>
         ),
@@ -262,12 +346,24 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Quản lý affiliate</h1>
-        <p className="text-muted-foreground">
-          Theo dõi trạng thái tài khoản affiliate, hồ sơ đăng ký, ngân hàng nhận hoa hồng và hiệu suất bán hàng của
-          website SRX.
-        </p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Quản lý affiliate</h1>
+          <p className="text-muted-foreground">
+            Tạo affiliate mới, chỉnh sửa thông tin cá nhân, hoa hồng và tài khoản ngân hàng trong cùng một nơi.
+          </p>
+        </div>
+
+        <Button
+          onClick={() => {
+            setDialogMode("create");
+            setEditingAccount(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus className="size-4" />
+          Thêm affiliate
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -293,23 +389,23 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Hồ sơ chờ duyệt</CardTitle>
+            <CardTitle className="text-sm font-medium">Đơn qua affiliate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{summary.pendingApplications}</div>
-            <p className="text-muted-foreground text-xs">Cần kiểm tra lại hồ sơ affiliate</p>
+            <div className="text-2xl font-semibold">{summary.totalOrders}</div>
+            <p className="text-muted-foreground text-xs">Tổng đơn ghi nhận cho toàn hệ thống affiliate</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Hoa hồng chờ xử lý</CardTitle>
+            <CardTitle className="text-sm font-medium">Hoa hồng chưa chi</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">
               {formatCurrency(summary.totalPendingCommission + summary.totalApprovedCommission)}
             </div>
-            <p className="text-muted-foreground text-xs">Tổng hoa hồng chưa chi cho affiliate</p>
+            <p className="text-muted-foreground text-xs">Gồm hoa hồng chờ duyệt và đã duyệt</p>
           </CardContent>
         </Card>
       </div>
@@ -367,10 +463,12 @@ export function AffiliateManagementManager({ initialAccounts }: { initialAccount
         <DataTable key={tableRenderKey} table={table} columns={columns} />
       </div>
 
-      <AffiliateManagementDialog
+      <AffiliateAccountFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        mode={dialogMode}
         initialValue={editingAccount}
+        userOptions={userOptions}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
       />

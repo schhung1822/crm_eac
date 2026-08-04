@@ -28,6 +28,24 @@ export type SrxArticleReport = {
   suggestions: string[];
 };
 
+/**
+ * Dạng phẳng dùng cho UI: mỗi trục là một con số, checklist tách riêng.
+ * Mọi màn hình hiển thị điểm đều nhận đúng dạng này (xem ArticleScorePanel).
+ */
+export type SrxArticleScoreSummary = {
+  seo: number;
+  aeo: number;
+  geo: number;
+  overall: number;
+  strengths: string[];
+  suggestions: string[];
+  checks: {
+    seo: SrxScoreCheck[];
+    aeo: SrxScoreCheck[];
+    geo: SrxScoreCheck[];
+  };
+};
+
 export type SrxArticleScoreArgs = {
   title: string;
   /** Nội dung dạng HTML (CKEditor) hoặc markdown. */
@@ -98,5 +116,22 @@ export function scoreSrxArticle(args: SrxArticleScoreArgs): SrxArticleReport {
     geo,
     strengths: collectStrengths(axes),
     suggestions: collectSuggestions(axes),
+  };
+}
+
+/** Chuyển báo cáo đầy đủ sang dạng phẳng cho UI. */
+export function summarizeSrxArticleReport(report: SrxArticleReport): SrxArticleScoreSummary {
+  return {
+    seo: report.seo.score,
+    aeo: report.aeo.score,
+    geo: report.geo.score,
+    overall: report.overall,
+    strengths: report.strengths,
+    suggestions: report.suggestions,
+    checks: {
+      seo: report.seo.checks,
+      aeo: report.aeo.checks,
+      geo: report.geo.checks,
+    },
   };
 }

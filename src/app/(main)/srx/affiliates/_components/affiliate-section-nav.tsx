@@ -9,17 +9,12 @@ const navigationItems = [
   {
     href: "/srx/affiliates/manage",
     label: "Quản lý affiliate",
-    description: "Tài khoản và trạng thái hoạt động",
+    description: "Tài khoản, hồ sơ, hoa hồng và ngân hàng",
   },
   {
     href: "/srx/affiliates/approval",
     label: "Phê duyệt hồ sơ",
-    description: "Danh sách hồ sơ từ affiliate_applications",
-  },
-  {
-    href: "/srx/affiliates/commission",
-    label: "Thiết lập hoa hồng",
-    description: "Chính sách chi trả và cookie",
+    description: "Hồ sơ đăng ký gửi từ website",
   },
 ] as const;
 

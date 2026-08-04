@@ -66,6 +66,17 @@ function getScopeLabel(scopeType: SrxDiscountCode["scope_type"]): string {
   }
 }
 
+function getClassLabel(classValue: SrxDiscountCode["class"]): string {
+  switch (classValue) {
+    case "public":
+      return "Công khai";
+    case "private":
+      return "Riêng tư";
+    default:
+      return classValue;
+  }
+}
+
 function sortDiscountCodes(discountCodes: SrxDiscountCode[]): SrxDiscountCode[] {
   return [...discountCodes].sort((left, right) => right.created_at.getTime() - left.created_at.getTime());
 }
@@ -91,6 +102,7 @@ export function DiscountCodesManager({
       discountCode.code,
       discountCode.name,
       discountCode.description,
+      getClassLabel(discountCode.class),
       discountCode.product_names,
       discountCode.category_names,
     ]);
@@ -233,6 +245,16 @@ export function DiscountCodesManager({
                   : "Áp dụng toàn bộ đơn hàng"}
             </div>
           </div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "class",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Loại voucher" />,
+        cell: ({ row }) => (
+          <Badge variant={row.original.class === "public" ? "outline" : "secondary"}>
+            {getClassLabel(row.original.class)}
+          </Badge>
         ),
         enableSorting: false,
       },

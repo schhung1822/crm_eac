@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- hộp thoại có nhiều nhánh trạng thái tải/chọn model, tách nhỏ sẽ rối hơn. */
 "use client";
 
 import * as React from "react";
@@ -5,6 +6,7 @@ import * as React from "react";
 import { Check, ImagePlus, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +20,17 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  getSrxAiDefaultImageModel,
+  srxAiImageModels,
+  srxAiImageProviderIds,
+  srxAiProviderLabels,
+  type SrxAiImageProviderId,
+} from "@/lib/srx-ai-models.shared";
 import { cn } from "@/lib/utils";
+
+import { AiProviderModelFields } from "./ai-provider-model-fields";
+import { useSrxAiProviders } from "./use-srx-ai-providers";
 
 type ThumbnailSize = "1536x1024" | "1024x1024" | "1024x1536";
 
@@ -51,8 +63,33 @@ export function AiImageDialog({ title, excerpt, content, onUseAsFeatured, disabl
   const [size, setSize] = React.useState<ThumbnailSize>("1536x1024");
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [result, setResult] = React.useState<{ url: string; sceneBrief?: string } | null>(null);
+  const { providers, isLoading: isLoadingProviders } = useSrxAiProviders(open);
+  const [provider, setProvider] = React.useState<SrxAiImageProviderId | "">("");
+  const [model, setModel] = React.useState("");
 
   const canGenerate = title.trim().length > 0;
+  // Chỉ OpenAI và Gemini có API tạo ảnh, nên lọc lại từ danh sách kết nối AI.
+  const availableProviders = providers.filter(
+    (item): item is (typeof providers)[number] & { id: SrxAiImageProviderId } =>
+      item.hasApiKey && srxAiImageProviderIds.some((id) => id === item.id),
+  );
+  const modelOptions = provider ? srxAiImageModels[provider] : [];
+
+  React.useEffect(() => {
+    if (provider || availableProviders.length === 0) {
+      return;
+    }
+
+    const first = availableProviders[0].id;
+    setProvider(first);
+    setModel(getSrxAiDefaultImageModel(first));
+  }, [availableProviders, provider]);
+
+  function handleProviderChange(value: string) {
+    const next = value as SrxAiImageProviderId;
+    setProvider(next);
+    setModel(getSrxAiDefaultImageModel(next));
+  }
 
   async function handleGenerate() {
     if (!canGenerate) {
@@ -69,7 +106,14 @@ export function AiImageDialog({ title, excerpt, content, onUseAsFeatured, disabl
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "generate-thumbnail",
-          input: { title, excerpt, content, userBrief: brief, size },
+          input: {
+            title,
+            excerpt,
+            content,
+            userBrief: brief,
+            size,
+            ...(provider ? { provider, model } : {}),
+          },
         }),
       });
       const payload = await response.json();
@@ -119,6 +163,31 @@ export function AiImageDialog({ title, excerpt, content, onUseAsFeatured, disabl
         </DialogHeader>
 
         <div className="grid gap-4">
+          {!isLoadingProviders && availableProviders.length === 0 ? (
+            <Alert>
+              <AlertDescription className="text-xs leading-5">
+                Chưa có API key OpenAI hoặc Gemini. Vào <span className="font-medium">Quản lý kết nối (/ai)</span> để
+                nhập key có bật quyền tạo ảnh.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <AiProviderModelFields
+            idPrefix="ai-image"
+            modelLabel="Model tạo ảnh"
+            providerOptions={availableProviders.map((item) => ({
+              id: item.id,
+              label: srxAiProviderLabels[item.id],
+            }))}
+            modelOptions={modelOptions}
+            provider={provider}
+            model={model}
+            onProviderChange={handleProviderChange}
+            onModelChange={setModel}
+            isLoading={isLoadingProviders}
+            disabled={isGenerating}
+          />
+
           <div className="grid gap-2">
             <Label htmlFor="ai-image-brief">Mô tả ảnh mong muốn (tuỳ chọn)</Label>
             <Textarea
@@ -148,18 +217,30 @@ export function AiImageDialog({ title, excerpt, content, onUseAsFeatured, disabl
 
           <div className="grid gap-2">
             <Label htmlFor="ai-image-size">Tỷ lệ ảnh</Label>
-            <Select value={size} onValueChange={(value) => setSize(value as ThumbnailSize)} disabled={isGenerating}>
-              <SelectTrigger id="ai-image-size" className="w-full">
-                <SelectValue />
+            <Select
+              value={size}
+              onValueChange={(value) => setSize(value as ThumbnailSize)}
+              disabled={isGenerating || provider === "gemini"}
+            >
+              <SelectTrigger id="ai-image-size" className="w-full min-w-0">
+                <SelectValue>{SIZE_OPTIONS.find((option) => option.value === size)?.label}</SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-w-[min(22rem,calc(100vw-2rem))]">
                 {SIZE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label} — {option.hint}
+                  <SelectItem key={option.value} value={option.value} className="items-start">
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-medium">{option.label}</span>
+                      <span className="text-muted-foreground text-xs leading-4 whitespace-normal">{option.hint}</span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {provider === "gemini" ? (
+              <p className="text-muted-foreground text-xs leading-5">
+                Model ảnh của Gemini không nhận tham số tỷ lệ; muốn khung ngang/dọc thì mô tả trong ô trên.
+              </p>
+            ) : null}
           </div>
 
           {/* Khung xem trước: giữ chỗ cố định để không nhảy layout khi ảnh về. */}

@@ -2,6 +2,7 @@ import type {
   SrxAffiliateAccount,
   SrxAffiliateApplication,
   SrxAffiliateApplicationStatus,
+  SrxAffiliateUserOption,
 } from "@/lib/srx-affiliates.shared";
 
 export function formatCurrency(value: number): string {
@@ -75,6 +76,34 @@ export function getAffiliateApplicationStatusVariant(
       return "destructive";
     default:
       return "secondary";
+  }
+}
+
+export function getAffiliateGenderLabel(gender: SrxAffiliateAccount["application_gender"]): string {
+  switch (gender) {
+    case "male":
+      return "Nam";
+    case "female":
+      return "Nữ";
+    case "other":
+      return "Khác";
+    default:
+      return "Không tiết lộ";
+  }
+}
+
+export function getAffiliateUserStatusLabel(status: SrxAffiliateUserOption["status"]): string {
+  switch (status) {
+    case "active":
+      return "Đang hoạt động";
+    case "pending_verification":
+      return "Chờ xác thực";
+    case "inactive":
+      return "Ngưng hoạt động";
+    case "banned":
+      return "Bị khóa";
+    default:
+      return status;
   }
 }
 

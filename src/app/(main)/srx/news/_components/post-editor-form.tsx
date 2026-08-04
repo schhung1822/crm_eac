@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ArrowLeft, FileText, Gauge, Globe2, ImageIcon, Loader2, Save, Settings2, Sparkles, Tags } from "lucide-react";
+import { ArrowLeft, FileText, Gauge, Globe2, ImageIcon, Loader2, Save, Settings2, Tags } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +26,9 @@ import {
   type SrxNewsTag,
 } from "@/lib/srx-news.shared";
 
+import { AiWriteDialog, type AiWriteRequest } from "./ai-write-dialog";
 import { ArticleScorePanel, type ArticleScore } from "./article-score-panel";
 import type { CkeditorContentEditorProps } from "./ckeditor-content-editor";
-import { NewsAiAssistant } from "./news-ai-assistant";
 import { NewsFeaturedImageField } from "./news-featured-image-field";
 import { PostPreviewDialog, type NewsPreviewPost } from "./post-preview-dialog";
 
@@ -183,63 +183,76 @@ export function PostEditorForm({
   const [targetKeyword, setTargetKeyword] = React.useState("");
   const [isWriting, setIsWriting] = React.useState(false);
 
-  const handleWriteWithAi = React.useCallback(async () => {
-    if (!targetKeyword.trim() && !form.title.trim()) {
-      toast.error("Nhập tiêu đề hoặc từ khoá mục tiêu để AI biết viết về gì");
-      return;
-    }
+  const handleWriteWithAi = React.useCallback(
+    async (request: AiWriteRequest) => {
+      const isImproving = request.improve && !isRichTextContentEmpty(form.content);
 
-    try {
-      setIsWriting(true);
-
-      const response = await fetch("/api/srx/news/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "write-article",
-          input: {
-            title: form.title,
-            targetKeyword: targetKeyword.trim(),
-            brief: form.excerpt,
-            categoryName: categories.find((item) => item.id === form.category_id)?.name ?? "",
-          },
-        }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.message ?? "Không viết được bài");
+      if (!isImproving && !targetKeyword.trim() && !form.title.trim()) {
+        toast.error("Nhập tiêu đề hoặc từ khoá mục tiêu để AI biết viết về gì");
+        return false;
       }
 
-      const article = payload.article as {
-        title: string;
-        metaDescription: string;
-        slug: string;
-        html: string;
-        targetKeyword: string;
-        report: ArticleScore;
-      };
+      try {
+        setIsWriting(true);
 
-      setForm((current) => ({
-        ...current,
-        title: article.title || current.title,
-        excerpt: article.metaDescription || current.excerpt,
-        slug: article.slug || current.slug,
-        content: article.html,
-      }));
+        const response = await fetch("/api/srx/news/ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "write-article",
+            input: {
+              title: form.title,
+              targetKeyword: targetKeyword.trim(),
+              brief: request.brief || form.excerpt,
+              audience: request.audience,
+              tone: request.tone,
+              categoryName: categories.find((item) => item.id === form.category_id)?.name ?? "",
+              provider: request.provider,
+              model: request.model,
+              currentContent: isImproving ? form.content : "",
+              improvements: isImproving ? (score?.suggestions ?? []) : [],
+            },
+          }),
+        });
+        const payload = await response.json();
 
-      if (article.targetKeyword) {
-        setTargetKeyword(article.targetKeyword);
+        if (!response.ok) {
+          throw new Error(payload?.message ?? "Không viết được bài");
+        }
+
+        const article = payload.article as {
+          title: string;
+          metaDescription: string;
+          slug: string;
+          html: string;
+          targetKeyword: string;
+          report: ArticleScore;
+        };
+
+        setForm((current) => ({
+          ...current,
+          title: article.title || current.title,
+          excerpt: article.metaDescription || current.excerpt,
+          slug: article.slug || current.slug,
+          content: article.html,
+        }));
+
+        if (article.targetKeyword) {
+          setTargetKeyword(article.targetKeyword);
+        }
+
+        setScore(article.report);
+        toast.success(isImproving ? "AI đã tối ưu xong và chấm điểm lại" : "AI đã viết xong và chấm điểm bài");
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Không viết được bài");
+        return false;
+      } finally {
+        setIsWriting(false);
       }
-
-      setScore(article.report);
-      toast.success("AI đã viết xong và chấm điểm bài");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không viết được bài");
-    } finally {
-      setIsWriting(false);
-    }
-  }, [categories, form.category_id, form.excerpt, form.title, targetKeyword]);
+    },
+    [categories, form.category_id, form.content, form.excerpt, form.title, score?.suggestions, targetKeyword],
+  );
 
   const handleScore = React.useCallback(async () => {
     if (isRichTextContentEmpty(form.content)) {
@@ -368,14 +381,11 @@ export function PostEditorForm({
 
           <div className="flex shrink-0 items-center gap-2">
             <Badge variant="outline">{getStatusLabel(form.status)}</Badge>
-            <Button type="button" variant="outline" onClick={() => void handleWriteWithAi()} disabled={isWriting}>
-              {isWriting ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              Viết bằng AI
-            </Button>
-            <Button type="button" variant="outline" onClick={() => void handleScore()} disabled={isScoring}>
-              {isScoring ? <Loader2 className="size-4 animate-spin" /> : <Gauge className="size-4" />}
-              Chấm điểm
-            </Button>
+            <AiWriteDialog
+              hasContent={!isRichTextContentEmpty(form.content)}
+              isWriting={isWriting}
+              onWrite={handleWriteWithAi}
+            />
             <Button type="submit" form="news-post-form" disabled={isSubmitting || !categories.length}>
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               {isEditing ? "Lưu thay đổi" : "Tạo bài viết"}
@@ -445,8 +455,6 @@ export function PostEditorForm({
               </div>
             </CardContent>
           </Card>
-
-          <NewsAiAssistant categories={categories} form={form} setForm={setForm} tags={tags} />
         </div>
 
         <div className="grid min-w-0 content-start gap-5">

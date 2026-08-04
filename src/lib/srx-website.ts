@@ -14,6 +14,7 @@ import {
   parseSrxGiftRuleInput,
   parseSrxPaymentMethodInput,
   srxBannerSchema,
+  srxDiscountCodeClassValues,
   srxDiscountCodeScopeValues,
   srxDiscountCodeSchema,
   srxDiscountCodeTypeValues,
@@ -59,6 +60,10 @@ function slugify(value: string): string {
 
 function normalizeDiscountCode(value: string): string {
   return value.trim().toUpperCase();
+}
+
+function normalizeDiscountCodeClass(value: string | null): (typeof srxDiscountCodeClassValues)[number] {
+  return value === "private" ? "private" : "public";
 }
 
 function normalizeCodeToken(value: string): string {
@@ -326,6 +331,7 @@ function mapDiscountCode(discountCode: {
   total_usage_limit: number | null;
   per_user_limit: number | null;
   scope_type: (typeof srxDiscountCodeScopeValues)[number];
+  class: string | null;
   starts_at: Date | null;
   ends_at: Date | null;
   is_active: boolean;
@@ -354,6 +360,7 @@ function mapDiscountCode(discountCode: {
     total_usage_limit: discountCode.total_usage_limit,
     per_user_limit: discountCode.per_user_limit,
     scope_type: discountCode.scope_type,
+    class: normalizeDiscountCodeClass(discountCode.class),
     starts_at: discountCode.starts_at,
     ends_at: discountCode.ends_at,
     is_active: discountCode.is_active,
@@ -1068,6 +1075,7 @@ export async function createSrxDiscountCode(input: SrxDiscountCodeMutationInput)
           total_usage_limit: totalUsageLimit,
           per_user_limit: perUserLimit,
           scope_type: payload.scope_type,
+          class: payload.class,
           starts_at: startsAt,
           ends_at: endsAt,
           is_active: payload.is_active,
@@ -1203,6 +1211,7 @@ export async function updateSrxDiscountCode(
           total_usage_limit: totalUsageLimit,
           per_user_limit: perUserLimit,
           scope_type: payload.scope_type,
+          class: payload.class,
           starts_at: startsAt,
           ends_at: endsAt,
           is_active: payload.is_active,

@@ -3,12 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
 import { getCurrentUser } from "@/lib/auth";
-import { parseSrxAffiliateManagementInput, updateSrxAffiliateAccountManagement } from "@/lib/srx-affiliates";
+import { parseSrxAffiliateAccountUpdateInput, updateSrxAffiliateAccount } from "@/lib/srx-affiliates";
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ accountId: string }> },
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ accountId: string }> }) {
   try {
     const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý affiliate SRX");
 
@@ -18,8 +15,8 @@ export async function PATCH(
 
     const currentUser = await getCurrentUser();
     const { accountId } = await params;
-    const payload = parseSrxAffiliateManagementInput(await request.json());
-    const account = await updateSrxAffiliateAccountManagement(accountId, payload, currentUser?.userId);
+    const payload = parseSrxAffiliateAccountUpdateInput(await request.json());
+    const account = await updateSrxAffiliateAccount(accountId, payload, currentUser?.userId);
 
     if (!account) {
       return NextResponse.json({ message: "Không tìm thấy tài khoản affiliate" }, { status: 404 });
@@ -33,4 +30,3 @@ export async function PATCH(
     return buildApiErrorResponse(error, "Không thể cập nhật affiliate");
   }
 }
-

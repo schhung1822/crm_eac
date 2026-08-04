@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- chuỗi chọn nhà cung cấp/model là các nhánh phẳng theo từng API. */
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -6,6 +7,7 @@ import path from "node:path";
 
 import { convertImageBufferToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
+import { getSrxAiDefaultImageModel, type SrxAiImageProviderId } from "@/lib/srx-ai-models.shared";
 import { srxAiComplete } from "@/lib/srx-ai-provider";
 import { recordSrxAiUsage } from "@/lib/srx-ai-usage";
 import { getSrxConnectionSecret } from "@/lib/srx-connections";
@@ -22,6 +24,10 @@ export type SrxThumbnailInput = {
   size?: SrxThumbnailSize;
   /** Bỏ qua bước AI mô tả cảnh (nhanh hơn, nhưng ảnh bám nội dung kém hơn). */
   skipSceneBrief?: boolean;
+  /** Bỏ trống = tự chọn nhà cung cấp nào đang có API key (OpenAI trước, Gemini sau). */
+  provider?: SrxAiImageProviderId;
+  /** Bỏ trống = model mặc định của nhà cung cấp đó. */
+  model?: string;
 };
 
 export type SrxThumbnailResult = {
@@ -65,11 +71,15 @@ async function describeScene(input: SrxThumbnailInput): Promise<string | undefin
   const body = stripHtml(input.content ?? "").slice(0, 2000);
 
   try {
-    const result = await srxAiComplete({
-      system: SCENE_SYSTEM,
-      prompt: `Tiêu đề: ${input.title}\n${input.excerpt ? `Tóm tắt: ${input.excerpt}\n` : ""}${body ? `Nội dung: ${body}` : ""}`,
-      maxTokens: 200,
-    });
+    const result = await srxAiComplete(
+      {
+        system: SCENE_SYSTEM,
+        prompt: `Tiêu đề: ${input.title}\n${input.excerpt ? `Tóm tắt: ${input.excerpt}\n` : ""}${body ? `Nội dung: ${body}` : ""}`,
+        maxTokens: 200,
+      },
+      // Mô tả cảnh là tác vụ text: ưu tiên đúng nhà cung cấp người dùng đã chọn để vẽ.
+      { provider: input.provider },
+    );
 
     return result.text.trim() || undefined;
   } catch (error) {
@@ -92,8 +102,12 @@ export function buildSrxCoverPrompt(input: SrxThumbnailInput, sceneBrief?: strin
   return [userWish, subject, STYLE_GUIDANCE, NO_TEXT_RULES].filter(Boolean).join("\n\n");
 }
 
-async function generateWithOpenAi(apiKey: string, prompt: string, size: SrxThumbnailSize): Promise<Buffer> {
-  const model = "gpt-image-1";
+async function generateWithOpenAi(
+  apiKey: string,
+  prompt: string,
+  size: SrxThumbnailSize,
+  model: string,
+): Promise<Buffer> {
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -128,10 +142,9 @@ async function generateWithOpenAi(apiKey: string, prompt: string, size: SrxThumb
  * Google đổi tên model ảnh khá thường xuyên và mỗi API key lại được bật model khác
  * nhau, nên cho phép chỉ định qua biến môi trường thay vì phải sửa code.
  */
-const GEMINI_IMAGE_MODEL = process.env.SRX_GEMINI_IMAGE_MODEL?.trim() ?? "gemini-2.5-flash-image";
+const GEMINI_IMAGE_MODEL = process.env.SRX_GEMINI_IMAGE_MODEL?.trim() ?? getSrxAiDefaultImageModel("gemini");
 
-async function generateWithGemini(apiKey: string, prompt: string): Promise<Buffer> {
-  const model = GEMINI_IMAGE_MODEL;
+async function generateWithGemini(apiKey: string, prompt: string, model: string): Promise<Buffer> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const response = await fetch(url, {
     method: "POST",
@@ -172,6 +185,32 @@ async function saveThumbnail(buffer: Buffer): Promise<string> {
   return resolveSiteAssetUrl(`/upload/ports/${filename}`);
 }
 
+/**
+ * Người dùng chọn nhà cung cấp thì chỉ chạy đúng nhà đó (và báo lỗi thật nếu hỏng);
+ * bỏ trống thì thử OpenAI trước rồi rơi sang Gemini.
+ */
+function resolveImageTarget(
+  input: SrxThumbnailInput,
+  keys: { hasOpenAiKey: boolean; hasGeminiKey: boolean },
+): { useOpenAi: boolean; useGemini: boolean; openAiModel: string; geminiModel: string } {
+  if (input.provider === "chatgpt" && !keys.hasOpenAiKey) {
+    throw new Error("Chưa có API key OpenAI — cấu hình ở trang Quản lý kết nối");
+  }
+
+  if (input.provider === "gemini" && !keys.hasGeminiKey) {
+    throw new Error("Chưa có API key Gemini — cấu hình ở trang Quản lý kết nối");
+  }
+
+  const chosenModel = input.model?.trim() ?? "";
+
+  return {
+    useOpenAi: input.provider ? input.provider === "chatgpt" : true,
+    useGemini: input.provider ? input.provider === "gemini" : true,
+    openAiModel: input.provider === "chatgpt" && chosenModel ? chosenModel : getSrxAiDefaultImageModel("chatgpt"),
+    geminiModel: input.provider === "gemini" && chosenModel ? chosenModel : GEMINI_IMAGE_MODEL,
+  };
+}
+
 export async function generateSrxThumbnail(input: SrxThumbnailInput): Promise<SrxThumbnailResult> {
   const sceneBrief = await describeScene(input);
   const prompt = buildSrxCoverPrompt(input, sceneBrief);
@@ -186,39 +225,41 @@ export async function generateSrxThumbnail(input: SrxThumbnailInput): Promise<Sr
     throw new Error("Cần API key OpenAI hoặc Gemini để tạo ảnh — cấu hình ở trang Quản lý kết nối");
   }
 
+  const { useOpenAi, useGemini, openAiModel, geminiModel } = resolveImageTarget(input, {
+    hasOpenAiKey: Boolean(openAiKey),
+    hasGeminiKey: Boolean(geminiKey),
+  });
   const errors: string[] = [];
 
-  // Thử OpenAI trước, nếu lỗi (hết hạn mức, model bị chặn...) thì rơi sang Gemini
-  // thay vì báo hỏng luôn.
-  if (openAiKey) {
+  if (useOpenAi && openAiKey) {
     try {
-      const buffer = await generateWithOpenAi(openAiKey, prompt, size);
+      const buffer = await generateWithOpenAi(openAiKey, prompt, size, openAiModel);
 
       return {
         url: await saveThumbnail(buffer),
         alt: input.title,
         prompt,
         provider: "chatgpt",
-        model: "gpt-image-1",
+        model: openAiModel,
         sceneBrief,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(message);
-      console.error("[srx-news-thumbnail] OpenAI lỗi, thử Gemini:", message);
+      console.error("[srx-news-thumbnail] OpenAI lỗi:", message);
     }
   }
 
-  if (geminiKey) {
+  if (useGemini && geminiKey) {
     try {
-      const buffer = await generateWithGemini(geminiKey, prompt);
+      const buffer = await generateWithGemini(geminiKey, prompt, geminiModel);
 
       return {
         url: await saveThumbnail(buffer),
         alt: input.title,
         prompt,
         provider: "gemini",
-        model: GEMINI_IMAGE_MODEL,
+        model: geminiModel,
         sceneBrief,
       };
     } catch (error) {

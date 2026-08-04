@@ -12,6 +12,7 @@ import {
   ShoppingBagIcon,
   SquareArrowUpRight,
   Store,
+  Link,
   type LucideIcon,
   User,
   UserCog,
@@ -139,7 +140,6 @@ export const sidebarItems: NavGroup[] = [
         subItems: [
           { title: "Quản lý affiliate", url: "/srx/affiliates/manage" },
           { title: "Phê duyệt hồ sơ", url: "/srx/affiliates/approval" },
-          { title: "Thiết lập hoa hồng", url: "/srx/affiliates/commission" },
         ],
       },
       {
@@ -156,7 +156,7 @@ export const sidebarItems: NavGroup[] = [
       {
         title: "Quản lý kết nối",
         url: "/ai",
-        icon: BrainCircuit,
+        icon: Link,
       },
       {
         title: "Tài khoản",

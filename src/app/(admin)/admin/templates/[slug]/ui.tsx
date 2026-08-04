@@ -20,6 +20,7 @@ import {
   MapPin,
   MessageSquare,
   Palette,
+  Rocket,
   Save,
   Sparkles,
   Type,
@@ -27,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,28 +61,30 @@ const questionTypeLabels: Record<FieldType, string> = {
   textarea: "Textarea",
 };
 
-
-const templateEditorCopy: Record<TemplateStyle, {
-  heroTitle: string;
-  heroDescription: string;
-  heroImageLabel: string;
-  heroImageDescription: string;
-  eyebrowLabel: string;
-  titleLabel: string;
-  subtitleLabel: string;
-  infoTitle: string;
-  infoDescription: string;
-  infoTopLabel: string;
-  infoHeadlineLabel: string;
-  infoMottoLabel: string;
-  infoOrganizerLabel: string;
-  infoBottomLabel: string;
-  scheduleDescription: string;
-  locationDescription: string;
-  footerStyleTitle: string;
-  footerStyleDescription: string;
-  fieldHelp: string;
-}> = {
+const templateEditorCopy: Record<
+  TemplateStyle,
+  {
+    heroTitle: string;
+    heroDescription: string;
+    heroImageLabel: string;
+    heroImageDescription: string;
+    eyebrowLabel: string;
+    titleLabel: string;
+    subtitleLabel: string;
+    infoTitle: string;
+    infoDescription: string;
+    infoTopLabel: string;
+    infoHeadlineLabel: string;
+    infoMottoLabel: string;
+    infoOrganizerLabel: string;
+    infoBottomLabel: string;
+    scheduleDescription: string;
+    locationDescription: string;
+    footerStyleTitle: string;
+    footerStyleDescription: string;
+    fieldHelp: string;
+  }
+> = {
   default: {
     heroTitle: "Hero, heading va media",
     heroDescription: "Template 1 dung anh heading, tieu de va phu de o phan dau landing page.",
@@ -111,7 +115,8 @@ const templateEditorCopy: Record<TemplateStyle, {
     titleLabel: "Tieu de webinar",
     subtitleLabel: "Nhan nho duoi tieu de form",
     infoTitle: "Noi dung form va agenda",
-    infoDescription: "Template 2 dung headline cho tieu de form, motto/organizer/bottom cho mo ta va agenda neu chua bat cau hoi.",
+    infoDescription:
+      "Template 2 dung headline cho tieu de form, motto/organizer/bottom cho mo ta va agenda neu chua bat cau hoi.",
     infoTopLabel: "Badge phu",
     infoHeadlineLabel: "Tieu de form",
     infoMottoLabel: "Mo ta ngan",
@@ -157,7 +162,7 @@ function normalizePublicPath(currentTemplateSlug: string) {
   return `/events/${currentTemplateSlug}`;
 }
 
-function buildPublicUrl(pathOrUrl: string) {
+function buildPublicUrl(pathOrUrl: string, baseUrl?: string) {
   const trimmedPath = pathOrUrl.trim();
 
   if (!trimmedPath) {
@@ -168,8 +173,10 @@ function buildPublicUrl(pathOrUrl: string) {
     return trimmedPath;
   }
 
+  const trimmedBaseUrl = baseUrl?.trim() ?? "";
+
   try {
-    return new URL(trimmedPath, `${PUBLIC_LADIPAGE_BASE_URL}/`).toString();
+    return new URL(trimmedPath, `${trimmedBaseUrl === "" ? PUBLIC_LADIPAGE_BASE_URL : trimmedBaseUrl}/`).toString();
   } catch {
     return trimmedPath;
   }
@@ -527,7 +534,7 @@ function AdditionalFieldEditor({
     <div className="border-border/70 bg-card rounded-2xl border p-4 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h4 className="font-medium">{field.label || title}</h4>
+          <h4 className="font-medium">{field.label?.trim() ? field.label : title}</h4>
           <p className="text-muted-foreground text-xs leading-5">
             Bat field de submit kem du lieu. Bat hien thi neu muon nguoi dung nhap tren form.
           </p>
@@ -537,8 +544,16 @@ function AdditionalFieldEditor({
 
       <div className="grid gap-3 md:grid-cols-2">
         <ToggleField label="Luu field nay" checked={field.enabled} onChange={(value) => onChange({ enabled: value })} />
-        <ToggleField label="Hien thi tren form" checked={Boolean(field.visible)} onChange={(value) => onChange({ visible: value })} />
-        <ToggleField label="Bat buoc nhap" checked={Boolean(field.required)} onChange={(value) => onChange({ required: value })} />
+        <ToggleField
+          label="Hien thi tren form"
+          checked={Boolean(field.visible)}
+          onChange={(value) => onChange({ visible: value })}
+        />
+        <ToggleField
+          label="Bat buoc nhap"
+          checked={Boolean(field.required)}
+          onChange={(value) => onChange({ required: value })}
+        />
         <div className="space-y-2">
           <Label>Loai input</Label>
           <Select value={fieldType} onValueChange={(type: FieldType) => onChange({ type })}>
@@ -556,7 +571,11 @@ function AdditionalFieldEditor({
         </div>
         <div className="space-y-2">
           <Label>Label</Label>
-          <Input value={field.label ?? ""} onChange={(event) => onChange({ label: event.target.value })} placeholder={title} />
+          <Input
+            value={field.label ?? ""}
+            onChange={(event) => onChange({ label: event.target.value })}
+            placeholder={title}
+          />
         </div>
         <div className="space-y-2">
           <Label>Placeholder</Label>
@@ -589,12 +608,17 @@ export default function AdminTemplateEditor({
   slug,
   initialName,
   initialConfig,
+  initialStatus = "draft",
   editorTitle,
+  publicBaseUrl,
+  publicPath,
   redirectToEditBasePath,
 }: {
   slug: string;
   initialName: string;
   initialConfig: FormTemplateConfig;
+  /** Trạng thái hiện tại của Ladipage, để hiện đúng nhãn xuất bản. */
+  initialStatus?: "draft" | "published" | "archived";
   editorTitle?: string;
   publicBaseUrl?: string;
   publicPath?: string;
@@ -602,7 +626,8 @@ export default function AdminTemplateEditor({
 }) {
   const router = useRouter();
   const [config, setConfig] = React.useState<FormTemplateConfig>(initialConfig);
-  const [saving, setSaving] = React.useState(false);
+  const [saving, setSaving] = React.useState<"draft" | "publish" | null>(null);
+  const [status, setStatus] = React.useState(initialStatus);
   const [templateSlug, setTemplateSlug] = React.useState(slug);
   const [currentSlug, setCurrentSlug] = React.useState(slug);
 
@@ -610,13 +635,14 @@ export default function AdminTemplateEditor({
     setConfig((current) => ({ ...current, ...patch }));
   }, []);
 
-  const resolvedPublicPath = React.useMemo(
-    () => normalizePublicPath(templateSlug),
-    [templateSlug],
-  );
+  // Đường dẫn public do slug quyết định; chỉ giữ publicPath cũ khi nó được đặt tay khác mặc định.
+  const resolvedPublicPath = React.useMemo(() => {
+    const customPath = publicPath?.trim();
+    return customPath && customPath !== normalizePublicPath(slug) ? customPath : normalizePublicPath(templateSlug);
+  }, [publicPath, slug, templateSlug]);
   const publicUrl = React.useMemo(
-    () => buildPublicUrl(resolvedPublicPath),
-    [resolvedPublicPath],
+    () => buildPublicUrl(resolvedPublicPath, publicBaseUrl),
+    [publicBaseUrl, resolvedPublicPath],
   );
   const visibleDefaultFieldsCount = React.useMemo(
     () => [config.fields.full_name, config.fields.phone, config.fields.email].filter((field) => field.enabled).length,
@@ -636,9 +662,12 @@ export default function AdminTemplateEditor({
   }, [config.fields.email, config.fields.full_name, config.fields.phone, enabledQuestions]);
   const mediaCount = React.useMemo(
     () =>
-      [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url].filter((value) =>
-        value?.trim(),
-      ).length,
+      [
+        config.header.headingImageUrl,
+        config.infoEvent.logo1Url,
+        config.infoEvent.logo2Url,
+        config.infoEvent.logo3Url,
+      ].filter((value) => value?.trim()).length,
     [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url],
   );
   const themeSwatches = React.useMemo(
@@ -730,18 +759,20 @@ export default function AdminTemplateEditor({
     }
   }
 
-  async function onSave() {
+  async function onSave(publish: boolean) {
     try {
-      setSaving(true);
+      setSaving(publish ? "publish" : "draft");
       const nextSlug = templateSlug.trim();
       const result = await saveTemplateAction(
         currentSlug,
         nextSlug,
         config.behavior.eventName.trim() || initialName,
         config,
+        { publish },
       );
       setCurrentSlug(nextSlug);
       setTemplateSlug(nextSlug);
+      setStatus(result.status);
 
       const normalizedRedirectBasePath = redirectToEditBasePath?.trim();
 
@@ -753,12 +784,14 @@ export default function AdminTemplateEditor({
         }
       }
 
-      toast.success("Đã lưu cấu hình ladipage.");
+      toast.success(
+        publish ? "Đã xuất bản, trang public đã cập nhật." : "Đã lưu nháp. Trang public giữ nguyên bản cũ.",
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể lưu cấu hình ladipage.");
       console.error(error);
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   }
 
@@ -772,7 +805,9 @@ export default function AdminTemplateEditor({
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{templateStyleLabels[currentTemplateStyle]}</Badge>
-              <Badge variant="outline">srx.vn</Badge>
+              <Badge variant={status === "published" ? "default" : "secondary"}>
+                {status === "published" ? "Đã xuất bản" : status === "archived" ? "Lưu trữ" : "Nháp"}
+              </Badge>
             </div>
           </div>
 
@@ -789,9 +824,13 @@ export default function AdminTemplateEditor({
               <Copy className="size-4" />
               Sao chép URL
             </Button>
-            <Button type="button" onClick={() => void onSave()} disabled={saving}>
-              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            <Button type="button" variant="outline" onClick={() => void onSave(false)} disabled={saving !== null}>
+              {saving === "draft" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {saving === "draft" ? "Đang lưu..." : "Lưu nháp"}
+            </Button>
+            <Button type="button" onClick={() => void onSave(true)} disabled={saving !== null}>
+              {saving === "publish" ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+              {saving === "publish" ? "Đang xuất bản..." : status === "published" ? "Cập nhật bản public" : "Xuất bản"}
             </Button>
           </div>
         </div>
@@ -1288,7 +1327,7 @@ export default function AdminTemplateEditor({
                               rows={4}
                             />
                           </div>
-                          <div className="grid gap-4 mt-4">
+                          <div className="mt-4 grid gap-4">
                             <ColorInput
                               label="Màu Gradient bắt đầu"
                               value={config.footer.gradientFrom}
@@ -1491,9 +1530,7 @@ export default function AdminTemplateEditor({
             <div className="space-y-4 xl:sticky xl:top-24">
               <Card className="border-border/70 bg-background/95 overflow-hidden shadow-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    Thông tin nhanh
-                  </CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">Thông tin nhanh</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="border-border/70 bg-muted/20 overflow-hidden rounded-2xl border">
@@ -1563,24 +1600,26 @@ export default function AdminTemplateEditor({
 
                   {config.infoEvent.logo1Url || config.infoEvent.logo2Url || config.infoEvent.logo3Url ? (
                     <div className="grid grid-cols-3 gap-3">
-                      {[config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url].map((logo, index) => (
-                        <div
-                          key={`logo-preview-${index + 1}`}
-                          className="border-border/70 bg-muted/20 overflow-hidden rounded-2xl border"
-                        >
-                          {logo ? (
-                            <img
-                              src={logo}
-                              alt={`Logo ${index + 1}`}
-                              className="aspect-[16/9] w-full object-contain p-3"
-                            />
-                          ) : (
-                            <div className="text-muted-foreground flex aspect-[16/9] items-center justify-center text-xs">
-                              Trống
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                      {[config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url].map(
+                        (logo, index) => (
+                          <div
+                            key={`logo-preview-${index + 1}`}
+                            className="border-border/70 bg-muted/20 overflow-hidden rounded-2xl border"
+                          >
+                            {logo ? (
+                              <img
+                                src={logo}
+                                alt={`Logo ${index + 1}`}
+                                className="aspect-[16/9] w-full object-contain p-3"
+                              />
+                            ) : (
+                              <div className="text-muted-foreground flex aspect-[16/9] items-center justify-center text-xs">
+                                Trống
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      )}
                     </div>
                   ) : null}
                 </CardContent>

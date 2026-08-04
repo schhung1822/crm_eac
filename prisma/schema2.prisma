@@ -362,6 +362,7 @@ model discount_codes {
   total_usage_limit            Int?                           @db.UnsignedInt
   per_user_limit               Int?                           @db.UnsignedInt
   scope_type                   discount_codes_scope_type      @default(all_orders)
+  class                        String?                        @db.VarChar(20)
   starts_at                    DateTime?                      @db.DateTime(0)
   ends_at                      DateTime?                      @db.DateTime(0)
   is_active                    Boolean                        @default(true)

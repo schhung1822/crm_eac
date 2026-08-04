@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { Input } from "@/components/ui/input";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { filterBySearchTerm } from "@/lib/search-utils";
-import type { SrxLadipageEvent } from "@/lib/srx-ladipage-events";
+import type { SrxLadipageEvent, SrxLadipageEventSettingsInput } from "@/lib/srx-ladipage-events";
 
 import { LadipageEventRowActions } from "./ladipage-event-row-actions";
 
@@ -65,7 +65,14 @@ function formatDateTime(value: Date | null): string {
   }).format(value);
 }
 
-export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLadipageEvent[] }) {
+export function LadipageEventsManager({
+  initialEvents,
+  registrationCounts = {},
+}: {
+  initialEvents: SrxLadipageEvent[];
+  /** Số lượt đăng ký theo slug, lấy từ bảng checkin của database SRX. */
+  registrationCounts?: Record<string, number>;
+}) {
   const [events, setEvents] = React.useState<SrxLadipageEvent[]>(initialEvents);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
@@ -100,6 +107,44 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
       toast.error("Không thể sao chép URL public");
     }
   }, []);
+
+  const handleUpdateSettings = React.useCallback(
+    async (event: SrxLadipageEvent, settings: SrxLadipageEventSettingsInput) => {
+      try {
+        const response = await fetch(`/api/srx/ladipage-events/${event.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settings),
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.message ?? "Không thể cập nhật Ladipage sự kiện");
+        }
+
+        const updated = result.event as SrxLadipageEvent;
+        setEvents((current) =>
+          current.map((item) =>
+            item.id === event.id
+              ? {
+                  ...item,
+                  status: updated.status,
+                  isActive: updated.isActive,
+                  sortOrder: updated.sortOrder,
+                  hasUnpublishedChanges: updated.hasUnpublishedChanges,
+                  publishedAt: updated.publishedAt ? new Date(updated.publishedAt) : null,
+                  updatedAt: new Date(updated.updatedAt),
+                }
+              : item,
+          ),
+        );
+        toast.success("Đã cập nhật Ladipage sự kiện");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Không thể cập nhật Ladipage sự kiện");
+      }
+    },
+    [],
+  );
 
   const handleDelete = React.useCallback(
     async (event: SrxLadipageEvent) => {
@@ -171,6 +216,9 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
                 {row.original.isActive ? "Đang bật" : "Đang tắt"}
               </Badge>
             </div>
+            {row.original.status === "published" && row.original.hasUnpublishedChanges ? (
+              <div className="text-xs text-amber-600 dark:text-amber-400">Có bản nháp chưa xuất bản</div>
+            ) : null}
           </div>
         ),
         enableSorting: false,
@@ -194,6 +242,24 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
         accessorKey: "templateStyle",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Template" />,
         cell: ({ row }) => <span className="capitalize">{row.original.templateStyle || "default"}</span>,
+        enableSorting: false,
+      },
+      {
+        id: "registrations",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Lượt đăng ký" />,
+        cell: ({ row }) => {
+          const total = registrationCounts[row.original.slug] ?? 0;
+
+          return (
+            <Link
+              href={`/events?event=${encodeURIComponent(row.original.slug)}`}
+              className="hover:text-primary inline-flex flex-col transition-colors"
+            >
+              <span className="font-medium">{total}</span>
+              <span className="text-muted-foreground text-xs underline">Xem danh sách</span>
+            </Link>
+          );
+        },
         enableSorting: false,
       },
       {
@@ -234,6 +300,7 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
                   event={row.original}
                   onCopyPublicUrl={handleCopyPublicUrl}
                   onDelete={handleDelete}
+                  onUpdateSettings={handleUpdateSettings}
                   publicUrl={buildPublicUrl(row.original.publicPath, row.original.publicBaseUrl)}
                 />
               </DropdownMenuContent>
@@ -243,7 +310,7 @@ export function LadipageEventsManager({ initialEvents }: { initialEvents: SrxLad
         enableSorting: false,
       },
     ],
-    [handleCopyPublicUrl, handleDelete],
+    [handleCopyPublicUrl, handleDelete, handleUpdateSettings, registrationCounts],
   );
 
   const table = useDataTableInstance({

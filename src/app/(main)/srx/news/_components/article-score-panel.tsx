@@ -46,10 +46,13 @@ function toneFor(score: number) {
 
 /** Vòng tròn tiến độ vẽ bằng SVG, không cần thư viện chart. */
 function ScoreRing({ score, size = 76 }: { score: number; size?: number }) {
+  // Dữ liệu điểm đến từ API nên phải chịu được giá trị thiếu/sai kiểu: NaN lọt vào
+  // strokeDashoffset sẽ làm React văng lỗi và chết cả trang soạn bài.
+  const safeScore = Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
   const stroke = size >= 70 ? 7 : 5;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const tone = toneFor(score);
+  const tone = toneFor(safeScore);
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -73,11 +76,13 @@ function ScoreRing({ score, size = 76 }: { score: number; size?: number }) {
           fill="none"
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={circumference - (Math.max(0, Math.min(100, score)) / 100) * circumference}
+          strokeDashoffset={circumference - (safeScore / 100) * circumference}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={cn("leading-none font-semibold", size >= 70 ? "text-xl" : "text-sm", tone.text)}>{score}</span>
+        <span className={cn("leading-none font-semibold", size >= 70 ? "text-xl" : "text-sm", tone.text)}>
+          {safeScore}
+        </span>
       </div>
     </div>
   );
@@ -178,9 +183,9 @@ export function ArticleScorePanel({
             Điểm tổng của ba trục. Chấm bằng bộ tiêu chí cố định nên không tốn token AI.
           </p>
         </div>
-        <Button size="icon" variant="ghost" onClick={onRescore} disabled={isScoring} title="Chấm lại">
+        <Button size="sm" variant="outline" onClick={onRescore} disabled={isScoring}>
           {isScoring ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          <span className="sr-only">Chấm lại</span>
+          Chấm lại
         </Button>
       </div>
 

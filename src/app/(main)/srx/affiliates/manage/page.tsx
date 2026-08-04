@@ -1,9 +1,9 @@
-import { getSrxAffiliateAccounts } from "@/lib/srx-affiliates";
+import { getSrxAffiliateAccounts, getSrxAffiliateUserOptions } from "@/lib/srx-affiliates";
 
-import { AffiliateManagementManager } from "../_components/affiliate-management-manager";
+import { AffiliateAccountsManager } from "../_components/affiliate-accounts-manager";
 
 export default async function Page() {
-  const accounts = await getSrxAffiliateAccounts();
+  const [accounts, userOptions] = await Promise.all([getSrxAffiliateAccounts(), getSrxAffiliateUserOptions()]);
 
-  return <AffiliateManagementManager initialAccounts={accounts} />;
+  return <AffiliateAccountsManager initialAccounts={accounts} initialUserOptions={userOptions} />;
 }

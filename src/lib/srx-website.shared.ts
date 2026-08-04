@@ -6,6 +6,9 @@ export const srxDiscountCodeTypeSchema = z.enum(srxDiscountCodeTypeValues);
 export const srxDiscountCodeScopeValues = ["all_orders", "specific_products", "specific_categories"] as const;
 export const srxDiscountCodeScopeSchema = z.enum(srxDiscountCodeScopeValues);
 
+export const srxDiscountCodeClassValues = ["public", "private"] as const;
+export const srxDiscountCodeClassSchema = z.enum(srxDiscountCodeClassValues);
+
 export const srxBannerLinkTypeValues = ["homepage", "product", "category", "post", "custom"] as const;
 export const srxBannerLinkTypeSchema = z.enum(srxBannerLinkTypeValues);
 
@@ -40,6 +43,7 @@ export const srxDiscountCodeSchema = z.object({
   total_usage_limit: z.number().nullable(),
   per_user_limit: z.number().nullable(),
   scope_type: srxDiscountCodeScopeSchema,
+  class: srxDiscountCodeClassSchema,
   starts_at: z.coerce.date().nullable(),
   ends_at: z.coerce.date().nullable(),
   is_active: z.boolean(),
@@ -141,6 +145,7 @@ const srxDiscountCodeMutationSchema = z.object({
   total_usage_limit: z.string().trim().max(10).optional().default(""),
   per_user_limit: z.string().trim().max(10).optional().default(""),
   scope_type: srxDiscountCodeScopeSchema,
+  class: srxDiscountCodeClassSchema.optional().default("public"),
   starts_at: z.string().trim().optional().default(""),
   ends_at: z.string().trim().optional().default(""),
   is_active: z.boolean().optional().default(true),

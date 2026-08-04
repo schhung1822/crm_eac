@@ -2,7 +2,12 @@
 import "server-only";
 
 import { srxAiComplete, type SrxAiTextProvider } from "@/lib/srx-ai-provider";
-import { scoreSrxArticle, type SrxArticleReport } from "@/lib/srx-article-scoring";
+import {
+  scoreSrxArticle,
+  srxHtmlToMarkdown,
+  summarizeSrxArticleReport,
+  type SrxArticleScoreSummary,
+} from "@/lib/srx-article-scoring";
 
 export type SrxWriteArticleInput = {
   /** Bỏ trống thì AI tự đặt tiêu đề. */
@@ -19,6 +24,10 @@ export type SrxWriteArticleInput = {
   internalLinks?: Array<{ anchor: string; url: string }>;
   provider?: SrxAiTextProvider;
   model?: string;
+  /** Có giá trị = tối ưu lại bài đang có (HTML từ editor) thay vì viết mới. */
+  currentContent?: string;
+  /** Việc cần làm lấy từ bộ chấm điểm, để AI sửa đúng chỗ đang mất điểm. */
+  improvements?: string[];
 };
 
 export type SrxWrittenArticle = {
@@ -36,8 +45,8 @@ export type SrxWrittenArticle = {
   targetKeyword: string;
   provider: SrxAiTextProvider;
   model: string;
-  /** Điểm chấm ngay sau khi sinh, dùng chung bộ tiêu chí với editor. */
-  report: SrxArticleReport;
+  /** Điểm chấm ngay sau khi sinh, dùng chung bộ tiêu chí và đúng dạng editor cần. */
+  report: SrxArticleScoreSummary;
   /** Bản nghiên cứu bước 1, trả về để hiển thị/kiểm tra. */
   research?: string;
 };
@@ -141,6 +150,51 @@ BẮT BUỘC về đoạn mở đầu của "markdown" (đây là 2 tiêu chí c
 - Sau đoạn đó mới đến các heading H2/H3, trong đó có ít nhất 2 heading là câu hỏi.`;
 }
 
+/**
+ * Prompt cho chế độ tối ưu: giữ nguyên thông tin và cấu trúc bài cũ, chỉ sửa những
+ * chỗ đang mất điểm theo rubric. Trả về cùng schema JSON với chế độ viết mới.
+ */
+function buildImprovePrompt(input: SrxWriteArticleInput, currentMarkdown: string): string {
+  const todo = (input.improvements ?? []).slice(0, 15);
+
+  return `Tối ưu lại bài viết tiếng Việt dưới đây. GIỮ nguyên thông tin, số liệu và ý chính đã có -
+KHÔNG bịa thêm dữ liệu mới. Chỉ viết lại/bổ sung để bài đạt rubric bên dưới.
+
+${input.title?.trim() ? `Tiêu đề hiện tại: ${input.title.trim()}` : ""}
+${input.targetKeyword?.trim() ? `Từ khoá mục tiêu: ${input.targetKeyword.trim()}` : "Từ khoá mục tiêu: (tự chọn theo nội dung bài)"}
+${input.brief?.trim() ? `Yêu cầu thêm của người dùng: ${input.brief.trim()}` : ""}
+${input.audience?.trim() ? `Đối tượng đọc: ${input.audience.trim()}` : ""}
+${input.tone?.trim() ? `Giọng văn: ${input.tone.trim()}` : ""}
+
+${
+  todo.length
+    ? `VIỆC CẦN SỬA (lấy từ bộ chấm điểm, ưu tiên từ trên xuống):
+${todo.map((item) => `- ${item}`).join("\n")}`
+    : ""
+}
+
+BÀI HIỆN TẠI:
+"""
+${currentMarkdown.slice(0, 12000)}
+"""
+
+${SCORING_RUBRIC}
+
+Trả về JSON theo schema:
+{
+  "title": string,
+  "metaDescription": string,
+  "slug": string,
+  "markdown": string,
+  "faq": [{ "q": string, "a": string }],
+  "tags": string[],
+  "seoNotes": string
+}
+
+BẮT BUỘC: đoạn đầu tiên của "markdown" phải là câu trả lời trực tiếp cho câu hỏi mà từ khoá đặt ra,
+dài 40-320 ký tự, chứa nguyên văn từ khoá mục tiêu và đứng trước mọi heading.`;
+}
+
 function extractJson(raw: string): unknown {
   const trimmed = raw
     .trim()
@@ -191,21 +245,27 @@ function appendFaq(markdown: string, faq: Array<{ q: string; a: string }>): stri
 }
 
 export async function writeSrxNewsArticle(input: SrxWriteArticleInput): Promise<SrxWrittenArticle> {
-  // Bước 1: nghiên cứu. Lỗi ở bước này không chặn việc viết, chỉ ghi log.
+  const currentMarkdown = input.currentContent?.trim() ? srxHtmlToMarkdown(input.currentContent) : "";
+  const isImproving = currentMarkdown.length > 0;
+
+  // Bước 1: nghiên cứu. Chỉ cần khi viết mới; tối ưu thì đã có sẵn nội dung để bám.
+  // Lỗi ở bước này không chặn việc viết, chỉ ghi log.
   let research: string | undefined;
 
-  try {
-    const result = await srxAiComplete(
-      { system: RESEARCH_SYSTEM, prompt: buildResearchPrompt(input), maxTokens: 1200 },
-      { provider: input.provider, model: input.model },
-    );
-    research = result.text.trim() || undefined;
-  } catch (error) {
-    console.error("[writeSrxNewsArticle] bước nghiên cứu lỗi, viết không có tư liệu:", error);
+  if (!isImproving) {
+    try {
+      const result = await srxAiComplete(
+        { system: RESEARCH_SYSTEM, prompt: buildResearchPrompt(input), maxTokens: 1200 },
+        { provider: input.provider, model: input.model },
+      );
+      research = result.text.trim() || undefined;
+    } catch (error) {
+      console.error("[writeSrxNewsArticle] bước nghiên cứu lỗi, viết không có tư liệu:", error);
+    }
   }
 
   // Bước 2: viết bài. Thử tối đa 2 lần, lần 2 ép JSON thuần.
-  const basePrompt = buildWritePrompt(input, research);
+  const basePrompt = isImproving ? buildImprovePrompt(input, currentMarkdown) : buildWritePrompt(input, research);
   const strict =
     '\n\nQUAN TRỌNG: CHỈ trả về một object JSON hợp lệ, bắt đầu bằng "{" và kết thúc bằng "}". Không kèm markdown fence, không lời dẫn.';
   let lastError: unknown;
@@ -237,14 +297,16 @@ export async function writeSrxNewsArticle(input: SrxWriteArticleInput): Promise<
         throw new Error("Model trả về bài rỗng");
       }
 
-      const report = scoreSrxArticle({
-        title,
-        content: markdown,
-        contentIsMarkdown: true,
-        excerpt: metaDescription,
-        slug,
-        targetKeyword: input.targetKeyword,
-      });
+      const report = summarizeSrxArticleReport(
+        scoreSrxArticle({
+          title,
+          content: markdown,
+          contentIsMarkdown: true,
+          excerpt: metaDescription,
+          slug,
+          targetKeyword: input.targetKeyword,
+        }),
+      );
 
       return {
         title,

@@ -11,7 +11,27 @@ import {
 } from "@/lib/site-asset-url";
 import { getSrxDB } from "@/lib/srx-db";
 
-type SrxLadipageEventStatus = "draft" | "published" | "archived";
+export const srxLadipageEventStatusValues = ["draft", "published", "archived"] as const;
+export type SrxLadipageEventStatus = (typeof srxLadipageEventStatusValues)[number];
+
+/**
+ * Trang public do dự án SRX_web render (/events/[slug]). CRM chỉ là bảng điều khiển
+ * nên cần biết domain của web để dựng URL tuyệt đối cho nút "Mở trang public".
+ */
+export function resolveSrxLadipageBaseUrl(): string {
+  const rawValue =
+    process.env.SRX_EVENT_SITE_URL?.trim() ??
+    process.env.NEXT_PUBLIC_SRX_EVENT_SITE_URL?.trim() ??
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ??
+    process.env.SRX_PUBLIC_SITE_URL?.trim() ??
+    "https://srx.vn";
+
+  try {
+    return new URL(rawValue).origin;
+  } catch {
+    return "https://srx.vn";
+  }
+}
 
 type QueryValue = Date | number | string | null;
 
@@ -50,6 +70,8 @@ export type SrxLadipageEvent = {
   sortOrder: number;
   config: FormTemplateConfig;
   publishedConfig: FormTemplateConfig | null;
+  /** Bản nháp đang khác bản đã xuất bản — web vẫn hiển thị bản cũ cho tới khi bấm Xuất bản. */
+  hasUnpublishedChanges: boolean;
   publishedAt: Date | null;
   lastSyncedAt: Date | null;
   createdAt: Date;
@@ -157,8 +179,10 @@ function wrapMissingLadipageEventsTableError(error: unknown): never {
 }
 
 function mapLadipageEvent(row: LadipageEventRow): SrxLadipageEvent {
-  const config = normalizeConfigAssetUrls(toConfig(row.config_json) ?? defaultConfig);
-  const publishedConfig = toConfig(row.published_config_json);
+  const rawConfig = toConfig(row.config_json);
+  const rawPublishedConfig = toConfig(row.published_config_json);
+  const config = normalizeConfigAssetUrls(rawConfig ?? defaultConfig);
+  const publishedConfig = rawPublishedConfig;
 
   return {
     id: String(row.id),
@@ -166,7 +190,7 @@ function mapLadipageEvent(row: LadipageEventRow): SrxLadipageEvent {
     slug: row.slug,
     eventName: row.event_name,
     siteKey: row.site_key,
-    publicBaseUrl: normalizeOptionalString(row.public_base_url),
+    publicBaseUrl: normalizeOptionalString(row.public_base_url) || resolveSrxLadipageBaseUrl(),
     publicPath: normalizePublicPath(row.slug, row.public_path),
     status: row.status,
     isActive: Boolean(row.is_active),
@@ -174,6 +198,7 @@ function mapLadipageEvent(row: LadipageEventRow): SrxLadipageEvent {
     sortOrder: row.sort_order,
     config,
     publishedConfig: publishedConfig ? normalizeConfigAssetUrls(publishedConfig) : null,
+    hasUnpublishedChanges: !rawPublishedConfig || JSON.stringify(rawConfig) !== JSON.stringify(rawPublishedConfig),
     publishedAt: normalizeDate(row.published_at),
     lastSyncedAt: normalizeDate(row.last_synced_at),
     createdAt: normalizeDate(row.created_at) ?? new Date(),
@@ -347,6 +372,7 @@ async function insertLadipageEvent(
   eventName: string,
   config: FormTemplateConfig,
   currentSlug: string,
+  publish: boolean,
 ): Promise<SrxLadipageEvent> {
   const now = new Date();
   const normalizedConfig = normalizeConfigAssetUrlsForStorage(config);
@@ -359,6 +385,7 @@ async function insertLadipageEvent(
       event_name,
       legacy_template_slug,
       site_key,
+      public_base_url,
       public_path,
       status,
       is_active,
@@ -370,21 +397,22 @@ async function insertLadipageEvent(
       last_synced_at,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       name,
       slug,
       eventName,
       currentSlug || slug,
       "srx-event-site",
+      resolveSrxLadipageBaseUrl(),
       `/events/${slug}`,
-      "published",
+      publish ? "published" : "draft",
       1,
       normalizedConfig.templateStyle ?? "default",
       0,
       configJson,
-      configJson,
-      now,
+      publish ? configJson : null,
+      publish ? now : null,
       now,
       now,
       now,
@@ -406,6 +434,7 @@ async function updateLadipageEvent(
   name: string,
   eventName: string,
   config: FormTemplateConfig,
+  publish: boolean,
 ): Promise<SrxLadipageEvent> {
   const now = new Date();
   const normalizedConfig = normalizeConfigAssetUrlsForStorage(config);
@@ -415,6 +444,15 @@ async function updateLadipageEvent(
     !existingCurrent.publicPath || existingCurrent.publicPath === currentDefaultPublicPath
       ? `/events/${nextSlug}`
       : existingCurrent.publicPath;
+
+  // Lưu nháp chỉ ghi config_json; bản public (published_config_json) chỉ đổi khi bấm Xuất bản.
+  const publishClause = publish
+    ? `,
+       published_config_json = ?,
+       status = 'published',
+       published_at = ?`
+    : "";
+  const publishValues: QueryValue[] = publish ? [configJson, now] : [];
 
   await getSrxDB().query(
     `UPDATE ladipage_events
@@ -426,12 +464,8 @@ async function updateLadipageEvent(
        public_path = ?,
        template_style = ?,
        config_json = ?,
-       published_config_json = ?,
-       status = ?,
-       is_active = ?,
-       published_at = ?,
        last_synced_at = ?,
-       updated_at = ?
+       updated_at = ?${publishClause}
      WHERE slug = ?`,
     [
       name,
@@ -441,12 +475,9 @@ async function updateLadipageEvent(
       nextPublicPath,
       normalizedConfig.templateStyle ?? "default",
       configJson,
-      configJson,
-      "published",
-      1,
       now,
       now,
-      now,
+      ...publishValues,
       existingCurrent.slug,
     ],
   );
@@ -465,8 +496,10 @@ export async function saveSrxLadipageEvent(
   nextSlug: string,
   name: string,
   config: FormTemplateConfig,
+  options: { publish?: boolean } = {},
 ): Promise<SrxLadipageEvent> {
   try {
+    const publish = options.publish ?? false;
     const normalizedNextSlug = normalizeOptionalString(nextSlug);
 
     if (!normalizedNextSlug) {
@@ -480,10 +513,77 @@ export async function saveSrxLadipageEvent(
     await ensureSlugAvailable(normalizedNextSlug, existingCurrent?.slug);
 
     if (!existingCurrent) {
-      return insertLadipageEvent(normalizedNextSlug, normalizedName, normalizedEventName, config, currentSlug);
+      return insertLadipageEvent(normalizedNextSlug, normalizedName, normalizedEventName, config, currentSlug, publish);
     }
 
-    return updateLadipageEvent(existingCurrent, normalizedNextSlug, normalizedName, normalizedEventName, config);
+    return updateLadipageEvent(
+      existingCurrent,
+      normalizedNextSlug,
+      normalizedName,
+      normalizedEventName,
+      config,
+      publish,
+    );
+  } catch (error) {
+    wrapMissingLadipageEventsTableError(error);
+  }
+}
+
+export type SrxLadipageEventSettingsInput = {
+  status?: SrxLadipageEventStatus;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+/**
+ * Đổi trạng thái hiển thị của một Ladipage mà không đụng tới nội dung.
+ * Chuyển sang "published" thì lấy bản nháp hiện tại làm bản public luôn.
+ */
+export async function updateSrxLadipageEventSettings(
+  eventId: string,
+  input: SrxLadipageEventSettingsInput,
+): Promise<SrxLadipageEvent | null> {
+  try {
+    const existing = await fetchLadipageEventById(eventId);
+
+    if (!existing) {
+      return null;
+    }
+
+    const assignments: string[] = [];
+    const values: QueryValue[] = [];
+    const now = new Date();
+
+    if (input.status !== undefined) {
+      assignments.push("status = ?");
+      values.push(input.status);
+
+      if (input.status === "published") {
+        assignments.push("published_config_json = config_json", "published_at = ?");
+        values.push(now);
+      }
+    }
+
+    if (input.isActive !== undefined) {
+      assignments.push("is_active = ?");
+      values.push(input.isActive ? 1 : 0);
+    }
+
+    if (input.sortOrder !== undefined) {
+      assignments.push("sort_order = ?");
+      values.push(input.sortOrder);
+    }
+
+    if (assignments.length === 0) {
+      return existing;
+    }
+
+    assignments.push("updated_at = ?");
+    values.push(now, existing.id);
+
+    await getSrxDB().query(`UPDATE ladipage_events SET ${assignments.join(", ")} WHERE id = ?`, values);
+
+    return fetchLadipageEventById(existing.id);
   } catch (error) {
     wrapMissingLadipageEventsTableError(error);
   }

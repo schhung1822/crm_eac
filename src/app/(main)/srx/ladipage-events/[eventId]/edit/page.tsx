@@ -33,6 +33,7 @@ export default async function Page({ params }: { params: Promise<{ eventId: stri
       slug={ladipageEvent.slug}
       initialName={ladipageEvent.name}
       initialConfig={ladipageEvent.config}
+      initialStatus={ladipageEvent.status}
       editorTitle="Chỉnh sửa Ladipage sự kiện"
       publicBaseUrl={ladipageEvent.publicBaseUrl}
       publicPath={ladipageEvent.publicPath}

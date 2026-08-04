@@ -1,9 +1,5 @@
-import { getSrxAffiliateAccounts } from "@/lib/srx-affiliates";
+import { redirect } from "next/navigation";
 
-import { AffiliateCommissionManager } from "../_components/affiliate-commission-manager";
-
-export default async function Page() {
-  const accounts = await getSrxAffiliateAccounts();
-
-  return <AffiliateCommissionManager initialAccounts={accounts} />;
+export default function Page() {
+  redirect("/srx/affiliates/manage");
 }
