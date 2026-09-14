@@ -40,6 +40,7 @@ export const srxNewsPostSchema = z.object({
   excerpt: z.string(),
   content: z.string(),
   featured_image_url: z.string(),
+  featured_image_url_mb: z.string().optional().default(""),
   status: srxNewsStatusSchema,
   is_featured: z.boolean(),
   view_count: z.number(),

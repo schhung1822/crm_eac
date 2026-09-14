@@ -102,10 +102,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     const payload = deletePayloadSchema.parse(await request.json());
-    await deleteSrxMediaLibraryItem(payload.relative_path);
+    const deletedVariantCount = await deleteSrxMediaLibraryItem(payload.relative_path);
 
     return NextResponse.json({
-      message: "Đã xóa ảnh",
+      message: deletedVariantCount > 0 ? "Đã xóa ảnh và bản mobile đi kèm" : "Đã xóa ảnh",
+      deleted_variant_count: deletedVariantCount,
     });
   } catch (error) {
     return buildApiErrorResponse(error, "Không thể xóa ảnh");

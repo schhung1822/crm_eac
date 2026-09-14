@@ -4,7 +4,14 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { buildMobileImageUrl } from "@/lib/image-mobile-variant";
 import { convertImageBufferToWebp } from "@/lib/image-to-webp";
+import {
+  collectDerivedFilenames,
+  deleteMobileVariant,
+  findMobileVariantPath,
+  moveMobileVariant,
+} from "@/lib/srx-media-library-variants";
 import {
   parseSrxMediaLibraryItem,
   parseSrxMediaLibrarySnapshot,
@@ -137,6 +144,7 @@ async function createMediaItem(relativePath: string): Promise<SrxMediaLibraryIte
     top_level_directory: topLevelDirectory,
     filename: path.posix.basename(normalizedRelativePath),
     url: createPublicUrl(normalizedRelativePath),
+    mobile_url: findMobileVariantPath(absolutePath) ? createPublicUrl(buildMobileImageUrl(normalizedRelativePath)) : "",
     size_bytes: fileStats.size,
     modified_at: fileStats.mtime,
   });
@@ -148,6 +156,9 @@ async function walkDirectory(
   items: SrxMediaLibraryItem[],
 ): Promise<void> {
   const entries = await readdir(currentAbsolutePath, { withFileTypes: true });
+  const derivedFilenames = collectDerivedFilenames(
+    entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+  );
 
   for (const entry of entries) {
     const nextRelativePath = currentRelativePath ? path.posix.join(currentRelativePath, entry.name) : entry.name;
@@ -163,6 +174,11 @@ async function walkDirectory(
     }
 
     if (!IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+      continue;
+    }
+
+    // Bản thu nhỏ sinh kèm không phải một ảnh riêng, chỉ hiển thị ảnh gốc.
+    if (derivedFilenames.has(entry.name)) {
       continue;
     }
 
@@ -281,11 +297,13 @@ export async function updateSrxMediaLibraryItem(input: SrxMediaLibraryUpdateInpu
   }
 
   await rename(currentAbsolutePath, nextAbsolutePath);
+  await moveMobileVariant(currentAbsolutePath, nextAbsolutePath);
 
   return createMediaItem(nextRelativePath);
 }
 
-export async function deleteSrxMediaLibraryItem(relativePath: string): Promise<void> {
+/** Xóa ảnh gốc cùng bản mobile sinh kèm. Trả về số bản sinh kèm đã xóa. */
+export async function deleteSrxMediaLibraryItem(relativePath: string): Promise<number> {
   const normalizedRelativePath = normalizeRelativePath(relativePath);
   const absolutePath = resolveUploadFilePath(normalizedRelativePath);
 
@@ -301,5 +319,9 @@ export async function deleteSrxMediaLibraryItem(relativePath: string): Promise<v
     throw new Error("Không tìm thấy ảnh cần xóa");
   }
 
+  const deletedVariantCount = await deleteMobileVariant(absolutePath);
+
   await unlink(absolutePath);
+
+  return deletedVariantCount;
 }

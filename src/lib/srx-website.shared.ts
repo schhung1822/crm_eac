@@ -64,6 +64,7 @@ export const srxBannerSchema = z.object({
   slug: z.string(),
   description: z.string(),
   image_url: z.string(),
+  image_url_mb: z.string().optional().default(""),
   mobile_image_url: z.string(),
   alt_text: z.string(),
   button_label: z.string(),

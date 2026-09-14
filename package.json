@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit --incremental false --pretty false",
     "prisma:generate": "node scripts/prisma-generate.js",
     "srx:social-scheduler": "node scripts/srx-social-scheduler.js",
+    "srx:backfill-mobile-images": "node scripts/srx-backfill-mobile-images.js",
     "generate:presets": "ts-node --project tsconfig.scripts.json src/scripts/generate-theme-presets.ts"
   },
   "lint-staged": {

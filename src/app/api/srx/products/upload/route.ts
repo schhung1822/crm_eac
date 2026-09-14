@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { buildMobileImageUrl, writeMobileImageVariant } from "@/lib/image-mobile-variant";
 import { convertUploadedImageToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
@@ -18,6 +19,22 @@ function makeSafeFilename(name: string) {
     .replace(/[^a-zA-Z0-9-_]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+/** Tìm tên file chưa bị dùng, tính cả tên bản mobile để không ghi đè ảnh đã có. */
+function resolveAvailableFilename(uploadDir: string, baseName: string, extension: string): string {
+  let filename = `${baseName}${extension}`;
+  let counter = 1;
+
+  while (
+    existsSync(path.join(uploadDir, filename)) ||
+    existsSync(path.join(uploadDir, buildMobileImageUrl(filename)))
+  ) {
+    filename = `${baseName}-${counter}${extension}`;
+    counter++;
+  }
+
+  return filename;
 }
 
 export async function POST(request: NextRequest) {
@@ -53,21 +70,19 @@ export async function POST(request: NextRequest) {
     const rawBaseName = path.basename(file.name, path.extname(file.name));
     const baseName = makeSafeFilename(rawBaseName) || "image";
 
-    let filename = `${baseName}${extension}`;
-    let counter = 1;
-
-    while (existsSync(path.join(uploadDir, filename))) {
-      filename = `${baseName}-${counter}${extension}`;
-      counter++;
-    }
+    const filename = resolveAvailableFilename(uploadDir, baseName, extension);
 
     const filepath = path.join(uploadDir, filename);
 
     await writeFile(filepath, buffer);
 
+    // Bản mobile dùng cho giao diện nhỏ, tạo ngay lúc upload để không phải resize lúc hiển thị.
+    const mobileFilename = await writeMobileImageVariant(buffer, filepath, "product");
+
     return NextResponse.json({
       message: "Đã tải ảnh lên",
       url: resolveSiteAssetUrl(`/upload/product/${filename}`),
+      url_mb: mobileFilename ? resolveSiteAssetUrl(`/upload/product/${mobileFilename}`) : "",
       filename,
     });
   } catch (error) {

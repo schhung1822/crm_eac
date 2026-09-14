@@ -1,9 +1,10 @@
 /* eslint-disable max-lines, no-underscore-dangle */
-/* eslint-disable import/no-unresolved */
+
 import "server-only";
 
 import { escape, type ResultSetHeader, type RowDataPacket } from "mysql2";
 
+import { ensureMobileImageVariant } from "@/lib/image-mobile-variant";
 import { prisma2 } from "@/lib/prisma2";
 import {
   resolveHtmlAssetUrls,
@@ -16,6 +17,12 @@ import {
 } from "@/lib/site-asset-url";
 import { getSrxDB } from "@/lib/srx-db";
 import { withSrxReadFallback } from "@/lib/srx-db-errors";
+import { ensureMobileImageColumns } from "@/lib/srx-mobile-image-columns";
+import {
+  getProductMobileImageMaps,
+  syncProductMobileImages,
+  type ProductMobileImageMaps,
+} from "@/lib/srx-product-mobile-images";
 import {
   parseSrxProductCategoryInput,
   parseSrxProductInput,
@@ -255,6 +262,7 @@ type SrxProductTagRow = RowDataPacket & {
   class_name: string | null;
   stars: number | string | null;
   image_url: string | null;
+  image_url_mb: string | null;
   tag_groups: string | null;
   product_count: number | string | null;
   created_at: Date | string | null;
@@ -295,6 +303,7 @@ const srxProductTagsBaseQuery = `
     t.\`class\` AS class_name,
     t.stars,
     t.img AS image_url,
+    t.img_mb AS image_url_mb,
     t.\`Tags\` AS tag_groups,
     t.created_at,
     COALESCE(tag_stats.product_count, 0) AS product_count
@@ -446,6 +455,7 @@ function mapTag(tag: SrxProductTagRow): SrxProductTag {
     class: normalizeDelimitedValues(tag.class_name),
     stars: normalizeNullableNumber(tag.stars === null ? null : String(tag.stars)),
     image_url: resolveSiteAssetUrl(tag.image_url),
+    image_url_mb: resolveSiteAssetUrl(tag.image_url_mb),
     tag_groups: normalizeTagGroups(tag.tag_groups),
     product_count: Number(tag.product_count ?? 0) || 0,
     created_at: asDate(tag.created_at) ?? new Date(0),
@@ -490,82 +500,8 @@ async function getProductBenefitMap(productIds: readonly bigint[]): Promise<Map<
   return new Map(rows.map((row) => [row.id, normalizeOptionalString(row.benefit)]));
 }
 
-function mapProductVariant(variant: {
-  id: bigint;
-  sku: string;
-  barcode: string | null;
-  variant_name: string | null;
-  price: { toString(): string };
-  sale_price: { toString(): string } | null;
-  stock_quantity: number;
-  reserved_quantity: number;
-  low_stock_threshold: number;
-  weight_grams: { toString(): string } | null;
-  image_url: string | null;
-  is_default: boolean;
-  status: SrxProductVariantStatus;
-  created_at: Date;
-  updated_at: Date;
-}): SrxProductVariant {
-  return {
-    id: variant.id.toString(),
-    sku: variant.sku,
-    barcode: normalizeOptionalString(variant.barcode),
-    variant_name: normalizeOptionalString(variant.variant_name),
-    price: Number(variant.price.toString()),
-    sale_price: variant.sale_price ? Number(variant.sale_price.toString()) : null,
-    stock_quantity: variant.stock_quantity,
-    reserved_quantity: variant.reserved_quantity,
-    low_stock_threshold: variant.low_stock_threshold,
-    weight_grams: variant.weight_grams ? Number(variant.weight_grams.toString()) : null,
-    image_url: resolveSiteAssetUrl(variant.image_url),
-    is_default: variant.is_default,
-    status: variant.status,
-    created_at: variant.created_at,
-    updated_at: variant.updated_at,
-  };
-}
-
-// Mapping này chủ yếu gom dữ liệu Prisma sang shape trả về cho UI.
-// eslint-disable-next-line complexity
-function mapProduct(product: {
-  id: bigint;
-  name: string;
-  slug: string;
-  product_code: string;
-  short_description: string | null;
-  description: string | null;
-  usage_instructions: string | null;
-  ingredient_list: string | null;
-  benefit: string | null;
-  status: (typeof srxProductStatusValues)[number];
-  has_variants: boolean;
-  is_featured: boolean;
-  base_price: { toString(): string };
-  sale_price: { toString(): string } | null;
-  thumbnail_url: string | null;
-  info_img: string | null;
-  rating_average: { toString(): string };
-  rating_count: number;
-  sold_count: number;
-  view_count: number;
-  published_at: Date | null;
-  created_at: Date;
-  updated_at: Date;
-  category_id: bigint | null;
-  brand_id: bigint | null;
-  product_categories: { name: string; slug: string } | null;
-  brands: { name: string; slug: string } | null;
-  product_tag_links: Array<{ product_tags: { id: bigint; name: string; slug: string } }>;
-  product_images: Array<{
-    id: bigint;
-    image_url: string;
-    alt_text: string | null;
-    sort_order: number;
-    is_primary: boolean;
-    created_at: Date;
-  }>;
-  product_variants?: Array<{
+function mapProductVariant(
+  variant: {
     id: bigint;
     sku: string;
     barcode: string | null;
@@ -581,8 +517,90 @@ function mapProduct(product: {
     status: SrxProductVariantStatus;
     created_at: Date;
     updated_at: Date;
-  }>;
-}): SrxProduct {
+  },
+  mobileImageUrl: string | null,
+): SrxProductVariant {
+  return {
+    id: variant.id.toString(),
+    sku: variant.sku,
+    barcode: normalizeOptionalString(variant.barcode),
+    variant_name: normalizeOptionalString(variant.variant_name),
+    price: Number(variant.price.toString()),
+    sale_price: variant.sale_price ? Number(variant.sale_price.toString()) : null,
+    stock_quantity: variant.stock_quantity,
+    reserved_quantity: variant.reserved_quantity,
+    low_stock_threshold: variant.low_stock_threshold,
+    weight_grams: variant.weight_grams ? Number(variant.weight_grams.toString()) : null,
+    image_url: resolveSiteAssetUrl(variant.image_url),
+    image_url_mb: resolveSiteAssetUrl(mobileImageUrl),
+    is_default: variant.is_default,
+    status: variant.status,
+    created_at: variant.created_at,
+    updated_at: variant.updated_at,
+  };
+}
+
+// Mapping này chủ yếu gom dữ liệu Prisma sang shape trả về cho UI.
+// eslint-disable-next-line complexity
+function mapProduct(
+  product: {
+    id: bigint;
+    name: string;
+    slug: string;
+    product_code: string;
+    short_description: string | null;
+    description: string | null;
+    usage_instructions: string | null;
+    ingredient_list: string | null;
+    benefit: string | null;
+    status: (typeof srxProductStatusValues)[number];
+    has_variants: boolean;
+    is_featured: boolean;
+    base_price: { toString(): string };
+    sale_price: { toString(): string } | null;
+    thumbnail_url: string | null;
+    info_img: string | null;
+    rating_average: { toString(): string };
+    rating_count: number;
+    sold_count: number;
+    view_count: number;
+    published_at: Date | null;
+    created_at: Date;
+    updated_at: Date;
+    category_id: bigint | null;
+    brand_id: bigint | null;
+    product_categories: { name: string; slug: string } | null;
+    brands: { name: string; slug: string } | null;
+    product_tag_links: Array<{ product_tags: { id: bigint; name: string; slug: string } }>;
+    product_images: Array<{
+      id: bigint;
+      image_url: string;
+      alt_text: string | null;
+      sort_order: number;
+      is_primary: boolean;
+      created_at: Date;
+    }>;
+    product_variants?: Array<{
+      id: bigint;
+      sku: string;
+      barcode: string | null;
+      variant_name: string | null;
+      price: { toString(): string };
+      sale_price: { toString(): string } | null;
+      stock_quantity: number;
+      reserved_quantity: number;
+      low_stock_threshold: number;
+      weight_grams: { toString(): string } | null;
+      image_url: string | null;
+      is_default: boolean;
+      status: SrxProductVariantStatus;
+      created_at: Date;
+      updated_at: Date;
+    }>;
+  },
+  mobileImages: ProductMobileImageMaps,
+): SrxProduct {
+  const productId = product.id.toString();
   const tags = product.product_tag_links.map(({ product_tags }) => ({
     id: product_tags.id.toString(),
     name: product_tags.name,
@@ -592,12 +610,15 @@ function mapProduct(product: {
   const galleryImages = product.product_images.map((image) => ({
     id: image.id.toString(),
     image_url: resolveSiteAssetUrl(image.image_url),
+    image_url_mb: resolveSiteAssetUrl(mobileImages.galleryByImageId.get(image.id.toString())),
     alt_text: normalizeOptionalString(image.alt_text),
     sort_order: image.sort_order,
     is_primary: image.is_primary,
     created_at: image.created_at,
   }));
-  const variants = (product.product_variants ?? []).map(mapProductVariant);
+  const variants = (product.product_variants ?? []).map((variant) =>
+    mapProductVariant(variant, mobileImages.variantByVariantId.get(variant.id.toString()) ?? null),
+  );
 
   return srxProductSchema.parse({
     id: product.id.toString(),
@@ -615,7 +636,9 @@ function mapProduct(product: {
     base_price: Number(product.base_price.toString()),
     sale_price: product.sale_price ? Number(product.sale_price.toString()) : null,
     thumbnail_url: resolveSiteAssetUrl(product.thumbnail_url),
+    thumbnail_url_mb: resolveSiteAssetUrl(mobileImages.thumbnailByProductId.get(productId)),
     info_img: resolveSiteAssetUrl(product.info_img),
+    info_img_mb: resolveSiteAssetUrl(mobileImages.infoImageByProductId.get(productId)),
     rating_average: Number(product.rating_average.toString()),
     rating_count: product.rating_count,
     sold_count: product.sold_count,
@@ -945,6 +968,8 @@ export async function getSrxProductCategories(): Promise<SrxProductCategory[]> {
 
 export async function getSrxProductTags(): Promise<SrxProductTag[]> {
   return withSrxReadFallback("product tags", [], async () => {
+    await ensureMobileImageColumns("product_tags");
+
     const db = getSrxDB();
     const [rows] = await db.query<SrxProductTagRow[]>(`
       ${srxProductTagsBaseQuery}
@@ -979,6 +1004,8 @@ export async function getSrxProductTagOptionCatalog(): Promise<SrxProductTagOpti
 }
 
 export async function getSrxProductTagById(tagId: string): Promise<SrxProductTag | null> {
+  await ensureMobileImageColumns("product_tags");
+
   const db = getSrxDB();
   const [rows] = await db.query<SrxProductTagRow[]>(
     `
@@ -1022,16 +1049,23 @@ export async function getSrxProducts(): Promise<SrxProduct[]> {
         },
       },
     });
-    const infoImageMap = await getProductInfoImageMap(products.map((product) => product.id));
-    const benefitMap = await getProductBenefitMap(products.map((product) => product.id));
+    const productIds = products.map((product) => product.id);
+    const [infoImageMap, benefitMap, mobileImages] = await Promise.all([
+      getProductInfoImageMap(productIds),
+      getProductBenefitMap(productIds),
+      getProductMobileImageMaps(productIds),
+    ]);
 
     return products.map((product) =>
-      mapProduct({
-        ...product,
-        status: product.status as (typeof srxProductStatusValues)[number],
-        info_img: infoImageMap.get(product.id.toString()) ?? null,
-        benefit: benefitMap.get(product.id.toString()) ?? null,
-      }),
+      mapProduct(
+        {
+          ...product,
+          status: product.status as (typeof srxProductStatusValues)[number],
+          info_img: infoImageMap.get(product.id.toString()) ?? null,
+          benefit: benefitMap.get(product.id.toString()) ?? null,
+        },
+        mobileImages,
+      ),
     );
   });
 }
@@ -1065,15 +1099,21 @@ export async function getSrxProductById(productId: string): Promise<SrxProduct |
     if (!product || product.deleted_at !== null) {
       return null;
     }
-    const infoImageMap = await getProductInfoImageMap([product.id]);
-    const benefitMap = await getProductBenefitMap([product.id]);
+    const [infoImageMap, benefitMap, mobileImages] = await Promise.all([
+      getProductInfoImageMap([product.id]),
+      getProductBenefitMap([product.id]),
+      getProductMobileImageMaps([product.id]),
+    ]);
 
-    return mapProduct({
-      ...product,
-      status: product.status as (typeof srxProductStatusValues)[number],
-      info_img: infoImageMap.get(product.id.toString()) ?? null,
-      benefit: benefitMap.get(product.id.toString()) ?? null,
-    });
+    return mapProduct(
+      {
+        ...product,
+        status: product.status as (typeof srxProductStatusValues)[number],
+        info_img: infoImageMap.get(product.id.toString()) ?? null,
+        benefit: benefitMap.get(product.id.toString()) ?? null,
+      },
+      mobileImages,
+    );
   });
 }
 
@@ -1204,11 +1244,15 @@ export async function createSrxProductTag(input: SrxProductTagMutationInput): Pr
   const normalizedDescLong = resolveHtmlAssetUrlsForStorage(payload.desc_long);
   const stars = normalizeNullableNumber(payload.stars);
   await ensureProductTagSetOptions(payload.class, payload.tag_groups);
+  await ensureMobileImageColumns("product_tags");
+
+  // Bản 240px dùng cho danh sách thành phần và giao diện mobile.
+  const imageUrlMb = await ensureMobileImageVariant(imageUrl, "productTag");
   const db = getSrxDB();
   const [result] = await db.execute<ResultSetHeader>(
     `
-      INSERT INTO product_tags (name, slug, \`desc\`, desc_long, \`class\`, stars, img, \`Tags\`)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO product_tags (name, slug, \`desc\`, desc_long, \`class\`, stars, img, img_mb, \`Tags\`)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       payload.name,
@@ -1218,6 +1262,7 @@ export async function createSrxProductTag(input: SrxProductTagMutationInput): Pr
       serializeDelimitedValues(payload.class),
       stars,
       imageUrl,
+      imageUrlMb,
       serializeTagGroups(payload.tag_groups),
     ],
   );
@@ -1241,6 +1286,10 @@ export async function updateSrxProductTag(
   const normalizedDescLong = resolveHtmlAssetUrlsForStorage(payload.desc_long);
   const stars = normalizeNullableNumber(payload.stars);
   await ensureProductTagSetOptions(payload.class, payload.tag_groups);
+  await ensureMobileImageColumns("product_tags");
+
+  // Bản 240px dùng cho danh sách thành phần và giao diện mobile.
+  const imageUrlMb = await ensureMobileImageVariant(imageUrl, "productTag");
   const db = getSrxDB();
   const [existingRows] = await db.query<RowDataPacket[]>(
     `
@@ -1268,6 +1317,7 @@ export async function updateSrxProductTag(
         \`class\` = ?,
         stars = ?,
         img = ?,
+        img_mb = ?,
         \`Tags\` = ?
       WHERE id = ?
     `,
@@ -1279,6 +1329,7 @@ export async function updateSrxProductTag(
       serializeDelimitedValues(payload.class),
       stars,
       imageUrl,
+      imageUrlMb,
       serializeTagGroups(payload.tag_groups),
       tagId,
     ],
@@ -1401,12 +1452,20 @@ export async function createSrxProduct(input: SrxProductMutationInput): Promise<
     });
   });
 
-  return mapProduct({
-    ...product,
-    status: product.status as (typeof srxProductStatusValues)[number],
-    info_img: resolveNullableSiteAssetUrl(infoImageUrl),
-    benefit: normalizeOptionalString(payload.benefit),
-  });
+  // Bản 480px cho ảnh đại diện, ảnh mô tả, thư viện ảnh và ảnh biến thể.
+  await syncProductMobileImages(product.id);
+
+  const mobileImages = await getProductMobileImageMaps([product.id]);
+
+  return mapProduct(
+    {
+      ...product,
+      status: product.status as (typeof srxProductStatusValues)[number],
+      info_img: resolveNullableSiteAssetUrl(infoImageUrl),
+      benefit: normalizeOptionalString(payload.benefit),
+    },
+    mobileImages,
+  );
 }
 
 export async function updateSrxProduct(productId: string, input: SrxProductMutationInput): Promise<SrxProduct | null> {
@@ -1485,6 +1544,9 @@ export async function updateSrxProduct(productId: string, input: SrxProductMutat
     await syncProductInfoImage(tx, numericId, infoImageUrl);
     await syncProductVariants(tx, numericId, variants);
   });
+
+  // Bản 480px cho ảnh đại diện, ảnh mô tả, thư viện ảnh và ảnh biến thể.
+  await syncProductMobileImages(numericId);
 
   return getSrxProductById(productId);
 }

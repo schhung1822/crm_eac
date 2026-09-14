@@ -50,6 +50,8 @@ export const srxMediaLibraryItemSchema = z.object({
   top_level_directory: z.string(),
   filename: z.string(),
   url: z.string(),
+  /** Bản thu nhỏ sinh kèm; rỗng khi ảnh chưa có bản mobile. */
+  mobile_url: z.string().optional().default(""),
   size_bytes: z.number().int().nonnegative(),
   modified_at: z.coerce.date(),
 });
@@ -60,12 +62,7 @@ export const srxMediaLibrarySnapshotSchema = z.object({
 });
 
 export const srxMediaLibraryUpdateInputSchema = z.object({
-  relative_path: z
-    .string()
-    .trim()
-    .min(1)
-    .max(260)
-    .refine(isValidRelativePath, "Đường dẫn ảnh không hợp lệ"),
+  relative_path: z.string().trim().min(1).max(260).refine(isValidRelativePath, "Đường dẫn ảnh không hợp lệ"),
   next_directory: z
     .string()
     .trim()

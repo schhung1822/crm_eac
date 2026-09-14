@@ -16,6 +16,7 @@ type PublicBanner = {
   title: string;
   description: string;
   image_url: string;
+  image_url_mb: string;
   mobile_image_url: string;
   alt_text: string;
   button_label: string;
@@ -31,8 +32,10 @@ function toPublicBanner(banner: SrxBanner): PublicBanner {
     title: banner.title,
     description: banner.description,
     image_url: banner.image_url,
+    // Bản 960px sinh tự động; ảnh gốc vốn nhỏ hơn 960px thì không có bản này.
+    image_url_mb: banner.image_url_mb || banner.image_url,
     // Mini App hiển thị trên mobile nên ưu tiên ảnh mobile, thiếu thì dùng ảnh mặc định.
-    mobile_image_url: banner.mobile_image_url || banner.image_url,
+    mobile_image_url: banner.mobile_image_url || banner.image_url_mb || banner.image_url,
     alt_text: banner.alt_text || banner.title,
     button_label: banner.button_label,
     link_type: banner.link_type,
@@ -51,6 +54,7 @@ function toPublicBanner(banner: SrxBanner): PublicBanner {
  */
 export async function GET(request: NextRequest) {
   try {
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- ?position= rỗng phải rơi về vị trí mặc định, ?? sẽ giữ nguyên chuỗi rỗng.
     const rawPosition = request.nextUrl.searchParams.get("position")?.trim() || DEFAULT_POSITION;
     const parsedPosition = srxBannerPositionSchema.safeParse(rawPosition);
 

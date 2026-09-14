@@ -159,5 +159,7 @@ export default defineConfig([
     "src/components/ui",
     "*.config.ts",
     "*.mjs",
+    // Runner CommonJS cho ts-node, không nằm trong tsconfig nên parser TS không đọc được.
+    "scripts/*.js",
   ]),
 ]);

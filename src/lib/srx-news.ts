@@ -1,20 +1,21 @@
 /* eslint-disable max-lines, no-underscore-dangle */
-/* eslint-disable import/no-unresolved */
+
 import "server-only";
 
 import type { RowDataPacket } from "mysql2/promise";
 
-import { withSrxReadFallback } from "@/lib/srx-db-errors";
-import { getSrxDB } from "@/lib/srx-db";
+import { ensureMobileImageVariant } from "@/lib/image-mobile-variant";
 import { prisma2 } from "@/lib/prisma2";
-import { syncSrxNewsPostSocialChannels } from "@/lib/srx-news-social-posting";
-import { Prisma } from "../../prisma/generated/srx-app-client";
 import {
   resolveHtmlAssetUrls,
   resolveHtmlAssetUrlsForStorage,
   resolveNullableSiteAssetUrlForStorage,
   resolveSiteAssetUrl,
 } from "@/lib/site-asset-url";
+import { getSrxDB } from "@/lib/srx-db";
+import { withSrxReadFallback } from "@/lib/srx-db-errors";
+import { ensureMobileImageColumns } from "@/lib/srx-mobile-image-columns";
+import { syncSrxNewsPostSocialChannels } from "@/lib/srx-news-social-posting";
 import {
   parseSrxNewsCategoryInput,
   parseSrxNewsPostInput,
@@ -30,6 +31,8 @@ import {
   type SrxNewsTag,
   type SrxNewsTagMutationInput,
 } from "@/lib/srx-news.shared";
+
+import { Prisma } from "../../prisma/generated/srx-app-client";
 
 function normalizeOptionalString(value: string | null | undefined): string {
   return String(value ?? "").trim();
@@ -63,7 +66,9 @@ function parseOptionalDate(value: string | null | undefined): Date | null {
     return null;
   }
 
-  const normalizedDateInput = LOCAL_DATE_TIME_INPUT_PATTERN.test(trimmed) ? `${trimmed}${VIETNAM_TIME_OFFSET}` : trimmed;
+  const normalizedDateInput = LOCAL_DATE_TIME_INPUT_PATTERN.test(trimmed)
+    ? `${trimmed}${VIETNAM_TIME_OFFSET}`
+    : trimmed;
   const date = new Date(normalizedDateInput);
 
   if (Number.isNaN(date.getTime())) {
@@ -83,11 +88,13 @@ function isFutureDate(value: Date | null): boolean {
   return value ? value.getTime() > Date.now() : false;
 }
 
+// eslint-disable-next-line complexity
 function shouldSyncSocialOnSave(
   payload: SrxNewsPostMutationInput,
   publishedAt: Date | null,
   existingSocialIds?: PostSocialIds,
 ): boolean {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- id bài rỗng nghĩa là chưa đăng, ?? sẽ coi chuỗi rỗng là đã đăng.
   const hasExistingSocialPost = Boolean(existingSocialIds?.id_fb_post || existingSocialIds?.id_zalo_post);
 
   if (payload.status !== "published") {
@@ -105,27 +112,29 @@ function shouldSyncSocialOnSave(
 }
 
 async function ensurePostSocialScheduleColumns(): Promise<void> {
-  if (!ensurePostSocialScheduleColumnsPromise) {
-    ensurePostSocialScheduleColumnsPromise = (async () => {
-      const db = getSrxDB();
-      const [rows] = await db.query<ColumnRow[]>("SHOW COLUMNS FROM posts WHERE Field IN (?, ?)", [
-        "social_publish_facebook",
-        "social_publish_zalo",
-      ]);
-      const existingColumns = new Set(rows.map((row) => row.Field));
+  ensurePostSocialScheduleColumnsPromise ??= (async () => {
+    const db = getSrxDB();
+    const [rows] = await db.query<ColumnRow[]>("SHOW COLUMNS FROM posts WHERE Field IN (?, ?)", [
+      "social_publish_facebook",
+      "social_publish_zalo",
+    ]);
+    const existingColumns = new Set(rows.map((row) => row.Field));
 
-      if (!existingColumns.has("social_publish_facebook")) {
-        await db.execute("ALTER TABLE posts ADD COLUMN social_publish_facebook TINYINT(1) NOT NULL DEFAULT 0 AFTER id_fb_post");
-      }
+    if (!existingColumns.has("social_publish_facebook")) {
+      await db.execute(
+        "ALTER TABLE posts ADD COLUMN social_publish_facebook TINYINT(1) NOT NULL DEFAULT 0 AFTER id_fb_post",
+      );
+    }
 
-      if (!existingColumns.has("social_publish_zalo")) {
-        await db.execute("ALTER TABLE posts ADD COLUMN social_publish_zalo TINYINT(1) NOT NULL DEFAULT 0 AFTER social_publish_facebook");
-      }
-    })().catch((error: unknown) => {
-      ensurePostSocialScheduleColumnsPromise = null;
-      throw error;
-    });
-  }
+    if (!existingColumns.has("social_publish_zalo")) {
+      await db.execute(
+        "ALTER TABLE posts ADD COLUMN social_publish_zalo TINYINT(1) NOT NULL DEFAULT 0 AFTER social_publish_facebook",
+      );
+    }
+  })().catch((error: unknown) => {
+    ensurePostSocialScheduleColumnsPromise = null;
+    throw error;
+  });
 
   await ensurePostSocialScheduleColumnsPromise;
 }
@@ -181,6 +190,7 @@ function mapPost(post: {
   excerpt: string | null;
   content: string;
   featured_image_url: string | null;
+  featured_image_url_mb?: string | null;
   status: (typeof srxNewsStatusValues)[number];
   is_featured: boolean;
   view_count: number;
@@ -208,6 +218,7 @@ function mapPost(post: {
     excerpt: normalizeOptionalString(post.excerpt),
     content: resolveHtmlAssetUrls(post.content),
     featured_image_url: resolveSiteAssetUrl(post.featured_image_url),
+    featured_image_url_mb: resolveSiteAssetUrl(post.featured_image_url_mb),
     status: post.status,
     is_featured: post.is_featured,
     view_count: post.view_count,
@@ -341,13 +352,15 @@ async function getPostSocialIds(postId: bigint): Promise<PostSocialIds> {
     LIMIT 1
   `;
 
-  return rows[0] ?? {
-    id: postId,
-    id_fb_post: null,
-    id_zalo_post: null,
-    social_publish_facebook: false,
-    social_publish_zalo: false,
-  };
+  return (
+    rows[0] ?? {
+      id: postId,
+      id_fb_post: null,
+      id_zalo_post: null,
+      social_publish_facebook: false,
+      social_publish_zalo: false,
+    }
+  );
 }
 
 async function getPostSocialIdMap(postIds: readonly bigint[]): Promise<Map<string, PostSocialIds>> {
@@ -363,6 +376,45 @@ async function getPostSocialIdMap(postIds: readonly bigint[]): Promise<Map<strin
   `;
 
   return new Map(rows.map((row) => [row.id.toString(), row]));
+}
+
+type PostMobileImageRow = {
+  featured_image_url_mb: string | null;
+  id: bigint;
+};
+
+async function getPostMobileImageMap(postIds: readonly bigint[]): Promise<Map<string, string>> {
+  if (postIds.length === 0) {
+    return new Map();
+  }
+
+  await ensureMobileImageColumns("posts");
+  const rows = await prisma2.$queryRaw<PostMobileImageRow[]>`
+    SELECT id, featured_image_url_mb
+    FROM posts
+    WHERE id IN (${Prisma.join(postIds)})
+  `;
+
+  return new Map(
+    rows.flatMap((row) => (row.featured_image_url_mb ? [[row.id.toString(), row.featured_image_url_mb]] : [])),
+  );
+}
+
+/**
+ * Sinh bản 480px của ảnh đại diện rồi lưu đường dẫn lại. Trả về đường dẫn đó để
+ * hàm gọi dùng luôn, khỏi phải đọc lại từ cơ sở dữ liệu.
+ */
+async function syncPostMobileImage(postId: bigint, featuredImageUrl: string | null): Promise<string | null> {
+  await ensureMobileImageColumns("posts");
+  const mobileImageUrl = await ensureMobileImageVariant(featuredImageUrl, "news");
+
+  await prisma2.$executeRaw`
+    UPDATE posts
+    SET featured_image_url_mb = ${mobileImageUrl}
+    WHERE id = ${postId}
+  `;
+
+  return mobileImageUrl;
 }
 
 export { parseSrxNewsCategoryInput, parseSrxNewsPostInput, parseSrxNewsTagInput };
@@ -415,7 +467,11 @@ export async function getSrxNewsPosts(): Promise<SrxNewsPost[]> {
       },
     });
 
-    const socialIdMap = await getPostSocialIdMap(posts.map((post) => post.id));
+    const postIds = posts.map((post) => post.id);
+    const [socialIdMap, mobileImageMap] = await Promise.all([
+      getPostSocialIdMap(postIds),
+      getPostMobileImageMap(postIds),
+    ]);
 
     return posts.map((post) => {
       const socialIds = socialIdMap.get(post.id.toString());
@@ -423,6 +479,7 @@ export async function getSrxNewsPosts(): Promise<SrxNewsPost[]> {
       return mapPost({
         ...post,
         ...socialIds,
+        featured_image_url_mb: mobileImageMap.get(post.id.toString()) ?? null,
         status: post.status as (typeof srxNewsStatusValues)[number],
       });
     });
@@ -449,11 +506,15 @@ export async function getSrxNewsPostById(postId: string): Promise<SrxNewsPost | 
       return null;
     }
 
-    const socialIds = await getPostSocialIds(post.id);
+    const [socialIds, mobileImageMap] = await Promise.all([
+      getPostSocialIds(post.id),
+      getPostMobileImageMap([post.id]),
+    ]);
 
     return mapPost({
       ...post,
       ...socialIds,
+      featured_image_url_mb: mobileImageMap.get(post.id.toString()) ?? null,
       status: post.status as (typeof srxNewsStatusValues)[number],
     });
   });
@@ -662,8 +723,12 @@ export async function createSrxNewsPost(input: SrxNewsPostMutationInput): Promis
   });
   await updatePostSocialScheduleFlags(post.id, payload);
 
+  // Bản 480px của ảnh đại diện, dùng cho danh sách tin và giao diện mobile.
+  const mobileImageUrl = await syncPostMobileImage(post.id, featuredImageUrl);
+
   const mappedPost = mapPost({
     ...post,
+    featured_image_url_mb: mobileImageUrl,
     social_publish_facebook: payload.publish_to_facebook,
     social_publish_zalo: payload.publish_to_zalo,
     status: post.status as (typeof srxNewsStatusValues)[number],
@@ -737,6 +802,8 @@ export async function updateSrxNewsPost(postId: string, input: SrxNewsPostMutati
     }
   });
   await updatePostSocialScheduleFlags(numericId, payload);
+  // Bản 480px của ảnh đại diện, dùng cho danh sách tin và giao diện mobile.
+  await syncPostMobileImage(numericId, featuredImageUrl);
 
   const post = await getSrxNewsPostById(postId);
 

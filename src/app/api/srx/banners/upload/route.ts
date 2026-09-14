@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { writeMobileImageVariant } from "@/lib/image-mobile-variant";
 import { convertUploadedImageToWebp } from "@/lib/image-to-webp";
 import { resolveSiteAssetUrl } from "@/lib/site-asset-url";
 
@@ -49,9 +50,13 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     await writeFile(filepath, buffer);
 
+    // Bản mobile dùng cho giao diện nhỏ, tạo ngay lúc upload để không phải resize lúc hiển thị.
+    const mobileFilename = await writeMobileImageVariant(buffer, filepath, "banner");
+
     return NextResponse.json({
       message: "Đã tải banner lên",
       url: resolveSiteAssetUrl(`/upload/banner/${filename}`),
+      url_mb: mobileFilename ? resolveSiteAssetUrl(`/upload/banner/${mobileFilename}`) : "",
     });
   } catch (error) {
     return buildApiErrorResponse(error, "Không thể tải banner");

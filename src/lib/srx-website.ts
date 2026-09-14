@@ -2,12 +2,14 @@
 
 import "server-only";
 
+import { ensureMobileImageVariant } from "@/lib/image-mobile-variant";
 import { prisma2 } from "@/lib/prisma2";
 import {
   resolveNullableSiteAssetUrlForStorage,
   resolveSiteAssetUrl,
   resolveSiteAssetUrlForStorage,
 } from "@/lib/site-asset-url";
+import { ensureMobileImageColumns } from "@/lib/srx-mobile-image-columns";
 import {
   parseSrxBannerInput,
   parseSrxDiscountCodeInput,
@@ -382,6 +384,7 @@ function mapBanner(banner: {
   slug: string;
   description: string | null;
   image_url: string;
+  image_url_mb: string | null;
   mobile_image_url: string | null;
   alt_text: string | null;
   button_label: string | null;
@@ -402,6 +405,7 @@ function mapBanner(banner: {
     slug: banner.slug,
     description: normalizeOptionalString(banner.description),
     image_url: resolveSiteAssetUrl(banner.image_url),
+    image_url_mb: resolveSiteAssetUrl(banner.image_url_mb),
     mobile_image_url: resolveSiteAssetUrl(banner.mobile_image_url),
     alt_text: normalizeOptionalString(banner.alt_text),
     button_label: normalizeOptionalString(banner.button_label),
@@ -426,6 +430,7 @@ type BannerRow = {
   slug: string;
   description: string | null;
   image_url: string;
+  image_url_mb: string | null;
   mobile_image_url: string | null;
   alt_text: string | null;
   button_label: string | null;
@@ -449,6 +454,7 @@ async function getBannerByIdRaw(bannerId: bigint, client: BannerQueryClient = pr
       slug,
       description,
       image_url,
+      image_url_mb,
       mobile_image_url,
       alt_text,
       button_label,
@@ -478,6 +484,7 @@ async function getBannerBySlugRaw(slug: string, client: BannerQueryClient = pris
       slug,
       description,
       image_url,
+      image_url_mb,
       mobile_image_url,
       alt_text,
       button_label,
@@ -944,6 +951,8 @@ export async function getSrxDiscountCodes(): Promise<SrxDiscountCode[]> {
 
 export async function getSrxBanners(): Promise<SrxBanner[]> {
   try {
+    await ensureMobileImageColumns("banners");
+
     const banners = await prisma2.$queryRaw<BannerRow[]>(Prisma.sql`
       SELECT
         id,
@@ -951,6 +960,7 @@ export async function getSrxBanners(): Promise<SrxBanner[]> {
         slug,
         description,
         image_url,
+        image_url_mb,
         mobile_image_url,
         alt_text,
         button_label,
@@ -984,6 +994,8 @@ export async function getSrxBanners(): Promise<SrxBanner[]> {
  */
 export async function getSrxActiveBannersByPosition(position: SrxBannerPosition): Promise<SrxBanner[]> {
   try {
+    await ensureMobileImageColumns("banners");
+
     const banners = await prisma2.$queryRaw<BannerRow[]>(Prisma.sql`
       SELECT
         id,
@@ -991,6 +1003,7 @@ export async function getSrxActiveBannersByPosition(position: SrxBannerPosition)
         slug,
         description,
         image_url,
+        image_url_mb,
         mobile_image_url,
         alt_text,
         button_label,
@@ -1334,6 +1347,10 @@ export async function createSrxBanner(input: SrxBannerMutationInput): Promise<Sr
 
     validateDateRange(startsAt, endsAt);
 
+    await ensureMobileImageColumns("banners");
+
+    // Bản 960px dùng cho banner trên màn hình nhỏ.
+    const imageUrlMb = await ensureMobileImageVariant(imageUrl, "banner");
     const slug = await ensureUniqueBannerSlug(slugify(payload.slug || payload.title));
     const banner = await prisma2.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
@@ -1342,6 +1359,7 @@ export async function createSrxBanner(input: SrxBannerMutationInput): Promise<Sr
           slug,
           description,
           image_url,
+          image_url_mb,
           mobile_image_url,
           alt_text,
           button_label,
@@ -1359,6 +1377,7 @@ export async function createSrxBanner(input: SrxBannerMutationInput): Promise<Sr
           ${slug},
           ${normalizeNullableString(payload.description)},
           ${imageUrl},
+          ${imageUrlMb},
           ${mobileImageUrl},
           ${normalizeNullableString(payload.alt_text)},
           ${normalizeNullableString(payload.button_label)},
@@ -1397,13 +1416,18 @@ export async function updateSrxBanner(bannerId: string, input: SrxBannerMutation
 
     validateDateRange(startsAt, endsAt);
 
+    await ensureMobileImageColumns("banners");
+
     const existing = await getBannerByIdRaw(numericId);
 
     if (!existing) {
       return null;
     }
 
+    // Bản 960px dùng cho banner trên màn hình nhỏ.
+    const imageUrlMb = await ensureMobileImageVariant(imageUrl, "banner");
     const slug = await ensureUniqueBannerSlug(slugify(payload.slug || payload.title), numericId);
+
     await prisma2.$executeRaw(Prisma.sql`
       UPDATE banners
       SET
@@ -1411,6 +1435,7 @@ export async function updateSrxBanner(bannerId: string, input: SrxBannerMutation
         slug = ${slug},
         description = ${normalizeNullableString(payload.description)},
         image_url = ${imageUrl},
+        image_url_mb = ${imageUrlMb},
         mobile_image_url = ${mobileImageUrl},
         alt_text = ${normalizeNullableString(payload.alt_text)},
         button_label = ${normalizeNullableString(payload.button_label)},
