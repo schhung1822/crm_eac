@@ -61,6 +61,9 @@ export type InfoEventConfig = {
   logo1Url?: string;
   logo2Url?: string;
   logo3Url?: string;
+  // Danh sách đánh số 01, 02... phía trên form của template 2.
+  // undefined = config cũ, web tự lấy từ nhãn câu hỏi; [] = ẩn khối.
+  agendaItems?: string[];
 };
 
 export type TemplateFieldsConfig = {
@@ -70,7 +73,18 @@ export type TemplateFieldsConfig = {
   email: { enabled: boolean; required: boolean; label: string; placeholder: string };
 
   // hidden (toggle)
-  hidden: Record<HiddenFieldKey, { enabled: boolean; label?: string; placeholder?: string; required?: boolean; visible?: boolean; type?: FieldType; options?: string[] }>;
+  hidden: Record<
+    HiddenFieldKey,
+    {
+      enabled: boolean;
+      label?: string;
+      placeholder?: string;
+      required?: boolean;
+      visible?: boolean;
+      type?: FieldType;
+      options?: string[];
+    }
+  >;
 };
 
 export type FormTemplateConfig = {

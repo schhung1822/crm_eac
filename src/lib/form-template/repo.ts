@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma"; // bạn đã có prisma client
 
-import { defaultConfig } from "./defaultConfig";
+import { defaultConfig } from "./default-config";
 import { FormTemplateConfig } from "./types";
 
 export async function getTemplateBySlug(slug: string) {
   const row = await prisma.formTemplate.findUnique({ where: { slug } });
   if (!row || !row.configJson) return null;
   return {
-    id: row.id_temp || "",
-    slug: row.slug || "",
-    name: row.name || "",
+    id: row.id_temp ?? "",
+    slug: row.slug ?? "",
+    name: row.name ?? "",
     isActive: row.isActive === "1" || row.isActive === "true",
     config: JSON.parse(row.configJson) as FormTemplateConfig,
   };
@@ -22,9 +22,9 @@ export async function getActiveTemplate() {
   });
   if (!row || !row.configJson) return null;
   return {
-    id: row.id_temp || "",
-    slug: row.slug || "",
-    name: row.name || "",
+    id: row.id_temp ?? "",
+    slug: row.slug ?? "",
+    name: row.name ?? "",
     isActive: row.isActive === "1" || row.isActive === "true",
     config: JSON.parse(row.configJson) as FormTemplateConfig,
   };
@@ -43,7 +43,7 @@ export async function updateTemplateBySlug(
   currentSlug: string,
   nextSlug: string,
   name: string,
-  config: FormTemplateConfig
+  config: FormTemplateConfig,
 ) {
   const configJson = JSON.stringify(config);
   const normalizedNextSlug = nextSlug.trim();

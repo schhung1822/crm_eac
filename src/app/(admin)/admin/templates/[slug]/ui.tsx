@@ -6,139 +6,189 @@
 
 import * as React from "react";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
-  Calendar,
+  ArrowLeft,
+  CalendarDays,
+  Clock3,
   Copy,
+  ExternalLink,
   FileText,
   FormInput,
   Globe,
   Image as ImageIcon,
   Link2,
+  ListOrdered,
   Loader2,
   MapPin,
   MessageSquare,
   Palette,
+  Plug,
+  Plus,
   Rocket,
+  RotateCcw,
   Save,
-  Sparkles,
+  Settings2,
+  Shirt,
+  SlidersHorizontal,
+  Trash2,
   Type,
   Upload,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { templateThemePresets } from "@/lib/form-template/defaultConfig";
-import type { FieldType, FormTemplateConfig, HiddenFieldKey, TemplateStyle } from "@/lib/form-template/types";
+import { templateThemePresets } from "@/lib/form-template/default-config";
+import type {
+  FieldType,
+  FormTemplateConfig,
+  HiddenFieldKey,
+  InfoEventConfig,
+  TemplateStyle,
+  TemplateTheme,
+} from "@/lib/form-template/types";
+import { cn } from "@/lib/utils";
 
 import { saveTemplateAction } from "./actions";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-const EVENT_IMAGE_PLACEHOLDER = "/upload/events/...";
 const PUBLIC_LADIPAGE_BASE_URL = "https://srx.vn";
+// Giữ khớp với MAX_AGENDA_ITEMS / LEGACY_AGENDA_ITEMS_LIMIT trong SRX_web StarryEventLanding.jsx.
+const MAX_AGENDA_ITEMS = 6;
+const LEGACY_AGENDA_ITEMS_LIMIT = 3;
+const MAX_QUESTIONS = 5;
+// Cùng thứ tự với config lưu trong DB — web render trường bổ sung theo thứ tự này.
+const HIDDEN_FIELD_KEYS: HiddenFieldKey[] = ["user_id", "city", "role", "clinic", "full_name_nv"];
 
 const templateStyleLabels: Record<TemplateStyle, string> = {
-  default: "Bong bóng Hồng",
-  starry: "Template 2 - Webinar red",
+  default: "Template 1 · Bong bóng hồng",
+  starry: "Template 2 · Webinar đỏ",
 };
 
 const questionTypeLabels: Record<FieldType, string> = {
-  email: "Email",
-  select: "Dropdown",
-  tel: "Điện thoại",
   text: "Text",
-  textarea: "Textarea",
+  textarea: "Đoạn văn",
+  select: "Dropdown",
+  email: "Email",
+  tel: "Số điện thoại",
 };
 
-const templateEditorCopy: Record<
-  TemplateStyle,
-  {
-    heroTitle: string;
-    heroDescription: string;
-    heroImageLabel: string;
-    heroImageDescription: string;
-    eyebrowLabel: string;
-    titleLabel: string;
-    subtitleLabel: string;
-    infoTitle: string;
-    infoDescription: string;
-    infoTopLabel: string;
-    infoHeadlineLabel: string;
-    infoMottoLabel: string;
-    infoOrganizerLabel: string;
-    infoBottomLabel: string;
-    scheduleDescription: string;
-    locationDescription: string;
-    footerStyleTitle: string;
-    footerStyleDescription: string;
-    fieldHelp: string;
-  }
-> = {
+const hiddenFieldLabels: Record<HiddenFieldKey, string> = {
+  user_id: "User ID",
+  city: "Khu vực",
+  role: "Vai trò",
+  clinic: "Đơn vị công tác",
+  full_name_nv: "Sale tư vấn",
+};
+
+type InfoTextKey = "topText" | "headline" | "motto" | "organizerText" | "bottomText";
+
+type InfoTextField = { label: string; placeholder: string; hint?: string; multiline?: boolean };
+
+type TemplateCopy = {
+  bannerHint: string;
+  descTextLabel: string;
+  subtitleLabel: string;
+  subtitleHint: string;
+  contentTitle: string;
+  contentDescription: string;
+  scheduleDescription: string;
+  infoOrder: InfoTextKey[];
+  infoFields: Record<InfoTextKey, InfoTextField>;
+  themeTokens: { key: keyof TemplateTheme; label: string }[];
+};
+
+// Mỗi template dùng cùng một config nhưng đặt text ở vị trí khác nhau, nên nhãn trong editor đổi theo template.
+const templateCopy: Record<TemplateStyle, TemplateCopy> = {
   default: {
-    heroTitle: "Hero, heading va media",
-    heroDescription: "Template 1 dung anh heading, tieu de va phu de o phan dau landing page.",
-    heroImageLabel: "Anh heading",
-    heroImageDescription: "Anh hero/heading hien thi tren dau template 1.",
-    eyebrowLabel: "Dong mo ta tren tieu de",
-    titleLabel: "Tieu de chinh landing page",
-    subtitleLabel: "Phu de",
-    infoTitle: "Khoi gioi thieu",
-    infoDescription: "Cac text hien thi o khoi gioi thieu ben duoi form cua template 1.",
-    infoTopLabel: "Dong chu tren",
-    infoHeadlineLabel: "Headline",
-    infoMottoLabel: "Motto",
-    infoOrganizerLabel: "Organizer text",
-    infoBottomLabel: "Dong chu duoi",
-    scheduleDescription: "Ngay gio hien thi trong footer template 1.",
-    locationDescription: "Dia diem hien thi trong footer template 1.",
-    footerStyleTitle: "Footer va dress code",
-    footerStyleDescription: "Template 1 co footer gradient va cum dress code.",
-    fieldHelp: "Dung cau hoi bo sung neu can them du lieu ngoai cac field co ban.",
+    bannerHint: "Ảnh heading ở đầu trang.",
+    descTextLabel: "Dòng mô tả trên tiêu đề",
+    subtitleLabel: "Phụ đề",
+    subtitleHint: "Hiển thị ngay dưới tiêu đề chính.",
+    contentTitle: "Khối giới thiệu",
+    contentDescription: "Hiển thị bên dưới form đăng ký, cùng hàng logo đối tác.",
+    scheduleDescription: "Hiển thị ở footer của trang.",
+    infoOrder: ["topText", "headline", "motto", "organizerText", "bottomText"],
+    infoFields: {
+      topText: { label: "Dòng chữ trên", placeholder: "Ví dụ: Trân trọng kính mời Quý khách tham dự" },
+      headline: { label: "Headline", placeholder: "Ví dụ: SGA Renew Peel" },
+      motto: { label: "Motto", placeholder: "Ví dụ: Đa tầng tác động, dứt vòng mụn thâm" },
+      organizerText: {
+        label: "Giới thiệu sự kiện",
+        placeholder: "Ví dụ: Chương trình do EAC Group và SRX Laboratory tổ chức",
+        multiline: true,
+      },
+      bottomText: {
+        label: "Dòng chữ dưới",
+        placeholder: "Ví dụ: Rất hân hạnh được đón tiếp Quý khách",
+        multiline: true,
+      },
+    },
+    themeTokens: [
+      { key: "primary", label: "Màu chính" },
+      { key: "primary2", label: "Màu chính 2" },
+      { key: "text", label: "Chữ" },
+      { key: "muted", label: "Chữ phụ" },
+      { key: "bg", label: "Nền trang" },
+      { key: "card", label: "Nền khung form" },
+      { key: "ring", label: "Viền khi focus" },
+    ],
   },
   starry: {
-    heroTitle: "Banner webinar va thong tin nhanh",
-    heroDescription: "Template 2 dung banner doc, badge, tieu de, 3 o metadata va agenda ngan.",
-    heroImageLabel: "Banner dau trang",
-    heroImageDescription: "Anh banner dung full width o dau template 2, nen dung anh doc/mobile.",
-    eyebrowLabel: "Badge tren tieu de",
-    titleLabel: "Tieu de webinar",
-    subtitleLabel: "Nhan nho duoi tieu de form",
-    infoTitle: "Noi dung form va agenda",
-    infoDescription:
-      "Template 2 dung headline cho tieu de form, motto/organizer/bottom cho mo ta va agenda neu chua bat cau hoi.",
-    infoTopLabel: "Badge phu",
-    infoHeadlineLabel: "Tieu de form",
-    infoMottoLabel: "Mo ta ngan",
-    infoOrganizerLabel: "Mo ta chuong trinh",
-    infoBottomLabel: "Ghi chu/xac nhan",
-    scheduleDescription: "Ngay gio hien thi trong 3 o metadata cua template 2.",
-    locationDescription: "Dia diem/hinh thuc hien thi trong metadata va footer template 2.",
-    footerStyleTitle: "Mau footer",
-    footerStyleDescription: "Template 2 uu tien nen toi/do, khong dung cum dress code.",
-    fieldHelp: "Voi template 2, hay bat field bo sung nhu Clinic, Khu vuc, Sale tu van neu can giong mau HTML.",
+    bannerHint: "Nên dùng ảnh dọc tỉ lệ 4:5, hiển thị full chiều ngang ở đầu trang.",
+    descTextLabel: "Badge trên tiêu đề",
+    subtitleLabel: "Dòng nhấn dưới tiêu đề form",
+    subtitleHint: "Chữ in hoa nhỏ, màu nhấn, nằm trong khung form đăng ký.",
+    contentTitle: "Nội dung khung form",
+    contentDescription: "Tiêu đề và mô tả bên trong khung form. Ba đoạn mô tả được nối liền thành một đoạn.",
+    scheduleDescription: "Hiển thị ở 3 ô Ngày/Giờ/Địa điểm dưới tiêu đề và ở footer.",
+    infoOrder: ["headline", "motto", "organizerText", "bottomText", "topText"],
+    infoFields: {
+      headline: { label: "Tiêu đề form", placeholder: "Đăng ký tham dự" },
+      motto: {
+        label: "Mô tả - đoạn 1",
+        placeholder: "Ví dụ: Chương trình từ EAC GROUP và Similidiet Laboratories dành cho Bác sĩ, Spa/Clinic",
+        multiline: true,
+      },
+      organizerText: {
+        label: "Mô tả - đoạn 2",
+        placeholder: "Ví dụ: mong muốn cập nhật kiến thức về lão hoá nội sinh...",
+        multiline: true,
+      },
+      bottomText: {
+        label: "Mô tả - đoạn 3",
+        placeholder: "Ví dụ: Quý khách vui lòng hoàn thiện thông tin bên dưới để được hỗ trợ xác nhận tham dự.",
+        multiline: true,
+      },
+      topText: {
+        label: "Badge dự phòng",
+        placeholder: "Ví dụ: Webinar miễn phí",
+        hint: "Chỉ hiển thị khi ô Badge trên tiêu đề (tab Chung) để trống.",
+      },
+    },
+    themeTokens: [
+      { key: "primary", label: "Màu chính" },
+      { key: "primary2", label: "Màu chính 2" },
+      { key: "muted", label: "Màu nhấn (số, icon)" },
+      { key: "bg", label: "Nền trang" },
+    ],
   },
-};
-const hiddenFieldLabels: Record<HiddenFieldKey, string> = {
-  city: "City",
-  clinic: "Clinic",
-  full_name_nv: "Full name NV",
-  role: "Role",
-  user_id: "User ID",
 };
 
 type DefaultFieldConfig = FormTemplateConfig["fields"]["full_name"];
+type HiddenFieldConfig = FormTemplateConfig["fields"]["hidden"][HiddenFieldKey];
 type QuestionConfig = FormTemplateConfig["questions"][number];
+type LadipageStatus = "draft" | "published" | "archived";
 
 async function uploadEventImage(file: File): Promise<string> {
   const formData = new FormData();
@@ -156,6 +206,19 @@ async function uploadEventImage(file: File): Promise<string> {
   }
 
   return String(result.url ?? "");
+}
+
+// Config cũ chưa có agendaItems: web tự lấy nhãn câu hỏi đang bật, không có thì lấy headline/motto/organizer.
+function getLegacyAgendaItems(config: FormTemplateConfig): string[] {
+  const questionLabels = config.questions
+    .map((question, index) => ({ enabled: question.enabled, label: question.label.trim() || `Câu hỏi ${index + 1}` }))
+    .filter((question) => question.enabled)
+    .map((question) => question.label);
+  const fallbackItems = [config.infoEvent.headline, config.infoEvent.motto, config.infoEvent.organizerText]
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return (questionLabels.length ? questionLabels : fallbackItems).slice(0, LEGACY_AGENDA_ITEMS_LIMIT);
 }
 
 function normalizePublicPath(currentTemplateSlug: string) {
@@ -182,99 +245,157 @@ function buildPublicUrl(pathOrUrl: string, baseUrl?: string) {
   }
 }
 
-function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="border-border/70 bg-background/85 rounded-2xl border p-4 shadow-sm">
-      <div className="text-muted-foreground text-[11px] font-medium tracking-[0.16em] uppercase">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
-      <p className="text-muted-foreground mt-1 text-sm leading-5">{hint}</p>
-    </div>
-  );
+// <input type="color"> chỉ nhận #rrggbb; các giá trị rgba(...) vẫn giữ nguyên trong ô text bên cạnh.
+function toColorInputValue(value: string) {
+  const trimmed = value.trim();
+
+  if (/^#[\da-f]{6}$/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^#[\da-f]{3}$/i.test(trimmed)) {
+    return `#${[...trimmed.slice(1)].map((char) => char + char).join("")}`;
+  }
+
+  return "#000000";
 }
 
-function SectionCard({
+function Section({
   title,
   description,
   icon: Icon,
+  action,
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   icon: React.ComponentType<{ className?: string }>;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <Card className="border-border/70 bg-background/95 shadow-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <span className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-xl">
-            <Icon className="size-4" />
-          </span>
-          <span>{title}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <section className="bg-card text-card-foreground rounded-xl border shadow-xs">
+      <div className="flex items-start gap-3 border-b px-5 py-4">
+        <span className="bg-primary/10 text-primary mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[15px] leading-6 font-semibold">{title}</h2>
+          {description ? <p className="text-muted-foreground text-sm leading-5">{description}</p> : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
   );
 }
 
-function ColorInput({
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-foreground mb-3 text-sm font-semibold">{children}</h3>;
+}
+
+function Field({
   label,
-  value,
-  onChange,
+  hint,
+  className,
+  children,
 }: {
   label: string;
-  value: string;
-  onChange: (nextValue: string) => void;
+  hint?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="border-border/70 bg-card flex items-center gap-3 rounded-xl border p-3">
-        <input
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="border-border/70 h-11 w-14 cursor-pointer rounded-lg border bg-transparent"
-        />
-        <Input value={value} onChange={(event) => onChange(event.target.value)} className="font-mono text-sm" />
-      </div>
+    <div className={cn("space-y-1.5", className)}>
+      <Label className="text-foreground">{label}</Label>
+      {children}
+      {hint ? <p className="text-muted-foreground text-xs leading-5">{hint}</p> : null}
     </div>
   );
 }
 
-function ToggleField({
+function InlineSwitch({
   label,
   checked,
   onChange,
-  description,
+  disabled,
 }: {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
-  description?: string;
+  disabled?: boolean;
 }) {
+  const id = React.useId();
+
   return (
-    <div className="border-border/70 bg-card flex items-start justify-between gap-4 rounded-xl border p-3">
-      <div className="space-y-1">
-        <Label className="text-sm">{label}</Label>
-        {description ? <p className="text-muted-foreground text-xs leading-5">{description}</p> : null}
-      </div>
-      <Switch checked={checked} onCheckedChange={onChange} />
+    <div className="flex items-center gap-2">
+      <Switch id={id} checked={checked} onCheckedChange={onChange} disabled={disabled} />
+      <Label htmlFor={id} className={disabled ? undefined : "cursor-pointer"}>
+        {label}
+      </Label>
     </div>
   );
 }
 
-function ImageUploadField({
+function StatusBadge({ status }: { status: LadipageStatus }) {
+  if (status === "published") {
+    return (
+      <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
+        Đã xuất bản
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline" className="bg-muted">
+      {status === "archived" ? "Lưu trữ" : "Nháp"}
+    </Badge>
+  );
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-foreground">{label}</Label>
+      <div className="border-input focus-within:border-ring focus-within:ring-ring/50 dark:bg-input/30 flex h-9 items-center gap-2 rounded-md border pr-2 pl-1.5 shadow-xs transition-[color,box-shadow] focus-within:ring-[3px]">
+        <span
+          className="relative size-6 shrink-0 overflow-hidden rounded-[5px] border shadow-xs"
+          style={{ backgroundColor: value }}
+        >
+          <input
+            type="color"
+            aria-label={`Chọn ${label.toLowerCase()}`}
+            value={toColorInputValue(value)}
+            onChange={(event) => onChange(event.target.value)}
+            className="absolute inset-0 size-full cursor-pointer opacity-0"
+          />
+        </span>
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-label={label}
+          spellCheck={false}
+          className="min-w-0 flex-1 bg-transparent font-mono text-xs outline-none"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ImageField({
   label,
   value,
   onChange,
-  description,
+  hint,
+  layout = "row",
+  previewClassName = "size-20",
 }: {
   label: string;
   value: string;
   onChange: (url: string) => void;
-  description?: string;
+  hint?: string;
+  layout?: "row" | "stack";
+  previewClassName?: string;
 }) {
   const inputReference = React.useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -300,7 +421,7 @@ function ImageUploadField({
       setIsUploading(true);
       const url = await uploadEventImage(file);
       onChange(url);
-      toast.success(`Đã tải ${label.toLowerCase()} lên thư mục events`);
+      toast.success(`Đã tải ${label.toLowerCase()} lên`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : `Không thể tải ${label.toLowerCase()}`);
     } finally {
@@ -313,38 +434,29 @@ function ImageUploadField({
   }
 
   return (
-    <div className="border-border/70 bg-card rounded-2xl border p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <Label className="text-sm font-medium">{label}</Label>
-          <p className="text-muted-foreground text-xs leading-5">
-            {description ?? "Ảnh sẽ được lưu vào thư mục public/upload/events."}
-          </p>
-        </div>
-        <Badge variant="outline">upload/events</Badge>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4">
-        <div className="border-border/70 bg-muted/30 overflow-hidden rounded-2xl border border-dashed">
+    <div className="min-w-0 space-y-1.5">
+      <Label className="text-foreground">{label}</Label>
+      <div className={layout === "stack" ? "space-y-2" : "flex items-start gap-3"}>
+        <div
+          className={cn(
+            "bg-muted/60 text-muted-foreground flex shrink-0 items-center justify-center overflow-hidden rounded-lg border",
+            previewClassName,
+          )}
+        >
           {value ? (
-            <div className="bg-muted/20 flex aspect-[21/9] items-center justify-center">
-              <img src={value} alt={label} className="h-full w-full object-contain" />
-            </div>
+            <img src={value} alt={label} className="size-full object-contain" />
           ) : (
-            <div className="text-muted-foreground flex aspect-[16/9] flex-col items-center justify-center gap-2 text-center text-xs">
-              <ImageIcon className="size-6" />
-              <span>Chưa có ảnh</span>
-            </div>
+            <ImageIcon className="size-5" />
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="min-w-0 flex-1 space-y-2">
           <Input
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder={EVENT_IMAGE_PLACEHOLDER}
+            placeholder="/upload/events/ten-anh.jpg"
+            className="font-mono text-xs"
           />
-
           <div className="flex flex-wrap gap-2">
             <input
               ref={inputReference}
@@ -353,31 +465,142 @@ function ImageUploadField({
               className="hidden"
               onChange={(event) => void handleUpload(event.target.files)}
             />
-
             <Button
               type="button"
+              size="sm"
               variant="outline"
               disabled={isUploading}
               onClick={() => inputReference.current?.click()}
             >
-              {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {isUploading ? "Đang tải..." : "Tải ảnh"}
+              {isUploading ? <Loader2 className="animate-spin" /> : <Upload />}
+              {isUploading ? "Đang tải..." : value ? "Đổi ảnh" : "Tải ảnh"}
             </Button>
-
             {value ? (
-              <Button type="button" variant="ghost" disabled={isUploading} onClick={() => onChange("")}>
-                <X className="size-4" />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={isUploading}
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => onChange("")}
+              >
+                <X />
                 Xóa
               </Button>
             ) : null}
           </div>
         </div>
       </div>
+      {hint ? <p className="text-muted-foreground text-xs leading-5">{hint}</p> : null}
     </div>
   );
 }
 
-function DefaultFieldEditor({
+function FieldTypeSelect({ value, onChange }: { value: FieldType; onChange: (type: FieldType) => void }) {
+  return (
+    <Select value={value} onValueChange={(type: FieldType) => onChange(type)}>
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {(Object.keys(questionTypeLabels) as FieldType[]).map((type) => (
+          <SelectItem key={type} value={type}>
+            {questionTypeLabels[type]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Giữ text thô ở state riêng: nếu lọc dòng trống ngay khi gõ thì phím Enter bị "nuốt" và không thêm được lựa chọn mới.
+function OptionsTextarea({ options, onChange }: { options: string[]; onChange: (options: string[]) => void }) {
+  const [text, setText] = React.useState(() => options.join("\n"));
+
+  return (
+    <Textarea
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        onChange(
+          event.target.value
+            .split("\n")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        );
+      }}
+      placeholder={"Lựa chọn 1\nLựa chọn 2\nLựa chọn 3"}
+      rows={4}
+    />
+  );
+}
+
+function AgendaItemsEditor({
+  items,
+  isLegacy,
+  onChange,
+}: {
+  items: string[];
+  isLegacy: boolean;
+  onChange: (items: string[]) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {isLegacy && items.length ? (
+        <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+          Sự kiện này chưa có danh sách riêng nên trang public đang tự lấy nhãn câu hỏi bổ sung. Sửa, thêm hoặc xóa một
+          dòng bất kỳ để cố định nội dung.
+        </p>
+      ) : null}
+
+      {items.length ? (
+        items.map((item, index) => (
+          <div key={`agenda-item-${index + 1}`} className="flex items-start gap-3">
+            <span className="bg-primary text-primary-foreground mt-1 flex h-7 w-9 shrink-0 items-center justify-center rounded-md text-xs font-bold tabular-nums">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <Textarea
+              value={item}
+              onChange={(event) =>
+                onChange(items.map((current, itemIndex) => (itemIndex === index ? event.target.value : current)))
+              }
+              placeholder="Ví dụ: Cập nhật cơ chế lão hoá nội sinh"
+              rows={1}
+              className="min-h-9 resize-none py-1.5"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Xóa dòng ${index + 1}`}
+              className="text-muted-foreground hover:text-destructive shrink-0"
+              onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ))
+      ) : (
+        <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm">
+          Chưa có dòng nào, khối đánh số sẽ được ẩn trên trang public.
+        </p>
+      )}
+
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={items.length >= MAX_AGENDA_ITEMS}
+        onClick={() => onChange([...items, ""])}
+      >
+        <Plus />
+        Thêm dòng ({items.length}/{MAX_AGENDA_ITEMS})
+      </Button>
+    </div>
+  );
+}
+
+function DefaultFieldRow({
   title,
   field,
   onChange,
@@ -387,43 +610,39 @@ function DefaultFieldEditor({
   onChange: (patch: Partial<DefaultFieldConfig>) => void;
 }) {
   return (
-    <div className="border-border/70 bg-card rounded-2xl border p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h4 className="font-medium">{title}</h4>
-          <p className="text-muted-foreground text-xs leading-5">Chỉnh hiển thị, bắt buộc và nội dung gợi ý.</p>
-        </div>
-        <Badge variant={field.enabled ? "default" : "secondary"}>{field.enabled ? "Đang bật" : "Đang tắt"}</Badge>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Nhãn hiển thị</Label>
-          <Input value={field.label} onChange={(event) => onChange({ label: event.target.value })} />
-        </div>
-        <div className="space-y-2">
-          <Label>Placeholder</Label>
-          <Input value={field.placeholder} onChange={(event) => onChange({ placeholder: event.target.value })} />
+    <div className={cn("rounded-lg border", field.enabled ? "bg-card" : "bg-muted/50")}>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
+        <span className={cn("font-medium", !field.enabled && "text-muted-foreground")}>{title}</span>
+        <div className="flex items-center gap-5">
+          <InlineSwitch label="Hiển thị" checked={field.enabled} onChange={(value) => onChange({ enabled: value })} />
+          <InlineSwitch
+            label="Bắt buộc"
+            checked={field.required}
+            disabled={!field.enabled}
+            onChange={(value) => onChange({ required: value })}
+          />
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <ToggleField
-          label="Hiển thị field"
-          checked={field.enabled}
-          onChange={(value) => onChange({ enabled: value })}
-        />
-        <ToggleField
-          label="Bắt buộc nhập"
-          checked={field.required}
-          onChange={(value) => onChange({ required: value })}
-        />
-      </div>
+      {field.enabled ? (
+        <div className="grid gap-3 border-t px-4 py-4 sm:grid-cols-2">
+          <Field label="Nhãn hiển thị">
+            <Input value={field.label} onChange={(event) => onChange({ label: event.target.value })} />
+          </Field>
+          <Field label="Placeholder">
+            <Input
+              value={field.placeholder}
+              onChange={(event) => onChange({ placeholder: event.target.value })}
+              placeholder="Để trống sẽ dùng gợi ý mặc định"
+            />
+          </Field>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function QuestionEditor({
+function QuestionItem({
   index,
   question,
   onChange,
@@ -433,177 +652,155 @@ function QuestionEditor({
   onChange: (patch: Partial<QuestionConfig>) => void;
 }) {
   return (
-    <div className="border-border/70 bg-card rounded-2xl border p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium">Câu hỏi {index + 1}</h4>
-            <Badge variant={question.enabled ? "default" : "secondary"}>
-              {question.enabled ? questionTypeLabels[question.type] : "Đang tắt"}
-            </Badge>
-          </div>
-          <p className="text-muted-foreground text-xs leading-5">
-            Bật câu hỏi khi cần thêm dữ liệu ngoài các field mặc định.
-          </p>
+    <div className={cn("rounded-lg border", question.enabled ? "bg-card" : "bg-muted/50")}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className={cn("truncate font-medium", !question.enabled && "text-muted-foreground")}>
+            {question.label.trim() || `Câu hỏi ${index + 1}`}
+          </span>
+          {question.enabled ? <Badge variant="outline">{questionTypeLabels[question.type]}</Badge> : null}
+          {question.enabled && question.required ? <Badge variant="outline">Bắt buộc</Badge> : null}
         </div>
-        <Switch checked={question.enabled} onCheckedChange={(value) => onChange({ enabled: value })} />
+        <Switch
+          checked={question.enabled}
+          onCheckedChange={(value) => onChange({ enabled: value })}
+          aria-label={`Bật câu hỏi ${index + 1}`}
+        />
       </div>
 
       {question.enabled ? (
-        <div className="mt-4 space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Nhãn câu hỏi</Label>
-              <Input
-                value={question.label}
-                onChange={(event) => onChange({ label: event.target.value })}
-                placeholder="Ví dụ: Bạn quan tâm nội dung nào?"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Loại input</Label>
-              <Select value={question.type} onValueChange={(type: FieldType) => onChange({ type })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="textarea">Textarea</SelectItem>
-                  <SelectItem value="select">Dropdown</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="tel">Số điện thoại</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Placeholder</Label>
-              <Input
-                value={question.placeholder ?? ""}
-                onChange={(event) => onChange({ placeholder: event.target.value })}
-                placeholder="Nhập nội dung gợi ý..."
-              />
-            </div>
-          </div>
-
-          <ToggleField
-            label="Bắt buộc trả lời"
-            checked={question.required}
-            onChange={(value) => onChange({ required: value })}
-          />
-
+        <div className="grid gap-3 border-t px-4 py-4 sm:grid-cols-2">
+          <Field label="Nhãn câu hỏi" className="sm:col-span-2">
+            <Input
+              value={question.label}
+              onChange={(event) => onChange({ label: event.target.value })}
+              placeholder="Ví dụ: Bạn quan tâm nội dung nào?"
+            />
+          </Field>
+          <Field label="Loại input">
+            <FieldTypeSelect value={question.type} onChange={(type) => onChange({ type })} />
+          </Field>
+          <Field label="Placeholder">
+            <Input
+              value={question.placeholder ?? ""}
+              onChange={(event) => onChange({ placeholder: event.target.value })}
+              placeholder="Ví dụ: Nhập câu trả lời..."
+            />
+          </Field>
           {question.type === "select" ? (
-            <div className="space-y-2">
-              <Label>Tùy chọn dropdown</Label>
-              <Textarea
-                value={(question.options ?? []).join("\n")}
-                onChange={(event) =>
-                  onChange({
-                    options: event.target.value
-                      .split("\n")
-                      .map((item) => item.trim())
-                      .filter(Boolean),
-                  })
-                }
-                placeholder={"Lựa chọn 1\nLựa chọn 2\nLựa chọn 3"}
-                rows={4}
-              />
-            </div>
+            <Field label="Các lựa chọn" hint="Mỗi dòng là một lựa chọn." className="sm:col-span-2">
+              <OptionsTextarea options={question.options ?? []} onChange={(options) => onChange({ options })} />
+            </Field>
           ) : null}
-        </div>
-      ) : (
-        <div className="text-muted-foreground border-border/70 bg-muted/20 mt-4 rounded-xl border border-dashed px-4 py-3 text-sm">
-          Câu hỏi đang tắt. Bật lên để nhập label, placeholder và loại input.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AdditionalFieldEditor({
-  title,
-  field,
-  onChange,
-}: {
-  title: string;
-  field: FormTemplateConfig["fields"]["hidden"][HiddenFieldKey];
-  onChange: (patch: Partial<FormTemplateConfig["fields"]["hidden"][HiddenFieldKey]>) => void;
-}) {
-  const fieldType = field.type ?? "text";
-
-  return (
-    <div className="border-border/70 bg-card rounded-2xl border p-4 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 className="font-medium">{field.label?.trim() ? field.label : title}</h4>
-          <p className="text-muted-foreground text-xs leading-5">
-            Bat field de submit kem du lieu. Bat hien thi neu muon nguoi dung nhap tren form.
-          </p>
-        </div>
-        <Badge variant={field.enabled ? "default" : "secondary"}>{field.enabled ? "Dang bat" : "Dang tat"}</Badge>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <ToggleField label="Luu field nay" checked={field.enabled} onChange={(value) => onChange({ enabled: value })} />
-        <ToggleField
-          label="Hien thi tren form"
-          checked={Boolean(field.visible)}
-          onChange={(value) => onChange({ visible: value })}
-        />
-        <ToggleField
-          label="Bat buoc nhap"
-          checked={Boolean(field.required)}
-          onChange={(value) => onChange({ required: value })}
-        />
-        <div className="space-y-2">
-          <Label>Loai input</Label>
-          <Select value={fieldType} onValueChange={(type: FieldType) => onChange({ type })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="text">Text</SelectItem>
-              <SelectItem value="textarea">Textarea</SelectItem>
-              <SelectItem value="select">Dropdown</SelectItem>
-              <SelectItem value="email">Email</SelectItem>
-              <SelectItem value="tel">So dien thoai</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Label</Label>
-          <Input
-            value={field.label ?? ""}
-            onChange={(event) => onChange({ label: event.target.value })}
-            placeholder={title}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Placeholder</Label>
-          <Input value={field.placeholder ?? ""} onChange={(event) => onChange({ placeholder: event.target.value })} />
-        </div>
-      </div>
-
-      {fieldType === "select" ? (
-        <div className="mt-3 space-y-2">
-          <Label>Tuy chon dropdown</Label>
-          <Textarea
-            value={(field.options ?? []).join("\n")}
-            onChange={(event) =>
-              onChange({
-                options: event.target.value
-                  .split("\n")
-                  .map((item) => item.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder={"Lua chon 1\nLua chon 2\nLua chon 3"}
-            rows={4}
-          />
+          <div className="sm:col-span-2">
+            <InlineSwitch
+              label="Bắt buộc trả lời"
+              checked={question.required}
+              onChange={(value) => onChange({ required: value })}
+            />
+          </div>
         </div>
       ) : null}
     </div>
   );
 }
+
+function HiddenFieldItem({
+  fieldKey,
+  field,
+  onChange,
+}: {
+  fieldKey: HiddenFieldKey;
+  field: HiddenFieldConfig;
+  onChange: (patch: Partial<HiddenFieldConfig>) => void;
+}) {
+  const fieldType = field.type ?? "text";
+  const isShownOnForm = field.enabled && Boolean(field.visible);
+
+  return (
+    <div className={cn("rounded-lg border", field.enabled ? "bg-card" : "bg-muted/50")}>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={cn("truncate font-medium", !field.enabled && "text-muted-foreground")}>
+            {field.label?.trim() ? field.label : hiddenFieldLabels[fieldKey]}
+          </span>
+          <code className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">{fieldKey}</code>
+        </div>
+        <div className="flex items-center gap-5">
+          <InlineSwitch
+            label="Lưu dữ liệu"
+            checked={field.enabled}
+            onChange={(value) => onChange({ enabled: value })}
+          />
+          <InlineSwitch
+            label="Hiện trên form"
+            checked={Boolean(field.visible)}
+            disabled={!field.enabled}
+            onChange={(value) => onChange({ visible: value })}
+          />
+        </div>
+      </div>
+
+      {isShownOnForm ? (
+        <div className="grid gap-3 border-t px-4 py-4 sm:grid-cols-2">
+          <Field label="Nhãn hiển thị">
+            <Input
+              value={field.label ?? ""}
+              onChange={(event) => onChange({ label: event.target.value })}
+              placeholder={hiddenFieldLabels[fieldKey]}
+            />
+          </Field>
+          <Field label="Placeholder">
+            <Input
+              value={field.placeholder ?? ""}
+              onChange={(event) => onChange({ placeholder: event.target.value })}
+            />
+          </Field>
+          <Field label="Loại input">
+            <FieldTypeSelect value={fieldType} onChange={(type) => onChange({ type })} />
+          </Field>
+          <div className="flex items-end pb-2">
+            <InlineSwitch
+              label="Bắt buộc nhập"
+              checked={Boolean(field.required)}
+              onChange={(value) => onChange({ required: value })}
+            />
+          </div>
+          {fieldType === "select" ? (
+            <Field label="Các lựa chọn" hint="Mỗi dòng là một lựa chọn." className="sm:col-span-2">
+              <OptionsTextarea options={field.options ?? []} onChange={(options) => onChange({ options })} />
+            </Field>
+          ) : null}
+        </div>
+      ) : field.enabled ? (
+        <p className="text-muted-foreground border-t px-4 py-2.5 text-xs leading-5">
+          Không hiện trên form, giá trị được tự điền từ tham số trên đường dẫn (xem tab Tích hợp).
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function SummaryRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+      <dt className="text-muted-foreground w-16 shrink-0">{label}</dt>
+      <dd className={cn("min-w-0 break-words", value ? "font-medium" : "text-muted-foreground italic")}>
+        {value || "Chưa nhập"}
+      </dd>
+    </div>
+  );
+}
+
 export default function AdminTemplateEditor({
   slug,
   initialName,
@@ -618,7 +815,7 @@ export default function AdminTemplateEditor({
   initialName: string;
   initialConfig: FormTemplateConfig;
   /** Trạng thái hiện tại của Ladipage, để hiện đúng nhãn xuất bản. */
-  initialStatus?: "draft" | "published" | "archived";
+  initialStatus?: LadipageStatus;
   editorTitle?: string;
   publicBaseUrl?: string;
   publicPath?: string;
@@ -630,10 +827,16 @@ export default function AdminTemplateEditor({
   const [status, setStatus] = React.useState(initialStatus);
   const [templateSlug, setTemplateSlug] = React.useState(slug);
   const [currentSlug, setCurrentSlug] = React.useState(slug);
+  const [savedSnapshot, setSavedSnapshot] = React.useState(() => JSON.stringify({ config: initialConfig, slug }));
 
   const update = React.useCallback((patch: Partial<FormTemplateConfig>) => {
     setConfig((current) => ({ ...current, ...patch }));
   }, []);
+
+  const isDirty = React.useMemo(
+    () => JSON.stringify({ config, slug: templateSlug }) !== savedSnapshot,
+    [config, savedSnapshot, templateSlug],
+  );
 
   // Đường dẫn public do slug quyết định; chỉ giữ publicPath cũ khi nó được đặt tay khác mặc định.
   const resolvedPublicPath = React.useMemo(() => {
@@ -644,69 +847,36 @@ export default function AdminTemplateEditor({
     () => buildPublicUrl(resolvedPublicPath, publicBaseUrl),
     [publicBaseUrl, resolvedPublicPath],
   );
-  const visibleDefaultFieldsCount = React.useMemo(
-    () => [config.fields.full_name, config.fields.phone, config.fields.email].filter((field) => field.enabled).length,
-    [config.fields.email, config.fields.full_name, config.fields.phone],
-  );
-  const enabledQuestions = React.useMemo(
-    () => config.questions.slice(0, 5).filter((question) => question.enabled),
-    [config.questions],
-  );
-  const enabledQuestionsCount = enabledQuestions.length;
-  const requiredInputCount = React.useMemo(() => {
-    const requiredBaseFields = [config.fields.full_name, config.fields.phone, config.fields.email].filter(
-      (field) => field.enabled && field.required,
-    ).length;
-    const requiredQuestions = enabledQuestions.filter((question) => question.required).length;
-    return requiredBaseFields + requiredQuestions;
-  }, [config.fields.email, config.fields.full_name, config.fields.phone, enabledQuestions]);
-  const mediaCount = React.useMemo(
-    () =>
-      [
-        config.header.headingImageUrl,
-        config.infoEvent.logo1Url,
-        config.infoEvent.logo2Url,
-        config.infoEvent.logo3Url,
-      ].filter((value) => value?.trim()).length,
-    [config.header.headingImageUrl, config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url],
-  );
-  const themeSwatches = React.useMemo(
-    () =>
-      [
-        { label: "Primary", color: config.theme.primary },
-        { label: "Primary 2", color: config.theme.primary2 },
-        { label: "Text", color: config.theme.text },
-        { label: "Muted", color: config.theme.muted },
-        { label: "Background", color: config.theme.bg },
-        { label: "Card", color: config.theme.card },
-        { label: "Ring", color: config.theme.ring },
-        { label: "Footer from", color: config.footer.gradientFrom },
-        { label: "Footer to", color: config.footer.gradientTo },
-      ].map((entry, index, items) => ({
-        ...entry,
-        key: `swatch-${entry.color}-${items.slice(0, index).filter((item) => item.color === entry.color).length}`,
-      })),
-    [
-      config.footer.gradientFrom,
-      config.footer.gradientTo,
-      config.theme.bg,
-      config.theme.card,
-      config.theme.muted,
-      config.theme.primary,
-      config.theme.primary2,
-      config.theme.ring,
-      config.theme.text,
-    ],
-  );
-  const visibleFieldLabels = React.useMemo(
-    () =>
-      [config.fields.full_name, config.fields.phone, config.fields.email]
+  const hasSlug = templateSlug.trim() !== "";
+
+  const currentTemplateStyle = config.templateStyle ?? "default";
+  const copy = templateCopy[currentTemplateStyle] ?? templateCopy.default;
+  const isStarry = currentTemplateStyle === "starry";
+  const isLegacyAgenda = config.infoEvent.agendaItems === undefined;
+  const agendaItems = React.useMemo(() => config.infoEvent.agendaItems ?? getLegacyAgendaItems(config), [config]);
+  const enabledQuestionsCount = config.questions.slice(0, MAX_QUESTIONS).filter((question) => question.enabled).length;
+
+  // Cùng thứ tự với form trên web: trường mặc định → trường bổ sung đang hiện → câu hỏi.
+  const formFieldLabels = React.useMemo(
+    () => [
+      ...[config.fields.full_name, config.fields.phone, config.fields.email]
         .filter((field) => field.enabled)
         .map((field) => field.label),
-    [config.fields.email, config.fields.full_name, config.fields.phone],
+      ...HIDDEN_FIELD_KEYS.filter((key) => config.fields.hidden[key].enabled && config.fields.hidden[key].visible).map(
+        (key) => (config.fields.hidden[key].label ?? "").trim() || hiddenFieldLabels[key],
+      ),
+      ...config.questions
+        .slice(0, MAX_QUESTIONS)
+        .map((question, index) => (question.enabled ? question.label.trim() || `Câu hỏi ${index + 1}` : ""))
+        .filter(Boolean),
+    ],
+    [config.fields, config.questions],
   );
-  const currentTemplateStyle = config.templateStyle ?? "default";
-  const currentTemplateCopy = templateEditorCopy[currentTemplateStyle] ?? templateEditorCopy.default;
+  const summarySwatches = [
+    ...copy.themeTokens.map((token) => ({ label: token.label, color: config.theme[token.key] })),
+    { label: "Footer - màu đầu", color: config.footer.gradientFrom },
+    { label: "Footer - màu cuối", color: config.footer.gradientTo },
+  ];
 
   const applyTemplateStyle = React.useCallback(
     (templateStyle: TemplateStyle) => {
@@ -726,36 +896,37 @@ export default function AdminTemplateEditor({
     [config.footer, update],
   );
 
-  const updateDefaultField = React.useCallback(
-    (fieldKey: "full_name" | "phone" | "email", patch: Partial<DefaultFieldConfig>) => {
-      update({
-        fields: {
-          ...config.fields,
-          [fieldKey]: {
-            ...config.fields[fieldKey],
-            ...patch,
-          },
-        },
-      });
-    },
-    [config.fields, update],
-  );
+  const updateHeader = (patch: Partial<FormTemplateConfig["header"]>) =>
+    update({ header: { ...config.header, ...patch } });
+  const updateInfoEvent = (patch: Partial<InfoEventConfig>) => update({ infoEvent: { ...config.infoEvent, ...patch } });
+  const updateFooter = (patch: Partial<FormTemplateConfig["footer"]>) =>
+    update({ footer: { ...config.footer, ...patch } });
+  const updateBehavior = (patch: Partial<FormTemplateConfig["behavior"]>) =>
+    update({ behavior: { ...config.behavior, ...patch } });
 
-  const updateQuestion = React.useCallback(
-    (index: number, patch: Partial<QuestionConfig>) => {
-      const nextQuestions = [...config.questions];
-      nextQuestions[index] = { ...nextQuestions[index], ...patch };
-      update({ questions: nextQuestions });
-    },
-    [config.questions, update],
-  );
+  const updateDefaultField = (fieldKey: "full_name" | "phone" | "email", patch: Partial<DefaultFieldConfig>) =>
+    update({ fields: { ...config.fields, [fieldKey]: { ...config.fields[fieldKey], ...patch } } });
+
+  const updateHiddenField = (fieldKey: HiddenFieldKey, patch: Partial<HiddenFieldConfig>) =>
+    update({
+      fields: {
+        ...config.fields,
+        hidden: { ...config.fields.hidden, [fieldKey]: { ...config.fields.hidden[fieldKey], ...patch } },
+      },
+    });
+
+  const updateQuestion = (index: number, patch: Partial<QuestionConfig>) => {
+    const nextQuestions = [...config.questions];
+    nextQuestions[index] = { ...nextQuestions[index], ...patch };
+    update({ questions: nextQuestions });
+  };
 
   async function handleCopyPublicUrl() {
     try {
       await navigator.clipboard.writeText(publicUrl);
-      toast.success("Đã sao chép URL website hiển thị.");
+      toast.success("Đã sao chép URL trang public.");
     } catch {
-      toast.error("Không thể sao chép URL website hiển thị.");
+      toast.error("Không thể sao chép URL trang public.");
     }
   }
 
@@ -773,6 +944,7 @@ export default function AdminTemplateEditor({
       setCurrentSlug(nextSlug);
       setTemplateSlug(nextSlug);
       setStatus(result.status);
+      setSavedSnapshot(JSON.stringify({ config, slug: nextSlug }));
 
       const normalizedRedirectBasePath = redirectToEditBasePath?.trim();
 
@@ -795,861 +967,645 @@ export default function AdminTemplateEditor({
     }
   }
 
+  const tabTriggerClassName =
+    "text-foreground/70 hover:text-foreground data-[state=active]:text-foreground data-[state=active]:border-border h-8 flex-1 px-2 sm:flex-none sm:px-3 max-sm:[&_svg]:hidden";
+
   return (
-    <div className="bg-muted/20 min-h-screen">
-      <div className="border-border/70 bg-background/90 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <div className="space-y-2">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{editorTitle ?? "Chỉnh sửa Ladipage sự kiện"}</h1>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{templateStyleLabels[currentTemplateStyle]}</Badge>
-              <Badge variant={status === "published" ? "default" : "secondary"}>
-                {status === "published" ? "Đã xuất bản" : status === "archived" ? "Lưu trữ" : "Nháp"}
-              </Badge>
+    // Bù lại padding của layout để nền xám và thanh tiêu đề phủ kín vùng nội dung.
+    <div className="ladipage-editor bg-muted dark:bg-background -m-4 min-h-[calc(100svh-3rem)] md:-m-6">
+      <header className="bg-background/95 supports-[backdrop-filter]:bg-background/85 top-0 z-20 border-b backdrop-blur md:sticky [header[data-navbar-style=sticky]~div_&]:top-12">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-1">
+            {redirectToEditBasePath ? (
+              <Link
+                href={redirectToEditBasePath}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium"
+              >
+                <ArrowLeft className="size-3.5" />
+                Ladipage sự kiện
+              </Link>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {config.behavior.eventName.trim() || (editorTitle ?? initialName)}
+              </h1>
+              <StatusBadge status={status} />
+              {isDirty ? (
+                <Badge className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
+                  Chưa lưu thay đổi
+                </Badge>
+              ) : null}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {publicUrl ? (
-              <Button type="button" variant="outline" asChild>
+            {hasSlug ? (
+              <Button type="button" variant="ghost" asChild>
                 <a href={publicUrl} target="_blank" rel="noreferrer">
-                  <Link2 className="size-4" />
-                  Mở public
+                  <ExternalLink />
+                  <span className="max-sm:sr-only">Xem trang</span>
                 </a>
               </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={() => void handleCopyPublicUrl()}>
-              <Copy className="size-4" />
-              Sao chép URL
-            </Button>
             <Button type="button" variant="outline" onClick={() => void onSave(false)} disabled={saving !== null}>
-              {saving === "draft" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {saving === "draft" ? <Loader2 className="animate-spin" /> : <Save />}
               {saving === "draft" ? "Đang lưu..." : "Lưu nháp"}
             </Button>
             <Button type="button" onClick={() => void onSave(true)} disabled={saving !== null}>
-              {saving === "publish" ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+              {saving === "publish" ? <Loader2 className="animate-spin" /> : <Rocket />}
               {saving === "publish" ? "Đang xuất bản..." : status === "published" ? "Cập nhật bản public" : "Xuất bản"}
             </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-[1600px] px-4 py-2 lg:px-6 lg:py-6">
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0">
-            <Tabs defaultValue="general" className="space-y-5">
-              <TabsList className="border-border/70 bg-background h-auto w-full flex-wrap justify-start rounded-2xl border p-1">
-                <TabsTrigger value="general" className="rounded-xl px-4 py-2.5">
-                  <Sparkles className="size-4" />
-                  Tổng quan
-                </TabsTrigger>
-                <TabsTrigger value="form" className="rounded-xl px-4 py-2.5">
-                  <FormInput className="size-4" />
-                  Form
-                </TabsTrigger>
-                <TabsTrigger value="footer" className="rounded-xl px-4 py-2.5">
-                  <FileText className="size-4" />
-                  Thông tin
-                </TabsTrigger>
-              </TabsList>
+      <div className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 md:px-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Tabs defaultValue="general" className="min-w-0 gap-5">
+          <TabsList className="bg-muted h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg border p-1 sm:w-fit">
+            <TabsTrigger value="general" className={tabTriggerClassName}>
+              <Settings2 />
+              Chung
+            </TabsTrigger>
+            <TabsTrigger value="content" className={tabTriggerClassName}>
+              <FileText />
+              Nội dung
+            </TabsTrigger>
+            <TabsTrigger value="form" className={tabTriggerClassName}>
+              <FormInput />
+              Form
+            </TabsTrigger>
+            <TabsTrigger value="integration" className={tabTriggerClassName}>
+              <Plug />
+              Tích hợp
+            </TabsTrigger>
+          </TabsList>
 
-              <TabsContent value="general" className="space-y-5">
-                <Accordion type="multiple" defaultValue={["identity", "hero", "theme"]} className="space-y-4">
-                  <AccordionItem value="identity" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Nhận diện & xuất bản</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Thông tin ladipage"
-                        description="Tên sự kiện, slug và template là các thông tin chính khi triển khai landing page."
-                        icon={Globe}
-                      >
-                        <div className="grid gap-4 lg:grid-cols-12">
-                          <div className="space-y-2 lg:col-span-8">
-                            <Label>Tên sự kiện</Label>
-                            <Input
-                              value={config.behavior.eventName}
-                              onChange={(event) => {
-                                const eventName = event.target.value;
-                                const shouldSyncTitle =
-                                  !config.header.titleText.trim() ||
-                                  config.header.titleText.trim() === config.behavior.eventName.trim();
+          <TabsContent value="general" className="space-y-5">
+            <Section title="Thông tin trang" description="Tên sự kiện, template và đường dẫn public." icon={Globe}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Tên sự kiện" className="md:col-span-2">
+                  <Input
+                    value={config.behavior.eventName}
+                    onChange={(event) => {
+                      const eventName = event.target.value;
+                      const shouldSyncTitle =
+                        !config.header.titleText.trim() ||
+                        config.header.titleText.trim() === config.behavior.eventName.trim();
 
-                                update({
-                                  behavior: { ...config.behavior, eventName },
-                                  header: {
-                                    ...config.header,
-                                    titleText: shouldSyncTitle ? eventName : config.header.titleText,
-                                  },
-                                });
-                              }}
-                              placeholder="Ví dụ: Check in sự kiện EAC Summit"
-                            />
-                          </div>
-                          <div className="space-y-2 lg:col-span-4">
-                            <Label>Template Ladipage</Label>
-                            <Select
-                              value={currentTemplateStyle}
-                              onValueChange={(value: TemplateStyle) => applyTemplateStyle(value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Chọn template" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="default">Template 1</SelectItem>
-                                <SelectItem value="starry">Template 2</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2 lg:col-span-4">
-                            <Label>Slug trang</Label>
-                            <Input
-                              value={templateSlug}
-                              onChange={(event) => setTemplateSlug(event.target.value)}
-                              placeholder="eac-checkin"
-                            />
-                          </div>
-                          <div className="space-y-2 lg:col-span-8">
-                            <Label>URL website hiển thị</Label>
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                              <Input value={publicUrl} readOnly className="font-mono text-sm" />
-                              <Button type="button" variant="outline" onClick={() => void handleCopyPublicUrl()}>
-                                <Copy className="size-4" />
-                                Sao chép
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="hero" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Hero, heading và media</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-                        <ImageUploadField
-                          label="Ảnh heading"
-                          value={config.header.headingImageUrl}
-                          onChange={(url) => update({ header: { ...config.header, headingImageUrl: url } })}
-                        />
-
-                        <SectionCard
-                          title="Nội dung hero"
-                          description="Những text này xuất hiện ngay phần đầu landing page, cần ngắn và rõ."
-                          icon={Type}
-                        >
-                          <div className="grid gap-4">
-                            <div className="space-y-2">
-                              <Label>Alt text cho ảnh</Label>
-                              <Input
-                                value={config.header.headingAlt}
-                                onChange={(event) =>
-                                  update({ header: { ...config.header, headingAlt: event.target.value } })
-                                }
-                                placeholder="Ví dụ: Logo sự kiện"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Dòng mô tả trên tiêu đề</Label>
-                              <Input
-                                value={config.header.descText}
-                                onChange={(event) =>
-                                  update({ header: { ...config.header, descText: event.target.value } })
-                                }
-                                placeholder="We cordially invite"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Tiêu đề chính landing page</Label>
-                              <Input
-                                value={config.header.titleText}
-                                onChange={(event) =>
-                                  update({ header: { ...config.header, titleText: event.target.value } })
-                                }
-                                placeholder="Check in sự kiện"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Phụ đề</Label>
-                              <Textarea
-                                value={config.header.subtitleText ?? ""}
-                                onChange={(event) =>
-                                  update({ header: { ...config.header, subtitleText: event.target.value } })
-                                }
-                                placeholder="Nhập phụ đề nếu cần..."
-                                rows={3}
-                              />
-                            </div>
-                          </div>
-                        </SectionCard>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="theme" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Theme màu sắc</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Màu giao diện"
-                        description="Tất cả token màu quan trọng được gom vào cùng một chỗ để chỉnh nhanh."
-                        icon={Palette}
-                      >
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                          <ColorInput
-                            label="Primary"
-                            value={config.theme.primary}
-                            onChange={(value) => update({ theme: { ...config.theme, primary: value } })}
-                          />
-                          <ColorInput
-                            label="Primary 2"
-                            value={config.theme.primary2}
-                            onChange={(value) => update({ theme: { ...config.theme, primary2: value } })}
-                          />
-                          <ColorInput
-                            label="Text"
-                            value={config.theme.text}
-                            onChange={(value) => update({ theme: { ...config.theme, text: value } })}
-                          />
-                          <ColorInput
-                            label="Muted"
-                            value={config.theme.muted}
-                            onChange={(value) => update({ theme: { ...config.theme, muted: value } })}
-                          />
-                          <ColorInput
-                            label="Background"
-                            value={config.theme.bg}
-                            onChange={(value) => update({ theme: { ...config.theme, bg: value } })}
-                          />
-                          <ColorInput
-                            label="Card"
-                            value={config.theme.card}
-                            onChange={(value) => update({ theme: { ...config.theme, card: value } })}
-                          />
-                          <ColorInput
-                            label="Ring"
-                            value={config.theme.ring}
-                            onChange={(value) => update({ theme: { ...config.theme, ring: value } })}
-                          />
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-
-              <TabsContent value="form" className="space-y-5">
-                <Accordion type="multiple" defaultValue={["default-fields", "questions"]} className="space-y-4">
-                  <AccordionItem
-                    value="default-fields"
-                    className="border-border/70 bg-background rounded-2xl border px-5"
+                      update({
+                        behavior: { ...config.behavior, eventName },
+                        header: {
+                          ...config.header,
+                          titleText: shouldSyncTitle ? eventName : config.header.titleText,
+                        },
+                      });
+                    }}
+                    placeholder="Ví dụ: Webinar trẻ hoá đa tầng"
+                  />
+                </Field>
+                <Field label="Template" hint="Đổi template sẽ áp dụng lại bộ màu mặc định của template đó.">
+                  <Select
+                    value={currentTemplateStyle}
+                    onValueChange={(value: TemplateStyle) => applyTemplateStyle(value)}
                   >
-                    <AccordionTrigger className="py-5 text-base">Trường mặc định</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Trường mặc định"
-                        description="Chỉnh label, placeholder và mức bắt buộc cho 3 field cơ bản của form."
-                        icon={FormInput}
-                      >
-                        <div className="grid gap-4">
-                          <DefaultFieldEditor
-                            title="Họ và tên"
-                            field={config.fields.full_name}
-                            onChange={(patch) => updateDefaultField("full_name", patch)}
-                          />
-                          <DefaultFieldEditor
-                            title="Số điện thoại"
-                            field={config.fields.phone}
-                            onChange={(patch) => updateDefaultField("phone", patch)}
-                          />
-                          <DefaultFieldEditor
-                            title="Email"
-                            field={config.fields.email}
-                            onChange={(patch) => updateDefaultField("email", patch)}
-                          />
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="questions" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Câu hỏi bổ sung</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Trường tùy chỉnh"
-                        description="Tối đa 5 câu hỏi. Chỉ bật những câu thật sự cần để form gọn và dễ điền."
-                        icon={MessageSquare}
-                      >
-                        <div className="grid gap-4">
-                          {config.questions.slice(0, 5).map((question, index) => (
-                            <QuestionEditor
-                              key={question.id}
-                              index={index}
-                              question={question}
-                              onChange={(patch) => updateQuestion(index, patch)}
-                            />
-                          ))}
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="integration" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Tracking & tích hợp</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Nguồn dữ liệu"
-                        description="Khối này dành cho dữ liệu ẩn và webhook khi cần đồng bộ sang hệ thống khác."
-                        icon={Globe}
-                      >
-                        <div className="space-y-5">
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2 md:col-span-2">
-                              <Label>Webhook URL</Label>
-                              <Input
-                                value={config.webhookUrl}
-                                onChange={(event) => update({ webhookUrl: event.target.value })}
-                                placeholder="https://example.com/webhook"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Source</Label>
-                              <Input
-                                value={config.behavior.source}
-                                onChange={(event) =>
-                                  update({ behavior: { ...config.behavior, source: event.target.value } })
-                                }
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Query key đọc user_id</Label>
-                              <Input
-                                value={config.behavior.readUserIdFromQueryKey}
-                                onChange={(event) =>
-                                  update({
-                                    behavior: {
-                                      ...config.behavior,
-                                      readUserIdFromQueryKey: event.target.value,
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Prefill city key</Label>
-                              <Input
-                                value={config.behavior.prefillKeys.city ?? ""}
-                                onChange={(event) =>
-                                  update({
-                                    behavior: {
-                                      ...config.behavior,
-                                      prefillKeys: { ...config.behavior.prefillKeys, city: event.target.value },
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Prefill role key</Label>
-                              <Input
-                                value={config.behavior.prefillKeys.role ?? ""}
-                                onChange={(event) =>
-                                  update({
-                                    behavior: {
-                                      ...config.behavior,
-                                      prefillKeys: { ...config.behavior.prefillKeys, role: event.target.value },
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            <div>
-                              <h4 className="font-medium">Field ẩn</h4>
-                              <p className="text-muted-foreground text-sm leading-6">
-                                Những field này không hiển thị ra UI nhưng vẫn có thể đi kèm dữ liệu submit.
-                              </p>
-                            </div>
-                            <div className="grid gap-4 md:grid-cols-2">
-                              {(["user_id", "city", "role", "clinic", "full_name_nv"] as HiddenFieldKey[]).map(
-                                (key) => (
-                                  <AdditionalFieldEditor
-                                    key={key}
-                                    title={hiddenFieldLabels[key]}
-                                    field={config.fields.hidden[key]}
-                                    onChange={(patch) =>
-                                      update({
-                                        fields: {
-                                          ...config.fields,
-                                          hidden: {
-                                            ...config.fields.hidden,
-                                            [key]: { ...config.fields.hidden[key], ...patch },
-                                          },
-                                        },
-                                      })
-                                    }
-                                  />
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-
-              <TabsContent value="footer" className="space-y-5">
-                <Accordion
-                  type="multiple"
-                  defaultValue={["event-info", "logos", "footer-style", "schedule"]}
-                  className="space-y-4"
-                >
-                  <AccordionItem value="event-info" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Thông tin sự kiện</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Khối giới thiệu"
-                        description="Các text này xuất hiện ở phần nội dung giới thiệu phía dưới form."
-                        icon={FileText}
-                      >
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2 md:col-span-2">
-                            <Label>Dòng chữ trên</Label>
-                            <Input
-                              value={config.infoEvent.topText}
-                              onChange={(event) =>
-                                update({ infoEvent: { ...config.infoEvent, topText: event.target.value } })
-                              }
-                              placeholder="to attend the launch event"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Headline</Label>
-                            <Input
-                              value={config.infoEvent.headline}
-                              onChange={(event) =>
-                                update({ infoEvent: { ...config.infoEvent, headline: event.target.value } })
-                              }
-                              placeholder="SGA Renew Peel"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Motto</Label>
-                            <Input
-                              value={config.infoEvent.motto}
-                              onChange={(event) =>
-                                update({ infoEvent: { ...config.infoEvent, motto: event.target.value } })
-                              }
-                              placeholder="Đa tầng tác động, dứt vòng mụn thâm"
-                            />
-                          </div>
-                          <div className="space-y-2 md:col-span-2">
-                            <Label>Giới thiệu sự kiện</Label>
-                            <Textarea
-                              value={config.infoEvent.organizerText}
-                              onChange={(event) =>
-                                update({ infoEvent: { ...config.infoEvent, organizerText: event.target.value } })
-                              }
-                              placeholder="organized by EAC Group and SRX Laboratory Dermatology"
-                              rows={3}
-                            />
-                          </div>
-                          <div className="space-y-2 md:col-span-2">
-                            <Label>Dòng chữ dưới</Label>
-                            <Textarea
-                              value={config.infoEvent.bottomText}
-                              onChange={(event) =>
-                                update({ infoEvent: { ...config.infoEvent, bottomText: event.target.value } })
-                              }
-                              placeholder="We would be honored to have you at the event"
-                              rows={3}
-                            />
-                          </div>
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="logos" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Logo & hình ảnh phụ</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <SectionCard
-                        title="Logo sự kiện"
-                        description="Logo đối tác hoặc thương hiệu sẽ được hiển thị cạnh nhau ở khối thông tin sự kiện."
-                        icon={ImageIcon}
-                      >
-                        <div className="grid gap-5 xl:grid-cols-3">
-                          <ImageUploadField
-                            label="Logo 1"
-                            value={config.infoEvent.logo1Url ?? ""}
-                            onChange={(url) => update({ infoEvent: { ...config.infoEvent, logo1Url: url } })}
-                          />
-                          <ImageUploadField
-                            label="Logo 2"
-                            value={config.infoEvent.logo2Url ?? ""}
-                            onChange={(url) => update({ infoEvent: { ...config.infoEvent, logo2Url: url } })}
-                          />
-                          <ImageUploadField
-                            label="Logo 3"
-                            value={config.infoEvent.logo3Url ?? ""}
-                            onChange={(url) => update({ infoEvent: { ...config.infoEvent, logo3Url: url } })}
-                          />
-                        </div>
-                      </SectionCard>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem
-                    value="footer-style"
-                    className="border-border/70 bg-background rounded-2xl border px-5"
-                  >
-                    <AccordionTrigger className="py-5 text-base">Footer, dress code & màu sắc</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <div className="grid gap-5 xl:grid-cols-2">
-                        <SectionCard
-                          title="Footer"
-                          description="Gradient và màu chữ ở phần cuối landing page."
-                          icon={Palette}
-                        >
-                          <div className="space-y-2">
-                            <Label>Thông tin footer</Label>
-                            <Textarea
-                              value={config.footer.template2FooterText ?? ""}
-                              onChange={(event) =>
-                                update({ footer: { ...config.footer, template2FooterText: event.target.value } })
-                              }
-                              placeholder="Ví dụ: Ban tổ chức sẽ liên hệ xác nhận thông tin tham dự trước sự kiện."
-                              rows={4}
-                            />
-                          </div>
-                          <div className="mt-4 grid gap-4">
-                            <ColorInput
-                              label="Màu Gradient bắt đầu"
-                              value={config.footer.gradientFrom}
-                              onChange={(value) => update({ footer: { ...config.footer, gradientFrom: value } })}
-                            />
-                            <ColorInput
-                              label="Màu Gradient kết thúc"
-                              value={config.footer.gradientTo}
-                              onChange={(value) => update({ footer: { ...config.footer, gradientTo: value } })}
-                            />
-                            <ColorInput
-                              label="Màu chữ"
-                              value={config.footer.textColor}
-                              onChange={(value) => update({ footer: { ...config.footer, textColor: value } })}
-                            />
-                          </div>
-                        </SectionCard>
-                        <SectionCard
-                          title="Dress code"
-                          description="Tiêu đề, mô tả và 4 chấm màu hiển thị ở cột trái footer."
-                          icon={Sparkles}
-                        >
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>Tiêu đề dress code</Label>
-                              <Input
-                                value={config.footer.dressCodeTitle}
-                                onChange={(event) =>
-                                  update({ footer: { ...config.footer, dressCodeTitle: event.target.value } })
-                                }
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Mô tả dress code</Label>
-                              <Input
-                                value={config.footer.dressCodeDesc}
-                                onChange={(event) =>
-                                  update({ footer: { ...config.footer, dressCodeDesc: event.target.value } })
-                                }
-                              />
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <ColorInput
-                                label="Màu 1"
-                                value={config.footer.dressDots.white}
-                                onChange={(value) =>
-                                  update({
-                                    footer: {
-                                      ...config.footer,
-                                      dressDots: { ...config.footer.dressDots, white: value },
-                                    },
-                                  })
-                                }
-                              />
-                              <ColorInput
-                                label="Màu 2"
-                                value={config.footer.dressDots.whitePink}
-                                onChange={(value) =>
-                                  update({
-                                    footer: {
-                                      ...config.footer,
-                                      dressDots: { ...config.footer.dressDots, whitePink: value },
-                                    },
-                                  })
-                                }
-                              />
-                              <ColorInput
-                                label="Màu 3"
-                                value={config.footer.dressDots.pink}
-                                onChange={(value) =>
-                                  update({
-                                    footer: {
-                                      ...config.footer,
-                                      dressDots: { ...config.footer.dressDots, pink: value },
-                                    },
-                                  })
-                                }
-                              />
-                              <ColorInput
-                                label="Màu 4"
-                                value={config.footer.dressDots.black}
-                                onChange={(value) =>
-                                  update({
-                                    footer: {
-                                      ...config.footer,
-                                      dressDots: { ...config.footer.dressDots, black: value },
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                        </SectionCard>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="schedule" className="border-border/70 bg-background rounded-2xl border px-5">
-                    <AccordionTrigger className="py-5 text-base">Lịch và địa điểm</AccordionTrigger>
-                    <AccordionContent className="pb-5">
-                      <div className="grid gap-5 xl:grid-cols-2">
-                        <SectionCard
-                          title="Ngày giờ sự kiện"
-                          description="Cụm hiển thị ở cột giữa footer."
-                          icon={Calendar}
-                        >
-                          <div className="grid gap-4">
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="space-y-2">
-                                <Label>Ngày</Label>
-                                <Input
-                                  value={config.footer.dateDay}
-                                  onChange={(event) =>
-                                    update({ footer: { ...config.footer, dateDay: event.target.value } })
-                                  }
-                                  placeholder="23"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Tháng</Label>
-                                <Input
-                                  value={config.footer.dateMonth}
-                                  onChange={(event) =>
-                                    update({ footer: { ...config.footer, dateMonth: event.target.value } })
-                                  }
-                                  placeholder="12"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Năm</Label>
-                                <Input
-                                  value={config.footer.dateYear}
-                                  onChange={(event) =>
-                                    update({ footer: { ...config.footer, dateYear: event.target.value } })
-                                  }
-                                  placeholder="2025"
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Khung giờ</Label>
-                              <Input
-                                value={config.footer.timeText}
-                                onChange={(event) =>
-                                  update({ footer: { ...config.footer, timeText: event.target.value } })
-                                }
-                                placeholder="13:00 - 17:00"
-                              />
-                            </div>
-                          </div>
-                        </SectionCard>
-
-                        <SectionCard
-                          title="Địa điểm"
-                          description="Tên địa điểm và 2 dòng địa chỉ hiển thị ở cột phải footer."
-                          icon={MapPin}
-                        >
-                          <div className="grid gap-4">
-                            <div className="space-y-2">
-                              <Label>Tên địa điểm</Label>
-                              <Input
-                                value={config.footer.placeName}
-                                onChange={(event) =>
-                                  update({ footer: { ...config.footer, placeName: event.target.value } })
-                                }
-                                placeholder="MRD Palace"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Dòng địa chỉ 1</Label>
-                              <Input
-                                value={config.footer.placeLine1}
-                                onChange={(event) =>
-                                  update({ footer: { ...config.footer, placeLine1: event.target.value } })
-                                }
-                                placeholder="8th floor, Viet Tower building"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Dòng địa chỉ 2</Label>
-                              <Input
-                                value={config.footer.placeLine2}
-                                onChange={(event) =>
-                                  update({ footer: { ...config.footer, placeLine2: event.target.value } })
-                                }
-                                placeholder="01 Thai Ha Street, Hanoi"
-                              />
-                            </div>
-                          </div>
-                        </SectionCard>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <div className="min-w-0">
-            <div className="space-y-4 xl:sticky xl:top-24">
-              <Card className="border-border/70 bg-background/95 overflow-hidden shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">Thông tin nhanh</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="border-border/70 bg-muted/20 overflow-hidden rounded-2xl border">
-                    {config.header.headingImageUrl ? (
-                      <img
-                        src={config.header.headingImageUrl}
-                        alt={config.header.headingAlt || "Heading"}
-                        className="aspect-[16/9] w-full object-contain"
-                      />
-                    ) : (
-                      <div className="text-muted-foreground flex aspect-[16/9] items-center justify-center text-sm">
-                        Chưa có ảnh heading
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{templateStyleLabels[currentTemplateStyle]}</Badge>
-                      <Badge variant="outline">
-                        {config.footer.dateDay}/{config.footer.dateMonth}/{config.footer.dateYear}
-                      </Badge>
-                    </div>
-                    <h3 className="text-lg leading-7 font-semibold">
-                      {config.header.titleText || config.behavior.eventName || initialName}
-                    </h3>
-                    {config.header.descText ? (
-                      <p className="text-muted-foreground text-sm leading-6">{config.header.descText}</p>
-                    ) : null}
-                    {config.header.subtitleText ? (
-                      <p className="text-sm font-medium">{config.header.subtitleText}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="border-border/70 bg-muted/20 rounded-2xl border p-4">
-                    <div className="text-muted-foreground text-xs font-medium tracking-[0.16em] uppercase">
-                      Khối sự kiện
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      <div className="font-medium">{config.infoEvent.headline || "Chưa có headline"}</div>
-                      {config.infoEvent.motto ? (
-                        <p className="text-muted-foreground text-sm">{config.infoEvent.motto}</p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="border-border/70 bg-muted/20 rounded-2xl border p-4">
-                    <div className="text-muted-foreground text-xs font-medium tracking-[0.16em] uppercase">
-                      Form sẽ hiển thị
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {visibleFieldLabels.map((label) => (
-                        <Badge key={label} variant="secondary">
-                          {label}
-                        </Badge>
-                      ))}
-                      {enabledQuestions.map((question) => (
-                        <Badge key={question.id} variant="secondary">
-                          {question.label}
-                        </Badge>
-                      ))}
-                      {visibleFieldLabels.length === 0 && enabledQuestions.length === 0 ? (
-                        <span className="text-muted-foreground text-sm">Chưa có field nào đang bật.</span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {config.infoEvent.logo1Url || config.infoEvent.logo2Url || config.infoEvent.logo3Url ? (
-                    <div className="grid grid-cols-3 gap-3">
-                      {[config.infoEvent.logo1Url, config.infoEvent.logo2Url, config.infoEvent.logo3Url].map(
-                        (logo, index) => (
-                          <div
-                            key={`logo-preview-${index + 1}`}
-                            className="border-border/70 bg-muted/20 overflow-hidden rounded-2xl border"
-                          >
-                            {logo ? (
-                              <img
-                                src={logo}
-                                alt={`Logo ${index + 1}`}
-                                className="aspect-[16/9] w-full object-contain p-3"
-                              />
-                            ) : (
-                              <div className="text-muted-foreground flex aspect-[16/9] items-center justify-center text-xs">
-                                Trống
-                              </div>
-                            )}
-                          </div>
-                        ),
-                      )}
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Chọn template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">{templateStyleLabels.default}</SelectItem>
+                      <SelectItem value="starry">{templateStyleLabels.starry}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Slug trang" hint="Chỉ dùng chữ thường không dấu, số và dấu gạch ngang.">
+                  <Input
+                    value={templateSlug}
+                    onChange={(event) => setTemplateSlug(event.target.value)}
+                    placeholder="webinar-tre-hoa"
+                    className="font-mono"
+                  />
+                </Field>
+                <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 md:col-span-2">
+                  <Link2 className="text-muted-foreground size-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate font-mono text-sm">
+                    {hasSlug ? publicUrl : "Nhập slug để tạo đường dẫn public"}
+                  </span>
+                  {hasSlug ? (
+                    <div className="flex items-center gap-1">
+                      <Button type="button" size="sm" variant="ghost" onClick={() => void handleCopyPublicUrl()}>
+                        <Copy />
+                        Sao chép
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" asChild>
+                        <a href={publicUrl} target="_blank" rel="noreferrer">
+                          <ExternalLink />
+                          Mở
+                        </a>
+                      </Button>
                     </div>
                   ) : null}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+            </Section>
 
-              <Card className="border-border/70 bg-background/95 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Palette className="size-4" />
-                    Theme tokens
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  {themeSwatches.map(({ color, key, label }) => (
-                    <div key={key} className="border-border/70 bg-card flex items-center gap-3 rounded-xl border p-3">
-                      <span
-                        className="border-border/70 size-10 rounded-full border shadow-sm"
-                        style={{ backgroundColor: color }}
+            <Section title="Banner & tiêu đề" description="Phần đầu tiên khách nhìn thấy khi mở trang." icon={Type}>
+              <div className="grid gap-5 md:grid-cols-[200px_minmax(0,1fr)]">
+                <ImageField
+                  label="Ảnh banner"
+                  layout="stack"
+                  previewClassName={cn("w-full", isStarry ? "aspect-[4/5] max-w-48" : "aspect-video")}
+                  value={config.header.headingImageUrl}
+                  onChange={(url) => updateHeader({ headingImageUrl: url })}
+                  hint={copy.bannerHint}
+                />
+                <div className="grid content-start gap-4">
+                  <Field label="Tiêu đề chính">
+                    <Input
+                      value={config.header.titleText}
+                      onChange={(event) => updateHeader({ titleText: event.target.value })}
+                      placeholder="Ví dụ: Webinar trẻ hoá đa tầng"
+                    />
+                  </Field>
+                  <Field label={copy.descTextLabel}>
+                    <Input
+                      value={config.header.descText}
+                      onChange={(event) => updateHeader({ descText: event.target.value })}
+                      placeholder="Ví dụ: EAC Group x Similidiet"
+                    />
+                  </Field>
+                  <Field label={copy.subtitleLabel} hint={copy.subtitleHint}>
+                    <Input
+                      value={config.header.subtitleText ?? ""}
+                      onChange={(event) => updateHeader({ subtitleText: event.target.value })}
+                      placeholder="Ví dụ: Miễn phí cho Bác sĩ, Spa/Clinic"
+                    />
+                  </Field>
+                  <Field label="Mô tả ảnh (alt)" hint="Hỗ trợ SEO và trình đọc màn hình.">
+                    <Input
+                      value={config.header.headingAlt}
+                      onChange={(event) => updateHeader({ headingAlt: event.target.value })}
+                      placeholder="Ví dụ: Banner webinar trẻ hoá đa tầng"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </Section>
+
+            {isStarry ? (
+              <Section
+                title="Danh sách đánh số"
+                description="Các dòng 01, 02, 03... nằm dưới 3 ô Ngày/Giờ/Địa điểm, ngay phía trên form đăng ký."
+                icon={ListOrdered}
+              >
+                <AgendaItemsEditor
+                  items={agendaItems}
+                  isLegacy={isLegacyAgenda}
+                  onChange={(nextItems) => updateInfoEvent({ agendaItems: nextItems })}
+                />
+              </Section>
+            ) : null}
+
+            <Section
+              title="Màu sắc"
+              description="Chỉ hiện những màu mà template đang chọn sử dụng."
+              icon={Palette}
+              action={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => applyTemplateStyle(currentTemplateStyle)}
+                >
+                  <RotateCcw />
+                  Màu mặc định
+                </Button>
+              }
+            >
+              <div className="space-y-5">
+                <div>
+                  <SubHeading>Giao diện</SubHeading>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {copy.themeTokens.map((token) => (
+                      <ColorField
+                        key={token.key}
+                        label={token.label}
+                        value={config.theme[token.key]}
+                        onChange={(value) => update({ theme: { ...config.theme, [token.key]: value } })}
                       />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium">{label}</div>
-                        <div className="text-muted-foreground truncate font-mono text-xs">{color}</div>
-                      </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t pt-5">
+                  <SubHeading>Footer</SubHeading>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <ColorField
+                      label="Màu đầu"
+                      value={config.footer.gradientFrom}
+                      onChange={(value) => updateFooter({ gradientFrom: value })}
+                    />
+                    <ColorField
+                      label="Màu cuối"
+                      value={config.footer.gradientTo}
+                      onChange={(value) => updateFooter({ gradientTo: value })}
+                    />
+                    <ColorField
+                      label="Màu chữ"
+                      value={config.footer.textColor}
+                      onChange={(value) => updateFooter({ textColor: value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Section>
+          </TabsContent>
+
+          <TabsContent value="content" className="space-y-5">
+            <Section title={copy.contentTitle} description={copy.contentDescription} icon={FileText}>
+              <div className="grid gap-4 md:grid-cols-2">
+                {copy.infoOrder.map((key) => {
+                  const field = copy.infoFields[key];
+
+                  return (
+                    <Field key={key} label={field.label} hint={field.hint} className="md:col-span-2">
+                      {field.multiline ? (
+                        <Textarea
+                          value={config.infoEvent[key]}
+                          onChange={(event) => updateInfoEvent({ [key]: event.target.value })}
+                          placeholder={field.placeholder}
+                          rows={2}
+                        />
+                      ) : (
+                        <Input
+                          value={config.infoEvent[key]}
+                          onChange={(event) => updateInfoEvent({ [key]: event.target.value })}
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </Field>
+                  );
+                })}
+              </div>
+            </Section>
+
+            <Section title="Thời gian & địa điểm" description={copy.scheduleDescription} icon={CalendarDays}>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-4">
+                  <SubHeading>Thời gian</SubHeading>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field label="Ngày">
+                      <Input
+                        value={config.footer.dateDay}
+                        onChange={(event) => updateFooter({ dateDay: event.target.value })}
+                        placeholder="23"
+                        inputMode="numeric"
+                      />
+                    </Field>
+                    <Field label="Tháng">
+                      <Input
+                        value={config.footer.dateMonth}
+                        onChange={(event) => updateFooter({ dateMonth: event.target.value })}
+                        placeholder="12"
+                        inputMode="numeric"
+                      />
+                    </Field>
+                    <Field label="Năm">
+                      <Input
+                        value={config.footer.dateYear}
+                        onChange={(event) => updateFooter({ dateYear: event.target.value })}
+                        placeholder="2026"
+                        inputMode="numeric"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Khung giờ">
+                    <Input
+                      value={config.footer.timeText}
+                      onChange={(event) => updateFooter({ timeText: event.target.value })}
+                      placeholder="Ví dụ: 19:30 - 21:00"
+                    />
+                  </Field>
+                </div>
+                <div className="space-y-4">
+                  <SubHeading>Địa điểm</SubHeading>
+                  <Field label="Tên địa điểm / hình thức">
+                    <Input
+                      value={config.footer.placeName}
+                      onChange={(event) => updateFooter({ placeName: event.target.value })}
+                      placeholder="Ví dụ: Online qua Zoom"
+                    />
+                  </Field>
+                  <Field label="Địa chỉ - dòng 1">
+                    <Input
+                      value={config.footer.placeLine1}
+                      onChange={(event) => updateFooter({ placeLine1: event.target.value })}
+                      placeholder="Ví dụ: Tầng 8, toà nhà Viet Tower"
+                    />
+                  </Field>
+                  <Field label="Địa chỉ - dòng 2">
+                    <Input
+                      value={config.footer.placeLine2}
+                      onChange={(event) => updateFooter({ placeLine2: event.target.value })}
+                      placeholder="Ví dụ: 01 Thái Hà, Hà Nội"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </Section>
+
+            <Section
+              title="Logo đối tác"
+              description="Tối đa 3 logo, xếp thành một hàng ngang. Nên dùng ảnh PNG nền trong suốt."
+              icon={ImageIcon}
+            >
+              <div className="grid gap-5 sm:grid-cols-3">
+                {(["logo1Url", "logo2Url", "logo3Url"] as const).map((key, index) => (
+                  <ImageField
+                    key={key}
+                    label={`Logo ${index + 1}`}
+                    layout="stack"
+                    previewClassName="aspect-video w-full"
+                    value={config.infoEvent[key] ?? ""}
+                    onChange={(url) => updateInfoEvent({ [key]: url })}
+                  />
+                ))}
+              </div>
+            </Section>
+
+            {isStarry ? (
+              <Section title="Ghi chú cuối trang" description="Đoạn chữ trong khung ở cuối footer." icon={FileText}>
+                <Textarea
+                  value={config.footer.template2FooterText ?? ""}
+                  onChange={(event) => updateFooter({ template2FooterText: event.target.value })}
+                  placeholder="Ví dụ: Ban tổ chức sẽ liên hệ xác nhận thông tin tham dự trước sự kiện."
+                  rows={3}
+                />
+              </Section>
+            ) : (
+              <Section title="Dress code" description="Tiêu đề, mô tả và 4 chấm màu hiển thị ở footer." icon={Shirt}>
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Tiêu đề">
+                      <Input
+                        value={config.footer.dressCodeTitle}
+                        onChange={(event) => updateFooter({ dressCodeTitle: event.target.value })}
+                        placeholder="Ví dụ: Dress code"
+                      />
+                    </Field>
+                    <Field label="Mô tả">
+                      <Input
+                        value={config.footer.dressCodeDesc}
+                        onChange={(event) => updateFooter({ dressCodeDesc: event.target.value })}
+                        placeholder="Ví dụ: Trắng - Hồng - Đen"
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {(["white", "whitePink", "pink", "black"] as const).map((dotKey, index) => (
+                      <ColorField
+                        key={dotKey}
+                        label={`Màu ${index + 1}`}
+                        value={config.footer.dressDots[dotKey]}
+                        onChange={(value) =>
+                          updateFooter({ dressDots: { ...config.footer.dressDots, [dotKey]: value } })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </Section>
+            )}
+          </TabsContent>
+
+          <TabsContent value="form" className="space-y-5">
+            <Section
+              title="Trường mặc định"
+              description="Họ tên, số điện thoại và email luôn đứng đầu form."
+              icon={FormInput}
+            >
+              <div className="space-y-3">
+                <DefaultFieldRow
+                  title="Họ và tên"
+                  field={config.fields.full_name}
+                  onChange={(patch) => updateDefaultField("full_name", patch)}
+                />
+                <DefaultFieldRow
+                  title="Số điện thoại"
+                  field={config.fields.phone}
+                  onChange={(patch) => updateDefaultField("phone", patch)}
+                />
+                <DefaultFieldRow
+                  title="Email"
+                  field={config.fields.email}
+                  onChange={(patch) => updateDefaultField("email", patch)}
+                />
+              </div>
+            </Section>
+
+            <Section
+              title="Trường bổ sung"
+              description="Đơn vị công tác, khu vực, sale tư vấn... Có thể hiện trên form hoặc gửi ngầm theo đường dẫn."
+              icon={SlidersHorizontal}
+            >
+              <div className="space-y-3">
+                {HIDDEN_FIELD_KEYS.map((key) => (
+                  <HiddenFieldItem
+                    key={key}
+                    fieldKey={key}
+                    field={config.fields.hidden[key]}
+                    onChange={(patch) => updateHiddenField(key, patch)}
+                  />
+                ))}
+              </div>
+            </Section>
+
+            <Section
+              title="Câu hỏi tùy chỉnh"
+              description="Tối đa 5 câu hỏi, hiển thị cuối form. Chỉ bật những câu thật sự cần."
+              icon={MessageSquare}
+              action={
+                <Badge variant="outline">
+                  {enabledQuestionsCount}/{MAX_QUESTIONS} đang bật
+                </Badge>
+              }
+            >
+              <div className="space-y-3">
+                {config.questions.slice(0, MAX_QUESTIONS).map((question, index) => (
+                  <QuestionItem
+                    key={question.id}
+                    index={index}
+                    question={question}
+                    onChange={(patch) => updateQuestion(index, patch)}
+                  />
+                ))}
+              </div>
+            </Section>
+          </TabsContent>
+
+          <TabsContent value="integration" className="space-y-5">
+            <Section
+              title="Webhook & nguồn dữ liệu"
+              description="Dùng khi cần đồng bộ đăng ký sang hệ thống khác."
+              icon={Plug}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field
+                  label="Webhook URL"
+                  hint="Để trống nếu không cần gửi dữ liệu ra ngoài."
+                  className="md:col-span-2"
+                >
+                  <Input
+                    value={config.webhookUrl}
+                    onChange={(event) => update({ webhookUrl: event.target.value })}
+                    placeholder="https://example.com/webhook"
+                    className="font-mono"
+                  />
+                </Field>
+                <Field label="Source" hint="Gắn kèm mỗi lượt đăng ký để phân biệt nguồn.">
+                  <Input
+                    value={config.behavior.source}
+                    onChange={(event) => updateBehavior({ source: event.target.value })}
+                    className="font-mono"
+                  />
+                </Field>
+              </div>
+            </Section>
+
+            <Section
+              title="Tự điền từ đường dẫn"
+              description="Tên tham số trên URL dùng để tự điền trường bổ sung. Ví dụ ?userid=123&city=HN."
+              icon={Link2}
+            >
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="Tham số User ID">
+                  <Input
+                    value={config.behavior.readUserIdFromQueryKey}
+                    onChange={(event) => updateBehavior({ readUserIdFromQueryKey: event.target.value })}
+                    placeholder="userid"
+                    className="font-mono"
+                  />
+                </Field>
+                <Field label="Tham số Khu vực">
+                  <Input
+                    value={config.behavior.prefillKeys.city ?? ""}
+                    onChange={(event) =>
+                      updateBehavior({ prefillKeys: { ...config.behavior.prefillKeys, city: event.target.value } })
+                    }
+                    placeholder="city"
+                    className="font-mono"
+                  />
+                </Field>
+                <Field label="Tham số Vai trò">
+                  <Input
+                    value={config.behavior.prefillKeys.role ?? ""}
+                    onChange={(event) =>
+                      updateBehavior({ prefillKeys: { ...config.behavior.prefillKeys, role: event.target.value } })
+                    }
+                    placeholder="role"
+                    className="font-mono"
+                  />
+                </Field>
+              </div>
+            </Section>
+          </TabsContent>
+        </Tabs>
+
+        <aside className="min-w-0">
+          <div className="bg-card text-card-foreground overflow-hidden rounded-xl border shadow-xs xl:sticky xl:top-36">
+            <div className="bg-muted/60 flex aspect-[16/10] items-center justify-center border-b">
+              {config.header.headingImageUrl ? (
+                <img
+                  src={config.header.headingImageUrl}
+                  alt={config.header.headingAlt || "Banner"}
+                  className="size-full object-contain"
+                />
+              ) : (
+                <div className="text-muted-foreground flex flex-col items-center gap-1.5 text-sm">
+                  <ImageIcon className="size-5" />
+                  Chưa có ảnh banner
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 p-4">
+              <div className="space-y-1.5">
+                <Badge variant="outline">{templateStyleLabels[currentTemplateStyle]}</Badge>
+                <h3 className="leading-6 font-semibold">
+                  {config.header.titleText || config.behavior.eventName || initialName}
+                </h3>
+                {config.header.descText ? (
+                  <p className="text-muted-foreground text-sm leading-5">{config.header.descText}</p>
+                ) : null}
+              </div>
+
+              <dl className="space-y-2">
+                <SummaryRow
+                  icon={CalendarDays}
+                  label="Ngày"
+                  value={[config.footer.dateDay, config.footer.dateMonth, config.footer.dateYear]
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .join("/")}
+                />
+                <SummaryRow icon={Clock3} label="Giờ" value={config.footer.timeText.trim()} />
+                <SummaryRow icon={MapPin} label="Địa điểm" value={config.footer.placeName.trim()} />
+              </dl>
+
+              <div className="space-y-2 border-t pt-4">
+                <div className="text-sm font-semibold">Trường trên form</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {formFieldLabels.length ? (
+                    formFieldLabels.map((label, index) => (
+                      <Badge key={`form-field-${index + 1}`} variant="outline">
+                        {label}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Chưa có trường nào đang bật.</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 border-t pt-4">
+                <div className="text-sm font-semibold">Màu sắc</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {summarySwatches.map((swatch) => (
+                    <span
+                      key={swatch.label}
+                      title={`${swatch.label}: ${swatch.color}`}
+                      className="size-6 rounded-full border shadow-xs"
+                      style={{ backgroundColor: swatch.color }}
+                    />
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+
+              {hasSlug ? (
+                <div className="space-y-2 border-t pt-4">
+                  <div className="text-sm font-semibold">Trang public</div>
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary min-w-0 flex-1 truncate font-mono text-xs underline-offset-4 hover:underline"
+                    >
+                      {publicUrl}
+                    </a>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="Sao chép URL trang public"
+                      onClick={() => void handleCopyPublicUrl()}
+                    >
+                      <Copy />
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );

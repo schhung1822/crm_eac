@@ -270,6 +270,13 @@ html {
   animation-delay: 240ms;
 }
 
+/* Trình chỉnh sửa Ladipage: ở giao diện sáng, viền ô nhập/switch tắt mặc định gần như trùng nền trắng.
+   Chỉ áp cho preset có viền nhạt; brutalist/soft-pop vốn đã có viền đậm nên giữ nguyên. */
+:root:is([data-theme-preset="default"], [data-theme-preset="tangerine"]):not(.dark) .ladipage-editor {
+  --border: color-mix(in oklch, var(--foreground) 13%, var(--background));
+  --input: color-mix(in oklch, var(--foreground) 24%, var(--background));
+}
+
 .srx-ckeditor {
   --ck-border-radius: calc(var(--radius) - 2px);
   --ck-color-base-background: var(--card);

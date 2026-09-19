@@ -95,7 +95,7 @@ http://localhost:3000/t/eac-checkin
 - `FooterConfig` - Cấu hình footer
 - `HeaderConfig` - Cấu hình header
 
-### Default Config (`lib/form-template/defaultConfig.ts`)
+### Default Config (`lib/form-template/default-config.ts`)
 
 Template mặc định với tất cả cấu hình ban đầu
 

@@ -1,6 +1,9 @@
 import { FormTemplateConfig, TemplateStyle, TemplateTheme } from "./types";
 
-export const templateThemePresets: Record<TemplateStyle, { footerFrom: string; footerTo: string; theme: TemplateTheme }> = {
+export const templateThemePresets: Record<
+  TemplateStyle,
+  { footerFrom: string; footerTo: string; theme: TemplateTheme }
+> = {
   default: {
     theme: {
       bg: "#fde7f1",
@@ -64,6 +67,7 @@ export function createBlankFormTemplateConfig(templateStyle: TemplateStyle = "de
       logo1Url: "",
       logo2Url: "",
       logo3Url: "",
+      agendaItems: [],
     },
     fields: {
       full_name: { enabled: true, required: true, label: "Họ và tên", placeholder: "" },
@@ -73,8 +77,22 @@ export function createBlankFormTemplateConfig(templateStyle: TemplateStyle = "de
         user_id: { enabled: true, label: "User ID", visible: false, required: false, placeholder: "", type: "text" },
         city: { enabled: false, label: "Khu vực", visible: false, required: false, placeholder: "", type: "text" },
         role: { enabled: false, label: "Vai trò", visible: false, required: false, placeholder: "", type: "text" },
-        clinic: { enabled: false, label: "Đơn vị công tác", visible: false, required: false, placeholder: "", type: "text" },
-        full_name_nv: { enabled: false, label: "Sale tư vấn", visible: false, required: false, placeholder: "", type: "text" },
+        clinic: {
+          enabled: false,
+          label: "Đơn vị công tác",
+          visible: false,
+          required: false,
+          placeholder: "",
+          type: "text",
+        },
+        full_name_nv: {
+          enabled: false,
+          label: "Sale tư vấn",
+          visible: false,
+          required: false,
+          placeholder: "",
+          type: "text",
+        },
       },
     },
     questions: createQuestions(),

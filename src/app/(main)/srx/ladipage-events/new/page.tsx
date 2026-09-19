@@ -1,5 +1,6 @@
 import AdminTemplateEditor from "@/app/(admin)/admin/templates/[slug]/ui";
-import { createBlankFormTemplateConfig } from "@/lib/form-template/defaultConfig";
+import { createBlankFormTemplateConfig } from "@/lib/form-template/default-config";
+import { resolveSrxLadipageBaseUrl } from "@/lib/srx-ladipage-events";
 
 function createInitialConfig() {
   return createBlankFormTemplateConfig("default");
@@ -14,6 +15,7 @@ export default function Page() {
       initialName="Ladipage sự kiện mới"
       initialConfig={initialConfig}
       editorTitle="Tạo Ladipage sự kiện"
+      publicBaseUrl={resolveSrxLadipageBaseUrl()}
       redirectToEditBasePath="/srx/ladipage-events"
     />
   );

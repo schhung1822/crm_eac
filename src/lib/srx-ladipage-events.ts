@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
-import { defaultConfig } from "@/lib/form-template/defaultConfig";
+import { defaultConfig } from "@/lib/form-template/default-config";
 import type { FormTemplateConfig } from "@/lib/form-template/types";
 import {
   resolveNullableSiteAssetUrl,
@@ -17,13 +17,12 @@ export type SrxLadipageEventStatus = (typeof srxLadipageEventStatusValues)[numbe
 /**
  * Trang public do dự án SRX_web render (/events/[slug]). CRM chỉ là bảng điều khiển
  * nên cần biết domain của web để dựng URL tuyệt đối cho nút "Mở trang public".
+ * Không fallback sang NEXT_PUBLIC_SITE_URL / SRX_PUBLIC_SITE_URL: đó là domain của chính CRM (crm.srx.vn).
  */
 export function resolveSrxLadipageBaseUrl(): string {
   const rawValue =
-    process.env.SRX_EVENT_SITE_URL?.trim() ??
-    process.env.NEXT_PUBLIC_SRX_EVENT_SITE_URL?.trim() ??
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ??
-    process.env.SRX_PUBLIC_SITE_URL?.trim() ??
+    (process.env.SRX_EVENT_SITE_URL ?? "").trim() ||
+    (process.env.NEXT_PUBLIC_SRX_EVENT_SITE_URL ?? "").trim() ||
     "https://srx.vn";
 
   try {
@@ -190,7 +189,8 @@ function mapLadipageEvent(row: LadipageEventRow): SrxLadipageEvent {
     slug: row.slug,
     eventName: row.event_name,
     siteKey: row.site_key,
-    publicBaseUrl: normalizeOptionalString(row.public_base_url) || resolveSrxLadipageBaseUrl(),
+    // Không đọc cột public_base_url: các bản ghi cũ đã lưu nhầm domain CRM vào đây.
+    publicBaseUrl: resolveSrxLadipageBaseUrl(),
     publicPath: normalizePublicPath(row.slug, row.public_path),
     status: row.status,
     isActive: Boolean(row.is_active),
@@ -461,6 +461,7 @@ async function updateLadipageEvent(
        slug = ?,
        event_name = ?,
        legacy_template_slug = ?,
+       public_base_url = ?,
        public_path = ?,
        template_style = ?,
        config_json = ?,
@@ -472,6 +473,7 @@ async function updateLadipageEvent(
       nextSlug,
       eventName,
       normalizeNullableString(existingCurrent.slug),
+      resolveSrxLadipageBaseUrl(),
       nextPublicPath,
       normalizedConfig.templateStyle ?? "default",
       configJson,
