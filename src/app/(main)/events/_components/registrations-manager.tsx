@@ -1,10 +1,8 @@
-/* eslint-disable max-lines */
 "use client";
 
 import * as React from "react";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Download, ExternalLink, LayoutTemplate, Search } from "lucide-react";
@@ -14,9 +12,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { exportData } from "@/lib/export-utils";
 import { matchesSearchTerm } from "@/lib/search-utils";
@@ -79,8 +75,6 @@ export function RegistrationsManager({
   eventOptions: RegistrationEventOption[];
   selectedSlug: string;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = React.useState("");
 
   const filteredRegistrations = React.useMemo(() => {
@@ -100,22 +94,6 @@ export function RegistrationsManager({
 
   const dynamicColumns = React.useMemo(() => collectDynamicColumns(filteredRegistrations), [filteredRegistrations]);
   const selectedEvent = eventOptions.find((option) => option.slug === selectedSlug) ?? null;
-
-  const handleEventChange = React.useCallback(
-    (nextSlug: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-
-      if (nextSlug === "all") {
-        params.delete("event");
-      } else {
-        params.set("event", nextSlug);
-      }
-
-      const queryString = params.toString();
-      router.push(queryString ? `/events?${queryString}` : "/events");
-    },
-    [router, searchParams],
-  );
 
   const handleExport = React.useCallback(() => {
     if (filteredRegistrations.length === 0) {
@@ -275,7 +253,7 @@ export function RegistrationsManager({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Lượt đăng ký sự kiện</h1>
+          <h2 className="text-xl font-semibold tracking-tight">Danh sách đăng ký</h2>
           <p className="text-muted-foreground">
             Dữ liệu form từ các Ladipage sự kiện. Cột câu hỏi hiển thị theo đúng trường tuỳ chỉnh của từng Ladipage.
           </p>
@@ -293,44 +271,6 @@ export function RegistrationsManager({
             Xuất CSV
           </Button>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Tổng lượt đăng ký</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{registrations.length}</div>
-            <p className="text-muted-foreground text-xs">
-              {selectedEvent ? `Của Ladipage "${selectedEvent.name}"` : "Toàn bộ Ladipage sự kiện"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Đang hiển thị</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{filteredRegistrations.length}</div>
-            <p className="text-muted-foreground text-xs">Sau khi lọc theo từ khóa tìm kiếm</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Trường tuỳ chỉnh</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              {dynamicColumns.answers.length + dynamicColumns.customFields.length}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              {dynamicColumns.answers.length} câu hỏi · {dynamicColumns.customFields.length} trường ẩn
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -353,20 +293,6 @@ export function RegistrationsManager({
               </Link>
             </Button>
           ) : null}
-
-          <Select value={selectedSlug || "all"} onValueChange={handleEventChange}>
-            <SelectTrigger className="w-full min-w-0 md:w-[280px]">
-              <SelectValue placeholder="Lọc theo Ladipage" />
-            </SelectTrigger>
-            <SelectContent className="max-w-[min(24rem,calc(100vw-2rem))]">
-              <SelectItem value="all">Tất cả Ladipage</SelectItem>
-              {eventOptions.map((option) => (
-                <SelectItem key={option.slug} value={option.slug}>
-                  {option.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
