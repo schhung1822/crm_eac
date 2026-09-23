@@ -2,27 +2,20 @@
 
 import dynamic from "next/dynamic";
 
+import type { ChannelSummary, ChartPoint, DashboardStats, OrderStatusSummary } from "./types";
+
 const DefaultDashboardClient = dynamic(() => import("./default-dashboard-client"), {
   ssr: false,
-  loading: () => <div className="@container/main min-h-[320px] animate-pulse rounded-lg border bg-muted/20" />,
+  loading: () => <div className="bg-muted/20 @container/main min-h-[320px] animate-pulse rounded-lg border" />,
 });
 
 type DefaultDashboardShellProps = {
-  stats: {
-    totalOrders: number;
-    totalTienHang: number;
-    totalThanhTien: number;
-    totalQuantity: number;
-  };
-  chartData: Array<{ date: string; orders: number; revenue: number }>;
-  channelSummary: Array<{
-    kenh_ban: string;
-    order_count: number;
-    quantity: number;
-    tien_hang: number;
-    giam_gia: number;
-    thanh_tien: number;
-  }>;
+  stats: DashboardStats;
+  previousStats: DashboardStats;
+  chartData: ChartPoint[];
+  channelSummary: ChannelSummary[];
+  statusSummary: OrderStatusSummary[];
+  hasDataError: boolean;
 };
 
 export default function DefaultDashboardShell(props: DefaultDashboardShellProps) {

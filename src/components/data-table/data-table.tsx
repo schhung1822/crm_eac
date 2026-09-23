@@ -33,6 +33,7 @@ interface DataTableProps<TData, TValue> {
   headClassName?: string;
   rowClassName?: string;
   cellClassName?: string;
+  defaultPageSize?: number;
 }
 
 function renderTableBody<TData, TValue>({
@@ -129,9 +130,10 @@ export function DataTable<TData, TValue>({
   headClassName,
   rowClassName,
   cellClassName,
+  defaultPageSize = 10,
 }: DataTableProps<TData, TValue>) {
   // ---- Phân trang cục bộ ----
-  const [pageSize, setPageSize] = React.useState(10);
+  const [pageSize, setPageSize] = React.useState(defaultPageSize);
   const [pageIndex, setPageIndex] = React.useState(0);
 
   const allRows = table.getRowModel().rows; // đã sort/filter xong

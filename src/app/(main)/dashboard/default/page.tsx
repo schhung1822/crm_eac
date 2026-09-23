@@ -1,27 +1,21 @@
 import { getChannelSalesSummary, getCRMStats } from "@/lib/crm-revenue";
-import { getChannels } from "@/lib/orders";
+import { getDailySalesTrend, getOrderStatusSummary } from "@/lib/default-dashboard";
 
 import DefaultDashboardShell from "./_components/default-dashboard-shell";
+import type { ChannelSummary, ChartPoint, DashboardStats, OrderStatusSummary } from "./_components/types";
 
 export const dynamic = "force-dynamic";
 
-const EMPTY_STATS = {
+const EMPTY_STATS: DashboardStats = {
   totalOrders: 0,
   totalTienHang: 0,
+  totalDiscount: 0,
   totalThanhTien: 0,
+  completedRevenue: 0,
   totalQuantity: 0,
 };
 
-const EMPTY_CHANNEL_SUMMARY: Array<{
-  kenh_ban: string;
-  order_count: number;
-  quantity: number;
-  tien_hang: number;
-  giam_gia: number;
-  thanh_tien: number;
-}> = [];
-
-function normalizeStats(value: Awaited<ReturnType<typeof getCRMStats>> | null | undefined) {
+function normalizeStats(value: Awaited<ReturnType<typeof getCRMStats>> | null | undefined): DashboardStats {
   if (!value) {
     return EMPTY_STATS;
   }
@@ -29,93 +23,78 @@ function normalizeStats(value: Awaited<ReturnType<typeof getCRMStats>> | null | 
   return {
     totalOrders: Number(value.totalOrders) || 0,
     totalTienHang: Number(value.totalTienHang) || 0,
+    totalDiscount: Number(value.totalDiscount) || 0,
     totalThanhTien: Number(value.totalThanhTien) || 0,
+    completedRevenue: Number(value.completedRevenue) || 0,
     totalQuantity: Number(value.totalQuantity) || 0,
   };
 }
 
-function normalizeChannelSummary(value: Awaited<ReturnType<typeof getChannelSalesSummary>> | null | undefined) {
-  return Array.isArray(value) ? value : EMPTY_CHANNEL_SUMMARY;
-}
-
-function asArray<T>(value: T[] | null | undefined): T[] {
-  return Array.isArray(value) ? value : [];
+function fulfilledOr<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === "fulfilled" ? result.value : fallback;
 }
 
 /** Không có filter trên URL => mặc định lọc theo tháng này. */
-function resolveDateRange(params: Record<string, string>): { from?: Date; to?: Date } {
+function resolveDateRange(params: Record<string, string>): { from: Date; to: Date } {
   const now = new Date();
-  const hasRangeParam = Boolean(params.from || params.to);
+  const parsedFrom = params.from ? new Date(`${params.from}T00:00:00`) : null;
+  const parsedTo = params.to ? new Date(`${params.to}T23:59:59.999`) : null;
 
-  const from = params.from
-    ? new Date(params.from)
-    : hasRangeParam
-      ? undefined
-      : new Date(now.getFullYear(), now.getMonth(), 1);
-  const to = params.to ? new Date(params.to) : hasRangeParam ? undefined : now;
+  const from =
+    parsedFrom && !Number.isNaN(parsedFrom.getTime()) ? parsedFrom : new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = parsedTo && !Number.isNaN(parsedTo.getTime()) ? parsedTo : now;
 
-  // Ensure toDate is end of day
-  if (to) {
+  if (!params.to) {
     to.setHours(23, 59, 59, 999);
   }
 
   return { from, to };
 }
 
-/** Gom đơn theo ngày để dựng dữ liệu biểu đồ. */
-function buildChartData(
-  channels: Array<{ create_time: Date | string; thanh_tien?: unknown }>,
-): Array<{ date: string; orders: number; revenue: number }> {
-  const chartMap = new Map<string, { orders: number; revenue: number }>();
+function resolvePreviousDateRange(from: Date, to: Date): { from: Date; to: Date } {
+  const rangeDuration = to.getTime() - from.getTime();
+  const previousTo = new Date(from.getTime() - 1);
+  const previousFrom = new Date(previousTo.getTime() - rangeDuration);
 
-  for (const channel of channels) {
-    const createdAt = channel.create_time instanceof Date ? channel.create_time : new Date(channel.create_time);
-
-    if (Number.isNaN(createdAt.getTime())) {
-      continue;
-    }
-
-    const key = createdAt.toISOString().slice(0, 10);
-    const bucket = chartMap.get(key) ?? { orders: 0, revenue: 0 };
-
-    bucket.orders += 1;
-    bucket.revenue += Number(channel.thanh_tien) || 0;
-    chartMap.set(key, bucket);
-  }
-
-  return [...chartMap.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([date, bucket]) => ({ date, orders: bucket.orders, revenue: bucket.revenue }));
+  return { from: previousFrom, to: previousTo };
 }
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const params = await searchParams;
   const { from, to } = resolveDateRange(params);
+  const previousRange = resolvePreviousDateRange(from, to);
 
-  const [channelsResult, channelSummaryResult, statsResult] = await Promise.allSettled([
-    getChannels({ from, to, limit: 10000 }),
-    getChannelSalesSummary(from, to),
-    getCRMStats(from, to),
-  ]);
+  const [statsResult, previousStatsResult, trendResult, channelSummaryResult, statusSummaryResult] =
+    await Promise.allSettled([
+      getCRMStats(from, to),
+      getCRMStats(previousRange.from, previousRange.to),
+      getDailySalesTrend(from, to),
+      getChannelSalesSummary(from, to, true),
+      getOrderStatusSummary(from, to),
+    ]);
 
-  if (
-    channelsResult.status === "rejected" ||
-    channelSummaryResult.status === "rejected" ||
-    statsResult.status === "rejected"
-  ) {
-    console.error("Default dashboard data fallback activated", {
-      channelsError: channelsResult.status === "rejected" ? channelsResult.reason : null,
-      channelSummaryError: channelSummaryResult.status === "rejected" ? channelSummaryResult.reason : null,
-      statsError: statsResult.status === "rejected" ? statsResult.reason : null,
-    });
+  const results = [statsResult, previousStatsResult, trendResult, channelSummaryResult, statusSummaryResult];
+  const errors = results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
+  const hasDataError = errors.length > 0;
+
+  if (hasDataError) {
+    console.error("Default dashboard data fallback activated", errors);
   }
 
-  const channels = channelsResult.status === "fulfilled" ? asArray(channelsResult.value) : [];
-  const channelSummary =
-    channelSummaryResult.status === "fulfilled"
-      ? normalizeChannelSummary(channelSummaryResult.value)
-      : EMPTY_CHANNEL_SUMMARY;
-  const stats = statsResult.status === "fulfilled" ? normalizeStats(statsResult.value) : EMPTY_STATS;
+  const stats = normalizeStats(fulfilledOr(statsResult, EMPTY_STATS));
+  const previousStats = normalizeStats(fulfilledOr(previousStatsResult, EMPTY_STATS));
+  const chartData = fulfilledOr<ChartPoint[]>(trendResult, []);
+  const channelSummary = fulfilledOr<ChannelSummary[]>(channelSummaryResult, []);
+  const statusSummary = fulfilledOr<OrderStatusSummary[]>(statusSummaryResult, []);
 
-  return <DefaultDashboardShell stats={stats} chartData={buildChartData(channels)} channelSummary={channelSummary} />;
+  return (
+    <DefaultDashboardShell
+      stats={stats}
+      previousStats={previousStats}
+      chartData={chartData}
+      channelSummary={channelSummary}
+      statusSummary={statusSummary}
+      hasDataError={hasDataError}
+    />
+  );
 }

@@ -9,6 +9,9 @@ export const productSchema = z.object({
   gia_ban: z.number(),
   gia_von: z.number(),
   property: z.string().optional(),
+  isActive: z.boolean(),
+  soldQuantity: z.number(),
+  salesRevenue: z.number(),
 });
 
 export type Product = z.infer<typeof productSchema>;

@@ -1,157 +1,139 @@
 "use client";
 
-import * as React from "react";
+import { memo } from "react";
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Legend } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { useIsMobile } from "@/hooks/use-mobile";
 
-type ChartPoint = { date: string; orders: number; revenue: number };
+import type { ChartPoint } from "./types";
 
-const TEMPLATES = {
-  default: { orders: "#60a5fa", revenue: "#22c55e" },
-  midnight: { orders: "#38bdf8", revenue: "#a78bfa" },
-  sunset: { orders: "#fb7185", revenue: "#f59e0b" },
-} as const;
+const chartConfig = {
+  revenue: {
+    label: "Doanh thu hoàn thành",
+    color: "#16a34a",
+  },
+  orders: {
+    label: "Đơn hàng",
+    color: "#3b82f6",
+  },
+} satisfies ChartConfig;
 
-export function formatVNDShort(value: number) {
-  if (value >= 1_000_000_000) return `${Math.round(value / 1_000_000_000)}tỷ`;
-  if (value >= 1_000_000) return `${Math.round(value / 1_000_000)}tr`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
-  return value.toString();
+function formatCurrency(value: number) {
+  return `${Math.round(value).toLocaleString("vi-VN")}đ`;
 }
 
-export const ChartAreaInteractive = React.memo(function ChartAreaInteractive({
-  chartData,
-  templateKey = "default",
-}: {
-  chartData?: ChartPoint[];
-  templateKey?: keyof typeof TEMPLATES;
-}) {
-  const isMobile = useIsMobile();
-  const [timeRange, setTimeRange] = React.useState("90d");
+export function formatVNDShort(value: number) {
+  const absoluteValue = Math.abs(value);
 
-  React.useEffect(() => {
-    if (isMobile) setTimeRange("7d");
-  }, [isMobile]);
+  if (absoluteValue >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`;
+  }
 
-  const tpl = TEMPLATES[templateKey] ?? TEMPLATES.default;
+  if (absoluteValue >= 1_000_000) {
+    return `${(value / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr`;
+  }
 
-  // ✅ QUAN TRỌNG: color phải là màu thật, KHÔNG phải var(...)
-  const chartConfig = React.useMemo(
-    () =>
-      ({
-        orders: { label: "Đơn hàng", color: tpl.orders },
-        revenue: { label: "Doanh thu", color: tpl.revenue },
-      }) satisfies ChartConfig,
-    [tpl.orders, tpl.revenue],
-  );
+  if (absoluteValue >= 1_000) {
+    return `${Math.round(value / 1_000).toLocaleString("vi-VN")}k`;
+  }
 
-  const staticChartData: ChartPoint[] = [{ date: new Date().toISOString(), orders: 0, revenue: 0 }];
-  const source = chartData ?? staticChartData;
+  return value.toLocaleString("vi-VN");
+}
 
-  const filteredData = source.filter((item) => {
-    const date = new Date(item.date);
-    const referenceDate = new Date();
-    let daysToSubtract = 90;
-    if (timeRange === "30d") daysToSubtract = 30;
-    else if (timeRange === "7d") daysToSubtract = 7;
+function formatDate(value: string, withYear = false) {
+  const date = new Date(`${value}T00:00:00`);
 
-    const startDate = new Date(referenceDate);
-    startDate.setDate(startDate.getDate() - daysToSubtract);
-    return date >= startDate;
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: withYear ? "numeric" : undefined,
   });
+}
 
-  // tránh trùng id nếu render nhiều chart
-  const gradOrdersId = `fillOrders-${templateKey}`;
-  const gradRevenueId = `fillRevenue-${templateKey}`;
-
+export const ChartAreaInteractive = memo(function ChartAreaInteractive({ chartData }: { chartData: ChartPoint[] }) {
   return (
-    <Card className="@container/card">
+    <Card className="h-full">
       <CardHeader>
-        <CardTitle>Biểu đồ đơn hàng - doanh thu</CardTitle>
+        <CardTitle>Xu hướng bán hàng</CardTitle>
       </CardHeader>
-
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        {/* ✅ ChartContainer sẽ set: --color-orders, --color-revenue */}
-        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
-          <AreaChart data={filteredData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gradOrdersId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-orders)" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-orders)" stopOpacity={0.1} />
-              </linearGradient>
-
-              <linearGradient id={gradRevenueId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={1.0} />
-                <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
-
-            <CartesianGrid vertical={false} />
-
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              minTickGap={32}
-              tickFormatter={(value) =>
-                new Date(value).toLocaleDateString("vi-VN", { month: "2-digit", day: "2-digit" })
-              }
-            />
-
-            <YAxis yAxisId="left" tickLine={false} axisLine={false} width={40} />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tickLine={false}
-              axisLine={false}
-              width={40}
-              tickFormatter={formatVNDShort}
-            />
-
-            <Legend wrapperStyle={{ paddingTop: "20px" }} />
-
-            <ChartTooltip
-              cursor={false}
-              defaultIndex={isMobile ? -1 : 10}
-              content={
-                <ChartTooltipContent
-                  labelFormatter={(value) =>
-                    new Date(value).toLocaleDateString("vi-VN", {
-                      weekday: "short",
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                    })
-                  }
-                  indicator="dot"
-                />
-              }
-            />
-
-            <Area
-              yAxisId="left"
-              dataKey="orders"
-              type="natural"
-              fill={`url(#${gradOrdersId})`}
-              stroke="var(--color-orders)"
-              name="Đơn hàng"
-            />
-
-            <Area
-              yAxisId="right"
-              dataKey="revenue"
-              type="natural"
-              fill={`url(#${gradRevenueId})`}
-              stroke="var(--color-revenue)"
-              name="Doanh thu"
-            />
-          </AreaChart>
-        </ChartContainer>
+      <CardContent className="px-2 sm:px-6">
+        {chartData.length === 0 ? (
+          <div className="text-muted-foreground flex h-[320px] items-center justify-center rounded-xl border border-dashed text-sm">
+            Chưa có dữ liệu bán hàng trong khoảng thời gian đã chọn.
+          </div>
+        ) : (
+          <ChartContainer config={chartConfig} className="aspect-auto h-[320px] min-h-[320px] w-full min-w-0">
+            <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
+                minTickGap={32}
+                tickFormatter={(value) => formatDate(String(value))}
+              />
+              <YAxis
+                yAxisId="revenue"
+                tickLine={false}
+                axisLine={false}
+                width={72}
+                tickFormatter={(value) => formatVNDShort(Number(value))}
+              />
+              <YAxis
+                yAxisId="orders"
+                orientation="right"
+                tickLine={false}
+                axisLine={false}
+                width={32}
+                allowDecimals={false}
+              />
+              <ChartTooltip
+                cursor={{ fill: "var(--muted)", opacity: 0.35 }}
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(value) => `Ngày ${formatDate(String(value), true)}`}
+                    formatter={(value, name) => (
+                      <div className="flex w-full items-center justify-between gap-6">
+                        <span className="text-muted-foreground">
+                          {name === "revenue" ? "Doanh thu hoàn thành" : "Đơn hàng"}
+                        </span>
+                        <span className="font-medium tabular-nums">
+                          {name === "revenue" ? formatCurrency(Number(value)) : Number(value).toLocaleString("vi-VN")}
+                        </span>
+                      </div>
+                    )}
+                  />
+                }
+              />
+              <Bar
+                yAxisId="revenue"
+                dataKey="revenue"
+                fill="var(--color-revenue)"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={48}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="orders"
+                type="monotone"
+                dataKey="orders"
+                stroke="var(--color-orders)"
+                strokeWidth={3}
+                dot={{ r: 3, fill: "var(--color-orders)" }}
+                activeDot={{ r: 5 }}
+                connectNulls
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

@@ -51,7 +51,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="nice-scroll max-h-[80vh] sm:max-h-[82vh]">
+      <SidebarContent className="nice-scroll">
         <NavMain indicators={indicators} />
       </SidebarContent>
       <SidebarFooter>

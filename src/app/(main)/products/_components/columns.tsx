@@ -1,25 +1,11 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { EllipsisVertical } from "lucide-react";
-import { z } from "zod";
 
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
-import { productSchema, Product } from "./schema";
+import type { Product } from "./schema";
 import { TableCellViewer } from "./table-cell-viewer";
-
-// Format số với dấu chấm (1.234.567)
-const formatNumber = (n: number) => {
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-};
 
 export const dashboardColumns: ColumnDef<Product>[] = [
   // Checkbox chọn nhiều dòng
@@ -88,7 +74,7 @@ export const dashboardColumns: ColumnDef<Product>[] = [
     accessorKey: "gia_ban",
     header: ({ column }) => <DataTableColumnHeader className="w-full text-right" column={column} title="Giá bán" />,
     cell: ({ row }) => (
-      <div className="text-right tabular-nums">{(row.original.gia_ban || 0).toLocaleString("vi-VN")}</div>
+      <div className="text-right tabular-nums">{(row.original.gia_ban || 0).toLocaleString("vi-VN")}đ</div>
     ),
     enableSorting: false,
   },
@@ -98,38 +84,52 @@ export const dashboardColumns: ColumnDef<Product>[] = [
     accessorKey: "gia_von",
     header: ({ column }) => <DataTableColumnHeader className="w-full text-right" column={column} title="Giá vốn" />,
     cell: ({ row }) => (
-      <div className="text-right tabular-nums">{(row.original.gia_von || 0).toLocaleString("vi-VN")}</div>
+      <div className="text-right tabular-nums">{(row.original.gia_von || 0).toLocaleString("vi-VN")}đ</div>
     ),
     enableSorting: false,
   },
 
-  // Thuộc tính
   {
-    accessorKey: "property",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Thuộc tính" />,
-    cell: ({ row }) => <span className="block max-w-[200px] truncate">{row.original.property}</span>,
-    enableSorting: false,
+    accessorKey: "soldQuantity",
+    header: ({ column }) => (
+      <DataTableColumnHeader className="w-full justify-end text-right" column={column} title="Đã bán" />
+    ),
+    cell: ({ row }) => (
+      <div className="text-right font-medium tabular-nums">{row.original.soldQuantity.toLocaleString("vi-VN")}</div>
+    ),
+    enableHiding: false,
+  },
+
+  {
+    accessorKey: "salesRevenue",
+    header: ({ column }) => (
+      <DataTableColumnHeader className="w-full justify-end text-right" column={column} title="Doanh thu" />
+    ),
+    cell: ({ row }) => (
+      <div className="text-right font-semibold tabular-nums">
+        {Math.round(row.original.salesRevenue).toLocaleString("vi-VN")}đ
+      </div>
+    ),
+    enableHiding: false,
   },
 
   // Actions
   {
     id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="data-[state=open]:bg-muted text-muted-foreground flex size-8" size="icon">
-            <EllipsisVertical />
-            <span className="sr-only">Mở menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Xem chi tiết</DropdownMenuItem>
-          <DropdownMenuItem>Tạo bản sao</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Xóa</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    header: () => <div className="text-right">Thao tác</div>,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <TableCellViewer
+          item={row.original}
+          trigger={
+            <Button variant="outline" size="sm">
+              Xem chi tiết
+            </Button>
+          }
+        />
+      </div>
     ),
     enableSorting: false,
+    enableHiding: false,
   },
 ];

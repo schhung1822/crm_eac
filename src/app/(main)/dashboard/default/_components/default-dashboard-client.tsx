@@ -1,39 +1,61 @@
 "use client";
 
-import { TableCards } from "../../crm/_components/table-cards";
+import { ChannelPerformance } from "./channel-performance";
+import { ChartAreaInteractive } from "./chart-area-interactive";
 import { DateRangeFilter } from "./date-range-filter";
 import { SectionCards } from "./section-cards";
-import { ChartAreaInteractive } from "./chart-area-interactive";
+import { StatusSummary } from "./status-summary";
+import type { ChannelSummary, ChartPoint, DashboardStats, OrderStatusSummary } from "./types";
 
 type DefaultDashboardClientProps = {
-  stats: {
-    totalOrders: number;
-    totalTienHang: number;
-    totalThanhTien: number;
-    totalQuantity: number;
-  };
-  chartData: Array<{ date: string; orders: number; revenue: number }>;
-  channelSummary: Array<{
-    kenh_ban: string;
-    order_count: number;
-    quantity: number;
-    tien_hang: number;
-    giam_gia: number;
-    thanh_tien: number;
-  }>;
+  stats: DashboardStats;
+  previousStats: DashboardStats;
+  chartData: ChartPoint[];
+  channelSummary: ChannelSummary[];
+  statusSummary: OrderStatusSummary[];
+  hasDataError: boolean;
 };
 
 export default function DefaultDashboardClient({
   stats,
+  previousStats,
   chartData,
   channelSummary,
+  statusSummary,
+  hasDataError,
 }: DefaultDashboardClientProps) {
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">
-      <DateRangeFilter />
-      <SectionCards stats={stats} />
-      <ChartAreaInteractive chartData={chartData} />
-      <TableCards channels={channelSummary} />
+      <section className="md:py-2">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Báo cáo tổng quan</h1>
+            </div>
+          </div>
+          <DateRangeFilter />
+        </div>
+      </section>
+
+      {hasDataError ? (
+        <div
+          role="alert"
+          className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+        >
+          Một phần dữ liệu báo cáo chưa tải được. Vui lòng thử tải lại trang.
+        </div>
+      ) : null}
+
+      <SectionCards stats={stats} previousStats={previousStats} />
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="min-w-0 xl:col-span-2">
+          <ChartAreaInteractive chartData={chartData} />
+        </div>
+        <StatusSummary data={statusSummary} />
+      </div>
+
+      <ChannelPerformance channels={channelSummary} />
     </div>
   );
 }

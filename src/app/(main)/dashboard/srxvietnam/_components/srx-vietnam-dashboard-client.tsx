@@ -777,21 +777,18 @@ function RecentPostsCard({ recentPosts }: Pick<SrxVietnamDashboardClientProps["d
 export default function SrxVietnamDashboardClient({ data }: SrxVietnamDashboardClientProps) {
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <Card className="overflow-hidden border-none bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white shadow-sm">
-        <CardHeader className="gap-4 lg:flex lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <Badge className="w-fit border-white/15 bg-white/10 text-white hover:bg-white/10">Dashboard SRX</Badge>
-            <div className="space-y-1">
-              <CardTitle className="text-3xl font-semibold tracking-tight">
-                Báo cáo vận hành website SRX Việt Nam
-              </CardTitle>
-            </div>
+      <CardHeader className="gap-4 lg:flex lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <CardTitle className="text-3xl font-semibold tracking-tight">
+              Báo cáo vận hành website SRX Việt Nam
+            </CardTitle>
           </div>
-          <div className="rounded-2xl bg-white/5 p-1">
-            <DateRangeFilter />
-          </div>
-        </CardHeader>
-      </Card>
+        </div>
+        <div className="rounded-2xl bg-white/5 p-1">
+          <DateRangeFilter />
+        </div>
+      </CardHeader>
 
       <KpiCards summary={data.summary} />
       <OperationalMetrics operations={data.operations} summary={data.summary} />

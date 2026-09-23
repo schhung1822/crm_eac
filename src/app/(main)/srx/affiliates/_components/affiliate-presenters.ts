@@ -21,6 +21,16 @@ export function formatDateTime(value: Date | null): string {
   return value.toLocaleString("vi-VN");
 }
 
+export function formatDatabaseLocalDateTime(value: Date | null): string {
+  if (!value) {
+    return "—";
+  }
+
+  // MySQL DATETIME stores created_at as Vietnam wall time, but Prisma materializes it as UTC.
+  // Formatting in UTC preserves the stored clock value instead of adding the browser offset again.
+  return value.toLocaleString("vi-VN", { timeZone: "UTC" });
+}
+
 export function getAffiliateAccountStatusLabel(status: SrxAffiliateAccount["status"]): string {
   switch (status) {
     case "active":

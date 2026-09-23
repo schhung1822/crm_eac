@@ -102,8 +102,10 @@ export const getCRMStats = unstable_cache(
       SELECT
         COUNT(DISTINCT order_ID) AS totalOrders,
         SUM(COALESCE(quantity, 0)) AS totalQuantity,
-        SUM(COALESCE(tien_hang, 0)) AS totalTienHang,
-        SUM(COALESCE(thanh_tien, 0)) AS totalThanhTien
+        SUM(COALESCE(tien_hang, 0) * COALESCE(quantity, 0)) AS totalTienHang,
+        SUM(COALESCE(giam_gia, 0)) AS totalDiscount,
+        SUM(COALESCE(thanh_tien, 0)) AS totalThanhTien,
+        SUM(CASE WHEN TRIM(status) = 'Hoàn thành' THEN COALESCE(thanh_tien, 0) ELSE 0 END) AS completedRevenue
       FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
       `,
@@ -116,7 +118,9 @@ export const getCRMStats = unstable_cache(
       totalOrders: Number(row.totalOrders) || 0,
       totalQuantity: Number(row.totalQuantity) || 0,
       totalTienHang: Number(row.totalTienHang) || 0,
+      totalDiscount: Number(row.totalDiscount) || 0,
       totalThanhTien: Number(row.totalThanhTien) || 0,
+      completedRevenue: Number(row.completedRevenue) || 0,
     };
   },
   ["crm-stats"],
@@ -156,15 +160,16 @@ export const getBrandConversionFunnel = unstable_cache(
 );
 
 export const getChannelSalesSummary = unstable_cache(
-  async (from?: Date, to?: Date) => {
+  async (from?: Date, to?: Date, completedOnly = false) => {
     const db = getDB();
     const dateFilter = buildDateFilter(from, to);
     const whereClause = dateFilter.clause || "1=1";
+    const completedFilter = completedOnly ? "AND TRIM(status) = 'Hoàn thành'" : "";
 
     const [rows] = await db.query<any[]>(
       `
       SELECT
-        COALESCE(kenh_ban, 'Khong ro') AS kenh_ban,
+        COALESCE(NULLIF(TRIM(kenh_ban), ''), 'Chưa xác định') AS kenh_ban,
         COUNT(DISTINCT order_ID) AS orders,
         SUM(COALESCE(quantity, 0)) AS quantity,
         SUM(COALESCE(tien_hang, 0) * COALESCE(quantity, 0)) AS tien_hang,
@@ -172,14 +177,15 @@ export const getChannelSalesSummary = unstable_cache(
         SUM(COALESCE(thanh_tien, 0)) AS thanh_tien
       FROM ${legacyEacTables.orders}
       WHERE ${whereClause}
-      GROUP BY COALESCE(kenh_ban, 'Khong ro')
+        ${completedFilter}
+      GROUP BY COALESCE(NULLIF(TRIM(kenh_ban), ''), 'Chưa xác định')
       ORDER BY thanh_tien DESC
       `,
       dateFilter.params,
     );
 
     return (rows ?? []).map((row) => ({
-      kenh_ban: String(row.kenh_ban ?? "Khong ro"),
+      kenh_ban: String(row.kenh_ban ?? "Chưa xác định"),
       order_count: Number(row.orders) || 0,
       quantity: Number(row.quantity) || 0,
       tien_hang: Number(row.tien_hang) || 0,

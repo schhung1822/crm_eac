@@ -284,6 +284,53 @@ function ConnectionDialog({
   );
 }
 
+function IntegrationGuide() {
+  return (
+    <Card className="gap-4">
+      <CardHeader className="px-4">
+        <div className="flex items-start gap-3">
+          <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+            <Info className="size-4" />
+          </span>
+          <div className="space-y-1">
+            <CardTitle className="text-base">Hướng dẫn sử dụng kết nối</CardTitle>
+            <CardDescription>Các kết nối này phục vụ quy trình tạo và đăng nội dung SRX.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 px-4 md:grid-cols-3">
+        <div className="rounded-xl border p-4">
+          <p className="text-sm font-semibold">1. Kết nối công cụ</p>
+          <p className="text-muted-foreground mt-2 text-sm leading-6">
+            Thêm API key AI để viết, tối ưu bài và tạo ảnh. Google Drive hỗ trợ tệp; Facebook Page và Zalo OA phục vụ
+            đăng nội dung lên các kênh tương ứng.
+          </p>
+        </div>
+        <div className="rounded-xl border p-4">
+          <p className="text-sm font-semibold">2. Sử dụng trong trình soạn tin</p>
+          <p className="text-muted-foreground mt-2 text-sm leading-6">
+            Trong trang tin tức, chọn nhà cung cấp và model ở modal viết bài hoặc tạo ảnh. Nội dung sinh ra cần được
+            kiểm tra, chỉnh sửa và duyệt trước khi đăng.
+          </p>
+        </div>
+        <div className="rounded-xl border p-4">
+          <p className="text-sm font-semibold">3. Theo dõi chi phí</p>
+          <p className="text-muted-foreground mt-2 text-sm leading-6">
+            Mỗi lần bấm viết, tối ưu hoặc tạo ảnh có thể phát sinh một hay nhiều lượt gọi API. Chi phí phụ thuộc model,
+            lượng token đầu vào/đầu ra và số ảnh được tạo.
+          </p>
+        </div>
+        <div className="bg-muted/40 text-muted-foreground rounded-xl border p-4 text-sm leading-6 md:col-span-3">
+          <span className="text-foreground font-medium">Lưu ý chi phí:</span> số liệu phía trên là ước tính theo lượng
+          sử dụng được hệ thống ghi nhận. Hóa đơn thực tế do từng nhà cung cấp AI quyết định và có thể thay đổi theo
+          bảng giá của họ. Nên ưu tiên model phù hợp, chuẩn bị yêu cầu rõ ràng và hạn chế tạo lại nhiều lần không cần
+          thiết.
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ConnectionsManager() {
   const [connections, setConnections] = React.useState<SrxConnectionState[]>([]);
   const [usage, setUsage] = React.useState<UsageReport>(emptyUsage);
@@ -423,11 +470,11 @@ export function ConnectionsManager() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Quản lý kết nối</h1>
-          <p className="text-muted-foreground text-sm">Quản lý API key AI và tích hợp ở một nơi.</p>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Kết nối AI và dịch vụ</h1>
+          <p className="text-muted-foreground text-sm">Cấu hình model AI, lưu trữ và các kênh đăng nội dung.</p>
         </div>
         <Button onClick={() => openEditor(srxConnectionCatalog[0])} disabled={isLoading}>
           <Plus className="size-4" />
@@ -435,49 +482,48 @@ export function ConnectionsManager() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="gap-1">
-            <CardDescription>Token vào</CardDescription>
-            <CardTitle className="text-3xl font-semibold tracking-tight">{formatTokens(usage.inputTokens)}</CardTitle>
-          </CardHeader>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="gap-0 py-0">
+          <CardContent className="px-4 py-4">
+            <p className="text-muted-foreground text-xs font-medium">Token đầu vào</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">{formatTokens(usage.inputTokens)}</p>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="gap-1">
-            <CardDescription>Token ra</CardDescription>
-            <CardTitle className="text-3xl font-semibold tracking-tight">{formatTokens(usage.outputTokens)}</CardTitle>
-          </CardHeader>
+        <Card className="gap-0 py-0">
+          <CardContent className="px-4 py-4">
+            <p className="text-muted-foreground text-xs font-medium">Token đầu ra</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">{formatTokens(usage.outputTokens)}</p>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="gap-1">
-            <CardDescription>Tổng chi phí dự kiến</CardDescription>
-            <CardTitle className="text-3xl font-semibold tracking-tight">
-              {formatUsd(usage.costUsd)} <span className="text-muted-foreground text-2xl">≈</span>{" "}
-              <span className="text-2xl text-rose-600 underline decoration-rose-600/40 underline-offset-4 dark:text-rose-400">
-                {formatVnd(usage.costVnd)}
-              </span>
-            </CardTitle>
-            {usage.calls > 0 ? (
-              <p className="text-muted-foreground text-xs">
-                {usage.calls.toLocaleString("vi-VN")} lượt gọi · tỷ giá {usage.usdToVndRate.toLocaleString("vi-VN")}{" "}
-                đ/USD
-              </p>
-            ) : (
-              <p className="text-muted-foreground text-xs">Chưa có lượt gọi AI nào được ghi nhận</p>
-            )}
-          </CardHeader>
+        <Card className="gap-0 py-0">
+          <CardContent className="px-4 py-4">
+            <p className="text-muted-foreground text-xs font-medium">Lượt gọi AI</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">
+              {usage.calls.toLocaleString("vi-VN")}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="gap-0 py-0">
+          <CardContent className="px-4 py-4">
+            <p className="text-muted-foreground text-xs font-medium">Chi phí ước tính</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">{formatVnd(usage.costVnd)}</p>
+            <p className="text-muted-foreground mt-1 text-xs tabular-nums">{formatUsd(usage.costUsd)}</p>
+          </CardContent>
         </Card>
       </div>
 
       {usage.byModel.length > 0 ? (
-        <Card>
-          <CardHeader>
+        <Card className="gap-3">
+          <CardHeader className="px-4">
             <CardTitle className="text-base">Chi tiết theo model</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y">
               {usage.byModel.map((row) => (
-                <li key={`${row.provider}-${row.model}`} className="flex items-center gap-3 px-6 py-3 text-sm">
+                <li
+                  key={`${row.provider}-${row.model}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                >
                   <span className="min-w-0 flex-1 truncate font-medium">{row.model}</span>
                   <span className="text-muted-foreground shrink-0 text-xs">
                     vào {formatTokens(row.inputTokens)} · ra {formatTokens(row.outputTokens)}
@@ -490,12 +536,13 @@ export function ConnectionsManager() {
         </Card>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="bg-muted/40 flex w-fit max-w-full flex-wrap gap-1 rounded-xl border p-1">
         {filterTabs.map((tab) => (
           <Button
             key={tab.value}
             size="sm"
-            variant={filter === tab.value ? "secondary" : "ghost"}
+            variant={filter === tab.value ? "default" : "ghost"}
+            aria-pressed={filter === tab.value}
             onClick={() => setFilter(tab.value)}
           >
             {tab.label}
@@ -506,11 +553,11 @@ export function ConnectionsManager() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="gap-3">
+        <CardHeader className="px-4">
           <CardTitle className="text-base">Có thể thêm</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <CardContent className="grid gap-2 px-4 sm:grid-cols-2 xl:grid-cols-4">
           {visibleCatalog.map((definition) => {
             const connection = connectionById.get(definition.id);
 
@@ -519,7 +566,7 @@ export function ConnectionsManager() {
                 key={definition.id}
                 type="button"
                 onClick={() => openEditor(definition)}
-                className="hover:border-primary/50 hover:bg-accent/40 flex items-center gap-3 rounded-lg border p-3 text-left transition-colors"
+                className="hover:border-primary/50 hover:bg-accent/40 flex items-center gap-3 rounded-lg border p-2.5 text-left transition-colors"
               >
                 <ConnectionLogo definition={definition} />
                 <span className="min-w-0">
@@ -534,8 +581,8 @@ export function ConnectionsManager() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="gap-3">
+        <CardHeader className="flex flex-row items-center justify-between px-4">
           <CardTitle className="text-base">Đã kết nối</CardTitle>
           <Button
             variant="ghost"
@@ -550,17 +597,17 @@ export function ConnectionsManager() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <p className="text-muted-foreground p-6 text-sm">Đang tải kết nối...</p>
+            <p className="text-muted-foreground px-4 py-5 text-sm">Đang tải kết nối...</p>
           ) : visibleConnected.length === 0 ? (
-            <p className="text-muted-foreground p-6 text-sm">
+            <p className="text-muted-foreground px-4 py-5 text-sm">
               Chưa có kết nối nào. Chọn một công cụ ở phần &ldquo;Có thể thêm&rdquo; để bắt đầu.
             </p>
           ) : (
             <ul className="divide-y">
               {visibleConnected.map(({ definition, connection }) => (
-                <li key={definition.id} className="flex items-center gap-3 px-6 py-4">
+                <li key={definition.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <ConnectionLogo definition={definition} />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[180px] flex-1">
                     <div className="truncate text-sm font-medium">{definition.label}</div>
                     <div className="text-muted-foreground truncate text-xs">
                       {srxConnectionCategoryLabels[definition.category]}
@@ -568,37 +615,41 @@ export function ConnectionsManager() {
                       {connection.statusMessage ? ` · ${connection.statusMessage}` : ""}
                     </div>
                   </div>
-                  <StatusBadge connection={connection} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => void handleTest(definition.id)}
-                    disabled={testingId === definition.id}
-                    title="Kiểm tra kết nối"
-                  >
-                    {testingId === definition.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                    <span className="sr-only">Kiểm tra {definition.label}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setPendingDelete(definition)}
-                    title="Xóa kết nối"
-                  >
-                    <Trash2 className="size-4" />
-                    <span className="sr-only">Xóa {definition.label}</span>
-                  </Button>
+                  <div className="ml-auto flex items-center gap-1">
+                    <StatusBadge connection={connection} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => void handleTest(definition.id)}
+                      disabled={testingId === definition.id}
+                      title="Kiểm tra kết nối"
+                    >
+                      {testingId === definition.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                      <span className="sr-only">Kiểm tra {definition.label}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setPendingDelete(definition)}
+                      title="Xóa kết nối"
+                    >
+                      <Trash2 className="size-4" />
+                      <span className="sr-only">Xóa {definition.label}</span>
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      <IntegrationGuide />
 
       <ConnectionDialog state={editing} onClose={() => setEditing(null)} onSaved={applyConnection} />
 

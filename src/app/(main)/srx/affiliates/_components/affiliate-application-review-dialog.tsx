@@ -22,6 +22,7 @@ import {
 } from "@/lib/srx-affiliates.shared";
 
 import {
+  formatDatabaseLocalDateTime,
   formatDateTime,
   getAffiliateAccountStatusLabel,
   getAffiliateApplicationStatusLabel,
@@ -98,7 +99,7 @@ export function AffiliateApplicationReviewDialog({
               </div>
 
               <div className="grid gap-1 text-sm md:text-right">
-                <div>Tạo hồ sơ: {formatDateTime(initialValue.created_at)}</div>
+                <div>Tạo hồ sơ: {formatDatabaseLocalDateTime(initialValue.created_at)}</div>
                 <div className="text-muted-foreground">Duyệt lần cuối: {formatDateTime(initialValue.reviewed_at)}</div>
                 <div className="text-muted-foreground">
                   Affiliate: {initialValue.affiliate_code || "Chưa liên kết"}

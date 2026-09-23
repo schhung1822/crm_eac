@@ -5,13 +5,26 @@ import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { format } from "date-fns";
-import { vi } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 type Range = { from?: Date; to?: Date };
+
+const PRESET_OPTIONS = [
+  { mode: "7d", label: "7 ngày" },
+  { mode: "30d", label: "30 ngày" },
+  { mode: "thisMonth", label: "Tháng này" },
+  { mode: "lastMonth", label: "Tháng trước" },
+  { mode: "ytd", label: "Năm này" },
+] as const;
+
+type PresetMode = (typeof PRESET_OPTIONS)[number]["mode"];
+
+const ACTIVE_FILTER_CLASS =
+  "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground focus-visible:ring-primary/40";
 
 function toISO(d?: Date) {
   if (!d) return "";
@@ -20,7 +33,7 @@ function toISO(d?: Date) {
 
 function fromISO(s?: string | null) {
   if (!s) return undefined;
-  const d = new Date(s);
+  const d = new Date(`${s}T00:00:00`);
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
@@ -43,17 +56,54 @@ function rangeFromParams(fromParam?: string | null, toParam?: string | null): Ra
   return { from: fromISO(fromParam), to: fromISO(toParam) };
 }
 
+function presetRange(mode: PresetMode, now = new Date()): Range {
+  let start = new Date(now);
+  let end = now;
+
+  if (mode === "7d") start.setDate(now.getDate() - 6);
+  if (mode === "30d") start.setDate(now.getDate() - 29);
+  if (mode === "thisMonth") start = startOfMonth(now);
+
+  if (mode === "lastMonth") {
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    start = previousMonth;
+    end = endOfMonth(previousMonth);
+  }
+
+  if (mode === "ytd") start.setMonth(0, 1);
+
+  return { from: start, to: end };
+}
+
 export function DateRangeFilter() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
+  const fromParam = sp.get("from");
+  const toParam = sp.get("to");
 
-  const [range, setRange] = React.useState<Range>(() => rangeFromParams(sp.get("from"), sp.get("to")));
+  const [range, setRange] = React.useState<Range>(() => rangeFromParams(fromParam, toParam));
+  const [isOpen, setIsOpen] = React.useState(false);
+  const appliedRange = React.useMemo(() => rangeFromParams(fromParam, toParam), [fromParam, toParam]);
+
+  const activePreset = React.useMemo(() => {
+    const appliedFrom = toISO(appliedRange.from);
+    const appliedTo = toISO(appliedRange.to);
+    const now = new Date();
+
+    return (
+      PRESET_OPTIONS.find(({ mode }) => {
+        const preset = presetRange(mode, now);
+        return toISO(preset.from) === appliedFrom && toISO(preset.to) === appliedTo;
+      })?.mode ?? null
+    );
+  }, [appliedRange]);
+
+  const isCustomRange = Boolean(appliedRange.from ?? appliedRange.to) && activePreset === null;
 
   React.useEffect(() => {
-    setRange(rangeFromParams(sp.get("from"), sp.get("to")));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp.get("from"), sp.get("to")]);
+    setRange(rangeFromParams(fromParam, toParam));
+  }, [fromParam, toParam]);
 
   const label = React.useMemo(() => {
     if (range.from && range.to) {
@@ -72,33 +122,13 @@ export function DateRangeFilter() {
     if (r.to) params.set("to", toISO(r.to));
     else params.delete("to");
 
-    router.replace(`${pathname}?${params.toString()}`);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+    setIsOpen(false);
   };
 
-  const quick = (mode: "7d" | "30d" | "90d" | "ytd" | "thisMonth" | "lastMonth") => {
-    const now = new Date();
-    let start = new Date(now);
-    let end = now;
-
-    if (mode === "7d") start.setDate(now.getDate() - 7);
-    if (mode === "30d") start.setDate(now.getDate() - 30);
-    if (mode === "90d") start.setDate(now.getDate() - 90);
-
-    if (mode === "thisMonth") {
-      start = startOfMonth(now);
-    }
-
-    if (mode === "lastMonth") {
-      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      start = prevMonth;
-      end = endOfMonth(prevMonth);
-    }
-
-    if (mode === "ytd") {
-      start.setMonth(0, 1);
-    }
-
-    const r = { from: start, to: end };
+  const quick = (mode: PresetMode) => {
+    const r = presetRange(mode);
     setRange(r);
     apply(r);
   };
@@ -109,27 +139,35 @@ export function DateRangeFilter() {
     const params = new URLSearchParams(sp.toString());
     params.delete("from");
     params.delete("to");
-    router.replace(`${pathname}?${params.toString()}`);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Popover>
+    <div className="bg-background/80 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-xl border p-1 shadow-sm backdrop-blur">
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="justify-start">
+          <Button
+            variant="ghost"
+            aria-pressed={isCustomRange}
+            className={cn(
+              "focus-visible:ring-primary/40 max-w-full justify-start gap-2 px-3",
+              isCustomRange && ACTIVE_FILTER_CLASS,
+            )}
+          >
             {label}
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-auto p-3" align="start">
-          <div className="flex gap-3">
+        <PopoverContent className="max-h-[80vh] w-auto max-w-[calc(100vw-2rem)] overflow-auto p-3" align="end">
+          <div className="flex flex-col gap-3 lg:flex-row">
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Từ ngày</span>
               <Calendar
                 mode="single"
                 selected={range.from}
                 onSelect={(d) => setRange({ ...range, from: d })}
-                disabled={(date) => (range.to ? date > range.to : false)}
+                disabled={(date) => date > new Date() || (range.to ? date > range.to : false)}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -138,7 +176,7 @@ export function DateRangeFilter() {
                 mode="single"
                 selected={range.to}
                 onSelect={(d) => setRange({ ...range, to: d })}
-                disabled={(date) => (range.from ? date < range.from : false)}
+                disabled={(date) => date > new Date() || (range.from ? date < range.from : false)}
               />
             </div>
           </div>
@@ -150,25 +188,26 @@ export function DateRangeFilter() {
         </PopoverContent>
       </Popover>
 
-      <Button variant="outline" size="sm" onClick={() => quick("7d")}>
-        7 ngày
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => quick("30d")}>
-        30 ngày
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => quick("thisMonth")}>
-        Tháng này
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => quick("lastMonth")}>
-        Tháng trước
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => quick("ytd")}>
-        Năm này
-      </Button>
+      {PRESET_OPTIONS.map((option) => {
+        const isActive = activePreset === option.mode;
 
-      {(sp.get("from") ?? sp.get("to")) && (
-        <Button variant="secondary" size="sm" onClick={clear}>
-          Xóa
+        return (
+          <Button
+            key={option.mode}
+            variant="ghost"
+            size="sm"
+            aria-pressed={isActive}
+            className={cn("focus-visible:ring-primary/40", isActive && ACTIVE_FILTER_CLASS)}
+            onClick={() => quick(option.mode)}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+
+      {(fromParam ?? toParam) && (
+        <Button variant="ghost" size="sm" onClick={clear}>
+          Đặt lại
         </Button>
       )}
     </div>

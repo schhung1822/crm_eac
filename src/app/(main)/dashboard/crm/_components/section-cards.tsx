@@ -1,9 +1,6 @@
 import { memo } from "react";
 
-import { TrendingUp } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 type SectionCardsProps = {
   stats: {
@@ -16,53 +13,25 @@ type SectionCardsProps = {
 
 export const SectionCards = memo(function SectionCards({ stats }: SectionCardsProps) {
   const formatNumber = (n: number) => n.toLocaleString("vi-VN");
+  const formatCurrency = (n: number) => `${Math.round(n).toLocaleString("vi-VN")}đ`;
+
+  const cards = [
+    { label: "Tổng đơn", value: formatNumber(stats.totalOrders) },
+    { label: "Sản phẩm bán ra", value: formatNumber(stats.totalQuantity) },
+    { label: "Tiền hàng", value: formatCurrency(stats.totalTienHang) },
+    { label: "Thành tiền", value: formatCurrency(stats.totalThanhTien) },
+  ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Tổng đơn</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {formatNumber(stats.totalOrders)}
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUp />
-              Đơn
-            </Badge>
-          </CardAction>
-        </CardHeader>
-      </Card>
-
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Tổng sản phẩm bán ra</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {formatNumber(stats.totalQuantity)}
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUp />
-              Sản phẩm
-            </Badge>
-          </CardAction>
-        </CardHeader>
-      </Card>
-
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Tổng thành tiền</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {formatNumber(stats.totalThanhTien)}
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUp />
-              VNĐ
-            </Badge>
-          </CardAction>
-        </CardHeader>
-      </Card>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map((card) => (
+        <Card key={card.label} className="gap-0 py-0">
+          <CardContent className="px-4 py-4">
+            <p className="text-muted-foreground text-xs font-medium">{card.label}</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">{card.value}</p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 });

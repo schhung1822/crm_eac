@@ -25,6 +25,7 @@ import {
 
 import { AffiliateApplicationReviewDialog } from "./affiliate-application-review-dialog";
 import {
+  formatDatabaseLocalDateTime,
   formatDateTime,
   getAffiliateAccountStatusLabel,
   getAffiliateAccountStatusVariant,
@@ -234,7 +235,7 @@ export function AffiliateApplicationManager({
         header: ({ column }) => <DataTableColumnHeader column={column} title="Thời gian" />,
         cell: ({ row }) => (
           <div className="space-y-1 text-sm">
-            <div>Tạo: {formatDateTime(row.original.created_at)}</div>
+            <div>Tạo: {formatDatabaseLocalDateTime(row.original.created_at)}</div>
             <div className="text-muted-foreground text-xs">Duyệt: {formatDateTime(row.original.reviewed_at)}</div>
           </div>
         ),

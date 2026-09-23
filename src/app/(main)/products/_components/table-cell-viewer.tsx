@@ -2,9 +2,6 @@
 
 import * as React from "react";
 
-import { Package, Tag, Layers, Banknote, ReceiptText, Image as ImageIcon } from "lucide-react";
-import { z } from "zod";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,151 +14,106 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { productSchema } from "./schema";
+import type { Product } from "./schema";
 
-function money(v: unknown) {
-  const n = typeof v === "number" ? v : Number(String(v ?? 0).replaceAll(",", ""));
-  if (!Number.isFinite(n)) return "0";
-  return n.toLocaleString("vi-VN");
+function formatNumber(value: number) {
+  return value.toLocaleString("vi-VN");
 }
 
-function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value?: React.ReactNode }) {
+function formatMoney(value: number) {
+  return `${Math.round(value).toLocaleString("vi-VN")}đ`;
+}
+
+function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="flex items-start gap-2.5">
-      <div className="text-muted-foreground mt-0.5">{icon}</div>
-      <div className="min-w-0 flex-1">
-        <div className="text-muted-foreground text-[11px]">{label}</div>
-        <div className="text-sm leading-snug font-medium">
-          {value ?? <span className="text-muted-foreground">—</span>}
-        </div>
+    <div className="bg-muted/40 rounded-xl border p-4">
+      <div className="text-muted-foreground text-xs font-medium">{label}</div>
+      <div
+        className={
+          accent ? "text-primary mt-2 text-lg font-semibold tabular-nums" : "mt-2 text-lg font-semibold tabular-nums"
+        }
+      >
+        {value}
       </div>
     </div>
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-card/60 rounded-2xl border p-3">
-      <div className="mb-2 text-sm font-semibold">{title}</div>
-      <div className="grid gap-2.5">{children}</div>
+    <div className="space-y-1">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="text-sm font-medium break-words">{value || "—"}</dd>
     </div>
   );
 }
 
-export function TableCellViewer({ item }: { item: z.infer<typeof productSchema> }) {
+export function TableCellViewer({ item, trigger }: { item: Product; trigger?: React.ReactElement }) {
   const isMobile = useIsMobile();
-
-  // ✅ Đổi field ảnh tại đây nếu schema bạn dùng tên khác
-  const thumbSrc =
-    (item as any)?.thumbnail || (item as any)?.image || (item as any)?.image_url || (item as any)?.thumb || "";
-
-  // ✅ Ảnh mặc định (bạn thay path theo dự án)
-  const DEFAULT_THUMB = "/images/product-default.png";
-
-  const giaBan = money(item.gia_ban || 0);
-  const giaVon = money(item.gia_von || 0);
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.name}
-        </Button>
+        {trigger ?? (
+          <Button variant="link" className="text-foreground h-auto max-w-full justify-start px-0 text-left">
+            <span className="truncate">{item.name}</span>
+          </Button>
+        )}
       </DrawerTrigger>
 
-      {/* max width 400px, full height desktop */}
-      <DrawerContent className="h-[100vh] sm:ml-auto sm:h-[100vh] sm:max-w-[400px]">
-        {/* HEADER sticky */}
-        <DrawerHeader className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 border-b backdrop-blur">
-          <div className="flex items-start gap-3">
-            {/* Thumbnail vuông */}
-            <div className="bg-muted relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumbSrc || DEFAULT_THUMB}
-                alt={item.name}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  const img = e.currentTarget;
-                  if (img.src.includes(DEFAULT_THUMB)) return;
-                  img.src = DEFAULT_THUMB;
-                }}
-              />
-              {!thumbSrc ? (
-                <div className="absolute inset-0 grid place-items-center">
-                  <ImageIcon className="text-muted-foreground h-5 w-5" />
-                </div>
-              ) : null}
-            </div>
+      <DrawerContent className="h-[85dvh] sm:ml-auto sm:h-[100dvh] sm:max-w-[520px]">
+        <DrawerHeader className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 gap-3 border-b px-5 py-5 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Đang bán" : "Ngừng bán"}</Badge>
+            {item.brand ? <Badge variant="outline">{item.brand}</Badge> : null}
+            {item.class ? <Badge variant="outline">{item.class}</Badge> : null}
+          </div>
 
-            <div className="min-w-0 flex-1">
-              <DrawerTitle className="truncate text-base">{item.name}</DrawerTitle>
-              <DrawerDescription className="truncate">
-                Mã: <span className="text-foreground font-medium">{item.pro_ID}</span>
-                {item.brand ? <> • {item.brand}</> : null}
-              </DrawerDescription>
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                {item.brand ? (
-                  <Badge variant="outline" className="rounded-full">
-                    <Tag className="mr-1 h-3.5 w-3.5" />
-                    {String(item.brand)}
-                  </Badge>
-                ) : null}
-
-                {item.class ? (
-                  <Badge variant="secondary" className="rounded-full">
-                    <Layers className="mr-1 h-3.5 w-3.5" />
-                    {String(item.class)}
-                  </Badge>
-                ) : null}
-              </div>
-            </div>
+          <div className="space-y-1.5">
+            <DrawerTitle className="text-xl leading-snug tracking-tight">{item.name}</DrawerTitle>
+            <DrawerDescription>
+              Mã sản phẩm: <span className="text-foreground font-mono font-medium">{item.pro_ID}</span>
+            </DrawerDescription>
           </div>
         </DrawerHeader>
 
-        {/* BODY scroll */}
-        <div className="nice-scroll flex-1 overflow-y-auto px-4 py-4">
-          <div className="grid gap-3">
-            <Block title="Tổng quan">
-              <Row
-                icon={<Package className="h-4 w-4" />}
-                label="Tên sản phẩm"
-                value={<span className="break-words">{item.name}</span>}
-              />
-              <Row icon={<Tag className="h-4 w-4" />} label="Thương hiệu" value={item.brand ?? "—"} />
-              <Row icon={<Layers className="h-4 w-4" />} label="Loại sản phẩm" value={item.class ?? "—"} />
-            </Block>
+        <div className="nice-scroll flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          <section className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <h3 className="text-sm font-semibold">Tổng quan kinh doanh</h3>
+              <span className="text-muted-foreground text-xs">Chỉ tính đơn hoàn thành</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Metric label="Giá bán" value={formatMoney(item.gia_ban)} />
+              <Metric label="Giá vốn" value={formatMoney(item.gia_von)} />
+              <Metric label="Số lượng đã bán" value={formatNumber(item.soldQuantity)} />
+              <Metric label="Doanh thu" value={formatMoney(item.salesRevenue)} accent />
+            </div>
+          </section>
 
-            <Block title="Giá">
-              <Row
-                icon={<Banknote className="h-4 w-4" />}
-                label="Giá bán"
-                value={<span className="tabular-nums">{giaBan} VNĐ</span>}
-              />
-              <Row
-                icon={<ReceiptText className="h-4 w-4" />}
-                label="Giá vốn"
-                value={<span className="tabular-nums">{giaVon} VNĐ</span>}
-              />
-            </Block>
+          <section className="rounded-xl border p-4">
+            <h3 className="mb-4 text-sm font-semibold">Thông tin sản phẩm</h3>
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Detail label="Mã sản phẩm" value={item.pro_ID} />
+              <Detail label="Thương hiệu" value={item.brand} />
+              <Detail label="Phân loại" value={item.class} />
+              <Detail label="Trạng thái" value={item.isActive ? "Đang bán" : "Ngừng bán"} />
+            </dl>
+          </section>
 
-            <Block title="Thuộc tính">
-              <div className="text-muted-foreground text-[11px]">Mô tả</div>
-              <div className="text-foreground/90 text-sm break-words whitespace-pre-wrap">
-                {item.property ? String(item.property) : "—"}
-              </div>
-            </Block>
-          </div>
+          <section className="rounded-xl border p-4">
+            <h3 className="mb-3 text-sm font-semibold">Mô tả và thuộc tính</h3>
+            <p className="text-muted-foreground text-sm leading-6 break-words whitespace-pre-wrap">
+              {item.property?.trim() ? item.property : "Chưa có mô tả cho sản phẩm này."}
+            </p>
+          </section>
         </div>
 
-        {/* FOOTER sticky */}
-        <DrawerFooter className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky bottom-0 z-10 border-t backdrop-blur">
+        <DrawerFooter className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky bottom-0 border-t px-5 py-4 backdrop-blur">
           <DrawerClose asChild>
-            <Button variant="outline" className="w-full rounded-xl">
+            <Button variant="outline" className="w-full">
               Đóng
             </Button>
           </DrawerClose>

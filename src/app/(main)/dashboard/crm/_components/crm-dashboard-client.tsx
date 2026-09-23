@@ -106,8 +106,14 @@ export default function CRMDashboardClient({
   channelSummary,
 }: CRMDashboardClientProps) {
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <DateRangeFilter />
+    <div className="@container/main flex flex-col gap-4 md:gap-6">
+      <section className="md:py-2">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Báo cáo CRM</h1>
+          <DateRangeFilter />
+        </div>
+      </section>
+
       <SectionCards stats={stats} />
       <CustomerInsightCards {...customerInsights} />
       <InsightCards revenueByChannel={revenueByChannel} revenueByBranchBars={revenueByBranchBars} />
