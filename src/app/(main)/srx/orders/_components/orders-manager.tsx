@@ -21,12 +21,12 @@ import { srxOrderPaymentStatusValues, srxOrderStatusValues, type SrxOrder } from
 import {
   formatCurrency,
   getOrderStatusLabel,
-  getOrderStatusVariant,
   getPaymentMethodLabel,
   getPaymentStatusLabel,
   getPaymentStatusVariant,
 } from "./order-presenters";
 import { OrderRowActions } from "./order-row-actions";
+import { OrderStatusQuickSelect } from "./order-status-quick-select";
 
 function matchesOrderSearch(order: SrxOrder, term: string) {
   return (
@@ -41,13 +41,22 @@ function matchesOrderSearch(order: SrxOrder, term: string) {
 }
 
 export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) {
+  const [orders, setOrders] = React.useState(initialOrders);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [orderStatusFilter, setOrderStatusFilter] = React.useState<string>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = React.useState<string>("all");
 
+  React.useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
+
+  const handleOrderUpdated = React.useCallback((nextOrder: SrxOrder) => {
+    setOrders((current) => current.map((item) => (item.id === nextOrder.id ? nextOrder : item)));
+  }, []);
+
   const filteredOrders = React.useMemo(() => {
     if (!searchTerm.trim()) {
-      return initialOrders.filter((order) => {
+      return orders.filter((order) => {
         const matchesOrderStatus = orderStatusFilter === "all" || order.order_status === orderStatusFilter;
         const matchesPaymentStatus = paymentStatusFilter === "all" || order.payment_status === paymentStatusFilter;
 
@@ -57,7 +66,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
 
     const term = searchTerm.toLowerCase();
 
-    return initialOrders.filter((order) => {
+    return orders.filter((order) => {
       const matchesSearch = matchesOrderSearch(order, term);
 
       const matchesOrderStatus = orderStatusFilter === "all" || order.order_status === orderStatusFilter;
@@ -65,7 +74,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
 
       return matchesSearch && matchesOrderStatus && matchesPaymentStatus;
     });
-  }, [initialOrders, orderStatusFilter, paymentStatusFilter, searchTerm]);
+  }, [orderStatusFilter, orders, paymentStatusFilter, searchTerm]);
 
   const summary = React.useMemo(
     () => ({
@@ -124,11 +133,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
       {
         accessorKey: "order_status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Trạng thái đơn" />,
-        cell: ({ row }) => (
-          <Badge variant={getOrderStatusVariant(row.original.order_status)}>
-            {getOrderStatusLabel(row.original.order_status)}
-          </Badge>
-        ),
+        cell: ({ row }) => <OrderStatusQuickSelect order={row.original} onUpdated={handleOrderUpdated} />,
         enableSorting: false,
       },
       {
@@ -190,7 +195,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: SrxOrder[] }) 
         enableSorting: false,
       },
     ],
-    [],
+    [handleOrderUpdated],
   );
 
   const table = useDataTableInstance({

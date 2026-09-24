@@ -482,6 +482,7 @@ model orders {
   order_addresses        order_addresses[]
   order_items            order_items[]
   order_status_histories order_status_histories[]
+  meta_dataset_events    meta_dataset_events[]
   affiliate_accounts     affiliate_accounts?      @relation(fields: [affiliate_account_id], references: [id], map: "fk_orders_affiliate_account")
   affiliate_links        affiliate_links?         @relation(fields: [affiliate_link_id], references: [id], map: "fk_orders_affiliate_link")
   users                  users?                   @relation(fields: [user_id], references: [id], map: "fk_orders_user")
@@ -492,6 +493,40 @@ model orders {
   @@index([payment_status], map: "idx_orders_payment_status")
   @@index([placed_at], map: "idx_orders_placed_at")
   @@index([user_id], map: "idx_orders_user_id")
+}
+
+model meta_dataset_events {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id             BigInt?   @db.UnsignedBigInt
+  order_number         String?   @db.VarChar(30)
+  registration_id      BigInt?   @db.UnsignedBigInt
+  event_slug           String?   @db.VarChar(180)
+  event_id             String    @unique(map: "uq_meta_dataset_events_event_id") @db.VarChar(190)
+  event_name           String    @db.VarChar(64)
+  source               String    @db.VarChar(100)
+  source_path          String?   @db.VarChar(255)
+  status               String    @default("pending") @db.VarChar(30)
+  dataset_id           String?   @db.VarChar(50)
+  graph_api_version    String?   @db.VarChar(20)
+  payload_json         Json
+  response_json        Json?
+  response_http_status Int?
+  meta_trace_id        String?   @db.VarChar(120)
+  attempt_count        Int       @default(0) @db.UnsignedInt
+  last_error           String?   @db.Text
+  last_attempt_at      DateTime? @db.DateTime(0)
+  sent_at              DateTime? @db.DateTime(0)
+  created_at           DateTime  @default(now()) @db.DateTime(0)
+  updated_at           DateTime  @default(now()) @db.DateTime(0)
+  orders               orders?   @relation(fields: [order_id], references: [id], onDelete: SetNull, map: "fk_meta_dataset_events_order")
+
+  @@index([order_id], map: "idx_meta_dataset_events_order_id")
+  @@index([registration_id], map: "idx_meta_dataset_events_registration_id")
+  @@index([event_slug], map: "idx_meta_dataset_events_event_slug")
+  @@index([event_name], map: "idx_meta_dataset_events_event_name")
+  @@index([source], map: "idx_meta_dataset_events_source")
+  @@index([status], map: "idx_meta_dataset_events_status")
+  @@index([created_at], map: "idx_meta_dataset_events_created_at")
 }
 
 model password_reset_tokens {

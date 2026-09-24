@@ -102,8 +102,8 @@ export function RulesHowToSections() {
 
       <Section
         id="howto-affiliate"
-        title="7. Hướng dẫn: affiliate"
-        description="Affiliate có hai đường vào hệ thống: người dùng tự đăng ký trên website, hoặc bạn tạo thẳng trong CRM."
+        title="7. Hướng dẫn: Affiliate"
+        description="Quy trình đầy đủ từ tiếp nhận hồ sơ, cấu hình tài khoản, theo dõi đơn giới thiệu đến đối soát và thanh toán hoa hồng cho affiliate."
       >
         <div className="grid gap-4 xl:grid-cols-2">
           <HowTo
@@ -111,11 +111,12 @@ export function RulesHowToSections() {
             path="/srx/affiliates/approval"
             role="Admin · Chủ cửa hàng"
             steps={[
-              "Mở hồ sơ, đối chiếu thông tin cá nhân, kênh bán và kế hoạch quảng bá.",
-              "Ghi chú nội bộ nếu cần lưu lý do.",
-              'Chọn "Đã duyệt" để hệ thống tự tạo mã affiliate và kích hoạt tài khoản, hoặc "Từ chối" kèm ghi chú.',
-              "Sang Quản lý affiliate để đặt tỷ lệ hoa hồng và thời hạn cookie cho người vừa duyệt.",
+              "Mở hồ sơ và đối chiếu họ tên, email, số điện thoại, kênh quảng bá, đường dẫn mạng xã hội và kế hoạch triển khai.",
+              "Kiểm tra nội dung quảng bá có phù hợp với thương hiệu; không duyệt hồ sơ thiếu thông tin quan trọng hoặc có dấu hiệu giả mạo.",
+              'Chọn "Đã duyệt" để hệ thống tạo mã affiliate và kích hoạt tài khoản. Nếu từ chối, ghi rõ lý do để có thể tra cứu về sau.',
+              "Sau khi duyệt, mở Quản lý affiliate để kiểm tra lại mã, trạng thái, chính sách hoa hồng, thời hạn cookie và thông tin nhận tiền.",
             ]}
+            note="Không dùng ghi chú duyệt để lưu mật khẩu, mã OTP, thông tin thẻ hoặc dữ liệu bảo mật khác."
           />
 
           <HowTo
@@ -126,12 +127,60 @@ export function RulesHowToSections() {
               "Chọn nguồn người dùng: dùng tài khoản website có sẵn (tìm theo tên/email/SĐT), hoặc tạo tài khoản website mới.",
               "Nếu tạo mới: nhập họ tên, email đăng nhập, số điện thoại và mật khẩu tối thiểu 8 ký tự.",
               "Để trống Mã affiliate để hệ thống tự sinh, hoặc nhập mã riêng.",
-              "Đặt kiểu hoa hồng (% hoặc số tiền), tỷ lệ và thời hạn cookie.",
+              "Chọn hoa hồng theo phần trăm khi giá trị đơn thay đổi nhiều; dùng số tiền cố định khi muốn chi cùng một mức cho mỗi đơn đủ điều kiện.",
+              "Đặt mức hoa hồng và thời hạn cookie theo chính sách đã thống nhất trước khi affiliate bắt đầu chia sẻ liên kết.",
               "Sang tab Hồ sơ điền thông tin cá nhân, tab Ngân hàng điền tài khoản nhận hoa hồng, rồi Tạo affiliate.",
             ]}
             note="Thông tin ngân hàng: hoặc để trống hoàn toàn, hoặc điền đủ chủ tài khoản + tên ngân hàng + số tài khoản."
           />
+
+          <HowTo
+            title="Chỉnh sửa và theo dõi một affiliate"
+            path="/srx/affiliates/manage"
+            role="Admin · Chủ cửa hàng"
+            steps={[
+              "Tìm theo tên, email, số điện thoại hoặc mã affiliate; dùng bộ lọc trạng thái để thu hẹp danh sách.",
+              "Mở xem nhanh để kiểm tra lượt click, số đơn, hoa hồng chờ duyệt, hoa hồng đã duyệt, đã thanh toán và tổng hợp đợt chi gần nhất.",
+              "Chỉ thay đổi tỷ lệ hoa hồng sau khi đã thống nhất ngày hiệu lực; nên ghi chú chính sách cũ và mới để phục vụ đối soát.",
+              "Dùng trạng thái Tạm dừng hoặc Đình chỉ khi cần ngăn hoạt động mới; không xoá dữ liệu của affiliate đã phát sinh đơn hoặc hoa hồng.",
+              "Cập nhật lại hồ sơ và tài khoản ngân hàng khi người dùng yêu cầu, đồng thời xác minh chủ tài khoản trước kỳ thanh toán kế tiếp.",
+            ]}
+            note="Mức hoa hồng trên tài khoản là cấu hình tính toán. Khi đối soát vẫn phải kiểm tra trạng thái từng đơn và các khoản đã được đưa vào đợt chi trước đó."
+          />
+
+          <HowTo
+            title="Đối soát và thanh toán hoa hồng"
+            path="/srx/affiliates/manage → Xem nhanh"
+            role="Admin · Chủ cửa hàng · Kế toán"
+            steps={[
+              "Chốt một kỳ đối soát cố định, ví dụ từ ngày đầu đến ngày cuối tháng; không trộn đơn của nhiều kỳ nếu chưa có ghi chú rõ ràng.",
+              <>
+                Chỉ đưa vào thanh toán các khoản ở trạng thái <b>Đã duyệt</b>. Loại trừ khoản đang chờ, bị từ chối, đã
+                huỷ hoặc đã thuộc một đợt chi trước đó.
+              </>,
+              "Đối chiếu đơn hàng đã thanh toán/hoàn tất, thời hạn đổi trả và các trường hợp hoàn tiền trước khi chốt số tiền.",
+              "Xác nhận lại tên chủ tài khoản, ngân hàng và số tài khoản với affiliate; gửi bảng kê gồm kỳ đối soát, các đơn hợp lệ và tổng hoa hồng.",
+              "Chuyển khoản với nội dung thống nhất, ví dụ: SRX AFF + mã affiliate + kỳ đối soát; lưu mã giao dịch hoặc chứng từ chuyển tiền.",
+              "Sau khi ngân hàng báo thành công, cập nhật đợt chi sang Đã thanh toán và bảo đảm các khoản liên quan không còn xuất hiện ở kỳ kế tiếp.",
+            ]}
+            note="Nếu CRM chưa có thao tác tạo hoặc cập nhật đợt chi, hãy dùng bảng đối soát được kiểm soát bởi kế toán và chỉ cập nhật dữ liệu khi tính năng thanh toán được bổ sung; không sửa trực tiếp database."
+          />
         </div>
+
+        <Callout title="Đề xuất chính sách thanh toán dễ vận hành">
+          Nên thanh toán theo một lịch cố định mỗi tháng, áp dụng ngưỡng tối thiểu để giảm phí giao dịch và tự động
+          chuyển số dư chưa đạt ngưỡng sang kỳ sau. Có thể bắt đầu với thời gian chờ 7–14 ngày sau khi đơn hoàn tất để
+          xử lý đổi trả. Mức hoa hồng nên được chọn theo biên lợi nhuận: phần trăm cho danh mục có giá trị biến động, số
+          tiền cố định cho sản phẩm hoặc chiến dịch cần kiểm soát chi phí. Mọi thay đổi chính sách phải có ngày hiệu lực
+          và được thông báo trước cho affiliate.
+        </Callout>
+
+        <Callout tone="warning" title="Nguyên tắc tránh trả sai hoặc trả trùng">
+          Không thanh toán từ số liệu lượt click hoặc tổng đơn. Số tiền chi phải lấy từ các khoản hoa hồng đã được
+          duyệt, đã qua thời gian đổi trả và chưa nằm trong đợt chi nào. Trước khi chuyển tiền, cần có hai bước kiểm
+          tra: người vận hành lập bảng kê và người có thẩm quyền hoặc kế toán xác nhận. Hồ sơ chứng từ và nghĩa vụ thuế
+          cần được kế toán xử lý theo loại người nhận và quy định đang áp dụng.
+        </Callout>
       </Section>
 
       <Section

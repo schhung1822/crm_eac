@@ -6,7 +6,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, ImageIcon, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -153,11 +153,27 @@ export function OrderDetailView({ initialValue }: { initialValue: SrxOrder }) {
                     key={item.id}
                     className="flex flex-col gap-3 rounded-lg border p-4 xl:flex-row xl:items-start xl:justify-between"
                   >
-                    <div className="space-y-1">
-                      <div className="font-medium">{item.product_name}</div>
-                      <div className="text-muted-foreground text-sm">
-                        {item.variant_name || "Không có biến thể"}
-                        {item.sku ? ` · SKU: ${item.sku}` : ""}
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+                        {item.image_url ? (
+                          // Ảnh sản phẩm có thể đến từ nhiều host do website cấu hình động.
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.image_url}
+                            alt={item.product_name}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ImageIcon className="text-muted-foreground size-5" aria-hidden="true" />
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-1 pt-0.5">
+                        <div className="font-medium break-words">{item.product_name}</div>
+                        <div className="text-muted-foreground text-sm">
+                          {item.variant_name || "Không có biến thể"}
+                          {item.sku ? ` · SKU: ${item.sku}` : ""}
+                        </div>
                       </div>
                     </div>
                     <div className="grid min-w-[240px] gap-1 text-sm xl:text-right">

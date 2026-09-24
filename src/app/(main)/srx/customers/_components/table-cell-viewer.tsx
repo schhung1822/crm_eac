@@ -93,7 +93,7 @@ export function TableCellViewer({ item }: { item: Users }) {
   const statusVariant = getStatusVariant(item.status);
   const verificationLabel = getVerificationLabel(item.is_email_verified);
   const addressDetails = buildAddressDetails(item);
-  const avatarSrc = item.avatar_url || undefined;
+  const avatarSrc = item.avatar_url || "/avatars/avatar.webp";
   const displayName = getOptionalText(item.display_name);
   const phoneNumber = getOptionalText(item.phone);
   const genderLabel = getOptionalText(item.gender);

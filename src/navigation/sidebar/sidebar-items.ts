@@ -109,6 +109,7 @@ export const sidebarItems: NavGroup[] = [
         icon: Store,
         subItems: [
           { title: "Đơn hàng", url: "/srx/orders" },
+          { title: "Sự kiện Meta", url: "/srx/meta-events" },
           { title: "Sản phẩm", url: "/srx/products" },
           { title: "Danh mục sản phẩm", url: "/srx/products_categories" },
           { title: "Từ điển thành phần", url: "/srx/product_tags" },

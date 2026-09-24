@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = [
   "/api/auth/me",
   "/api/auth/logout",
   "/api/srx/lead-forms-web",
+  "/api/srx/meta-events-web",
   "/api/srx/orders_web",
   "/api/srx/affiliate-applications-web",
 ];

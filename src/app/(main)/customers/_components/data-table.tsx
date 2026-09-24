@@ -2,49 +2,150 @@
 
 import * as React from "react";
 
-import { Download, Search } from "lucide-react";
+import { Building2, ChevronDown, Download, Search, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { DataTable as DataTableNew } from "@/components/data-table/data-table";
-import { DataTableViewOptions } from "@/components/data-table/data-table-view-options";
-import { withDndColumn } from "@/components/data-table/table-utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ExportDialog, type ExportFormat, type DateRange } from "@/components/ui/export-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { exportData, filterDataByDateRange } from "@/lib/export-utils";
 
 import { dashboardColumns } from "./columns";
-import { userSchema, Users } from "./schema";
+import { Users } from "./schema";
 
-export function DataTable({ data: initialData }: { data: Users[] }) {
-  const [data, setData] = React.useState<Users[]>(() => initialData);
+type FilterOption = {
+  value: string;
+  label: string;
+  count: number;
+};
+
+type CustomerFilterProps = {
+  label: string;
+  icon: React.ReactNode;
+  options: FilterOption[];
+  selected: Set<string>;
+  onChange: (selected: Set<string>) => void;
+};
+
+function CustomerFilter({ label, icon, options, selected, onChange }: CustomerFilterProps) {
+  const buttonLabel =
+    selected.size === 0 ? label : selected.size === 1 ? options.find((item) => selected.has(item.value))?.label : label;
+
+  const toggleOption = (value: string, checked: boolean) => {
+    const next = new Set(selected);
+    if (checked) next.add(value);
+    else next.delete(value);
+    onChange(next);
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="max-w-56 justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-2">
+            {icon}
+            <span className="truncate">{buttonLabel}</span>
+            {selected.size > 1 ? (
+              <span className="bg-muted rounded px-1.5 py-0.5 text-xs tabular-nums">{selected.size}</span>
+            ) : null}
+          </span>
+          <ChevronDown className="size-3.5 shrink-0 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-80 w-64 overflow-y-auto">
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {options.length ? (
+          options.map((option) => (
+            <DropdownMenuCheckboxItem
+              key={option.value || "__empty"}
+              checked={selected.has(option.value)}
+              onCheckedChange={(checked) => toggleOption(option.value, checked === true)}
+              onSelect={(event) => event.preventDefault()}
+            >
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              <span className="text-muted-foreground text-xs tabular-nums">{option.count}</span>
+            </DropdownMenuCheckboxItem>
+          ))
+        ) : (
+          <DropdownMenuItem disabled>Chưa có dữ liệu</DropdownMenuItem>
+        )}
+        {selected.size > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onChange(new Set())}>
+              <X className="size-4" />
+              Xóa bộ lọc
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function buildFilterOptions(data: Users[], getValue: (item: Users) => string, emptyLabel: string): FilterOption[] {
+  const counts = new Map<string, number>();
+  data.forEach((item) => {
+    const value = getValue(item);
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  });
+
+  return Array.from(counts, ([value, count]) => ({ value, label: value || emptyLabel, count })).sort((a, b) =>
+    a.label.localeCompare(b.label, "vi"),
+  );
+}
+
+export function DataTable({ data }: { data: Users[] }) {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [selectedCreators, setSelectedCreators] = React.useState<Set<string>>(() => new Set());
+  const [selectedBranches, setSelectedBranches] = React.useState<Set<string>>(() => new Set());
   const [exportDialogOpen, setExportDialogOpen] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
 
+  const creatorOptions = React.useMemo(
+    () => buildFilterOptions(data, (item) => item.create_by, "Chưa rõ người tạo"),
+    [data],
+  );
+  const branchOptions = React.useMemo(
+    () => buildFilterOptions(data, (item) => item.branch, "Chưa có chi nhánh"),
+    [data],
+  );
+
   const filteredData = React.useMemo(() => {
-    if (!searchTerm.trim()) return data;
+    const term = searchTerm.trim().toLocaleLowerCase("vi");
 
-    const term = searchTerm.toLowerCase();
-    return data.filter(
-      (item) =>
-        item.name.toLowerCase().includes(term) ||
-        item.customer_ID.toLowerCase().includes(term) ||
-        item.phone.toLowerCase().includes(term) ||
-        item.create_by.toLowerCase().includes(term),
-    );
-  }, [data, searchTerm]);
+    return data.filter((item) => {
+      if (selectedCreators.size > 0 && !selectedCreators.has(item.create_by)) return false;
+      if (selectedBranches.size > 0 && !selectedBranches.has(item.branch)) return false;
+      if (!term) return true;
 
-  const columns = withDndColumn(dashboardColumns);
+      return [item.name, item.customer_ID, item.phone, item.create_by, item.branch, item.company, item.address].some(
+        (value) => value.toLocaleLowerCase("vi").includes(term),
+      );
+    });
+  }, [data, searchTerm, selectedBranches, selectedCreators]);
+
   const table = useDataTableInstance({
     data: filteredData,
-    columns,
-    getRowId: (row) => row.customer_ID.toString(),
+    columns: dashboardColumns,
+    getRowId: (row) => row.customer_ID,
+  });
+  const tableRefreshKey = JSON.stringify({
+    search: searchTerm,
+    creators: Array.from(selectedCreators).sort(),
+    branches: Array.from(selectedBranches).sort(),
   });
 
   const handleExport = React.useCallback(
@@ -77,14 +178,11 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
           tong_ban_tru_tra_hang: "Tổng bán trừ trả hàng",
         };
 
-        const dateStr = new Date().toISOString().split("T")[0];
-        const filename = `customers_${dateStr}`;
-
         exportData({
           format,
           data: dataToExport,
           headers,
-          filename,
+          filename: `customers_${new Date().toISOString().split("T")[0]}`,
         });
 
         toast.success(`Xuất ${dataToExport.length} khách hàng thành công!`);
@@ -100,19 +198,38 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
   );
 
   return (
-    <div className="flex w-full flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative max-w-sm flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <Input
-            placeholder="Tìm kiếm theo tên, mã, SĐT, người tạo..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative w-full sm:max-w-sm sm:flex-1">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              placeholder="Tìm tên, mã, SĐT, địa chỉ..."
+              className="bg-background pl-10"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <CustomerFilter
+            label="Người tạo"
+            icon={<UserRound className="size-4 shrink-0" />}
+            options={creatorOptions}
+            selected={selectedCreators}
+            onChange={setSelectedCreators}
+          />
+          <CustomerFilter
+            label="Chi nhánh"
+            icon={<Building2 className="size-4 shrink-0" />}
+            options={branchOptions}
+            selected={selectedBranches}
+            onChange={setSelectedBranches}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <DataTableViewOptions table={table} />
+
+        <div className="flex items-center justify-between gap-3 lg:justify-end">
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {filteredData.length.toLocaleString("vi-VN")} / {data.length.toLocaleString("vi-VN")} khách hàng
+          </span>
           <Button
             variant="outline"
             size="sm"
@@ -120,13 +237,21 @@ export function DataTable({ data: initialData }: { data: Users[] }) {
             disabled={filteredData.length === 0}
           >
             <Download className="size-4" />
-            <span className="hidden lg:inline">Xuất</span>
+            Xuất
           </Button>
         </div>
       </div>
-      <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTableNew dndEnabled table={table} columns={columns} onReorder={setData} />
-      </div>
+
+      <DataTableNew
+        key={tableRefreshKey}
+        table={table}
+        columns={dashboardColumns}
+        tableClassName="min-w-[960px]"
+        headClassName="h-11"
+        rowClassName="h-[68px]"
+        cellClassName="px-3 py-2.5"
+        defaultPageSize={20}
+      />
 
       <ExportDialog
         open={exportDialogOpen}

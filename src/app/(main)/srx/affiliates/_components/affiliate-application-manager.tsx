@@ -4,14 +4,15 @@
 import * as React from "react";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Search } from "lucide-react";
+import { BadgeCheck, Clock3, Eye, Search, UserRoundCheck, UsersRound, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
@@ -22,6 +23,7 @@ import {
   type SrxAffiliateApplication,
   type SrxAffiliateApplicationReviewMutationInput,
 } from "@/lib/srx-affiliates.shared";
+import { getInitials } from "@/lib/utils";
 
 import { AffiliateApplicationReviewDialog } from "./affiliate-application-review-dialog";
 import {
@@ -49,13 +51,35 @@ function getApplicationSortWeight(status: SrxAffiliateApplication["status"]): nu
 function sortAffiliateApplications(applications: SrxAffiliateApplication[]): SrxAffiliateApplication[] {
   return [...applications].sort((left, right) => {
     const statusWeight = getApplicationSortWeight(left.status) - getApplicationSortWeight(right.status);
-
-    if (statusWeight !== 0) {
-      return statusWeight;
-    }
-
-    return right.created_at.getTime() - left.created_at.getTime();
+    return statusWeight || right.created_at.getTime() - left.created_at.getTime();
   });
+}
+
+function SummaryCard({
+  label,
+  value,
+  description,
+  icon,
+  iconClassName,
+}: {
+  label: string;
+  value: number;
+  description: string;
+  icon: React.ReactNode;
+  iconClassName: string;
+}) {
+  return (
+    <Card className="gap-0 py-0 shadow-sm">
+      <CardContent className="flex items-center gap-3 px-4 py-4">
+        <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}>{icon}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-muted-foreground text-xs font-medium">{label}</div>
+          <div className="mt-0.5 text-2xl font-semibold tabular-nums">{value.toLocaleString("vi-VN")}</div>
+          <div className="text-muted-foreground truncate text-xs">{description}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function AffiliateApplicationManager({
@@ -83,12 +107,11 @@ export function AffiliateApplicationManager({
         application.contact_phone,
         application.social_channel,
         application.website_url,
+        application.facebook_url,
+        application.tiktok_url,
         application.affiliate_code,
       ]);
-
-      const matchesStatus = statusFilter === "all" || application.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+      return matchesSearch && (statusFilter === "all" || application.status === statusFilter);
     });
   }, [applications, searchTerm, statusFilter]);
 
@@ -96,57 +119,28 @@ export function AffiliateApplicationManager({
     return applications.reduce(
       (result, application) => {
         result.total += 1;
-
-        if (application.status === "pending") {
-          result.pending += 1;
-        }
-
-        if (application.status === "approved") {
-          result.approved += 1;
-        }
-
-        if (application.status === "rejected") {
-          result.rejected += 1;
-        }
-
-        if (application.affiliate_account_id) {
-          result.linkedAccounts += 1;
-        }
-
+        result[application.status] += 1;
+        if (application.affiliate_account_id) result.linkedAccounts += 1;
         return result;
       },
-      {
-        total: 0,
-        pending: 0,
-        approved: 0,
-        rejected: 0,
-        linkedAccounts: 0,
-      },
+      { total: 0, pending: 0, approved: 0, rejected: 0, linkedAccounts: 0 },
     );
   }, [applications]);
 
   const handleSubmit = React.useCallback(
     async (value: SrxAffiliateApplicationReviewMutationInput) => {
-      if (!editingApplication) {
-        return;
-      }
+      if (!editingApplication) return;
 
       try {
         setIsSubmitting(true);
-
         const response = await fetch(`/api/srx/affiliate-applications/${editingApplication.id}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(value),
         });
-
         const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result?.message ?? "Không thể cập nhật hồ sơ affiliate");
-        }
+        if (!response.ok) throw new Error(result?.message ?? "Không thể cập nhật hồ sơ affiliate");
 
         const application = parseSrxAffiliateApplication(result.application);
         setApplications((current) =>
@@ -169,63 +163,63 @@ export function AffiliateApplicationManager({
       {
         accessorKey: "user_name",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Người đăng ký" />,
-        cell: ({ row }) => (
-          <div className="space-y-1">
-            <div className="font-medium">
-              {row.original.user_name || row.original.legal_full_name || "Chưa cập nhật"}
+        cell: ({ row }) => {
+          const name = row.original.user_name || row.original.legal_full_name || "Chưa cập nhật";
+          return (
+            <div className="flex max-w-64 min-w-0 items-center gap-3">
+              <Avatar className="size-9 shrink-0 border">
+                <AvatarImage src="/avatars/avatar.webp" alt={name} />
+                <AvatarFallback>{getInitials(name)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 space-y-0.5">
+                <div className="truncate font-medium" title={name}>
+                  {name}
+                </div>
+                <div className="text-muted-foreground truncate text-xs">
+                  {row.original.user_email || row.original.contact_email || "—"}
+                </div>
+                <div className="text-muted-foreground text-xs tabular-nums">
+                  {row.original.user_phone || row.original.contact_phone || "—"}
+                </div>
+              </div>
             </div>
-            <div className="text-muted-foreground text-xs">
-              {row.original.user_email || row.original.contact_email || "—"}
-            </div>
-            <div className="text-muted-foreground text-xs">
-              {row.original.user_phone || row.original.contact_phone || "—"}
-            </div>
-          </div>
-        ),
+          );
+        },
         enableSorting: false,
       },
       {
         accessorKey: "social_channel",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Kênh quảng bá" />,
         cell: ({ row }) => (
-          <div className="space-y-1 text-sm">
-            <div>{row.original.social_channel || "Chưa cập nhật"}</div>
-            <div className="text-muted-foreground line-clamp-1 text-xs">Website: {row.original.website_url || "—"}</div>
-            <div className="text-muted-foreground line-clamp-2 text-xs">
-              Kế hoạch: {row.original.promotion_plan || "Chưa có mô tả"}
+          <div className="max-w-60 min-w-0 space-y-1">
+            <div className="truncate font-medium">{row.original.social_channel || "Chưa cập nhật"}</div>
+            <div className="text-muted-foreground truncate text-xs" title={row.original.website_url}>
+              {row.original.website_url || "Chưa có website"}
             </div>
-          </div>
-        ),
-        enableSorting: false,
-      },
-      {
-        accessorKey: "affiliate_code",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Liên kết affiliate" />,
-        cell: ({ row }) => (
-          <div className="space-y-2">
-            <div className="font-medium">{row.original.affiliate_code || "Chưa liên kết"}</div>
-            {row.original.affiliate_account_status ? (
-              <Badge variant={getAffiliateAccountStatusVariant(row.original.affiliate_account_status)}>
-                {getAffiliateAccountStatusLabel(row.original.affiliate_account_status)}
-              </Badge>
-            ) : (
-              <div className="text-muted-foreground text-xs">Chưa có affiliate account</div>
-            )}
           </div>
         ),
         enableSorting: false,
       },
       {
         accessorKey: "status",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Trạng thái hồ sơ" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Trạng thái" />,
         cell: ({ row }) => (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Badge variant={getAffiliateApplicationStatusVariant(row.original.status)}>
               {getAffiliateApplicationStatusLabel(row.original.status)}
             </Badge>
-            <div className="text-muted-foreground line-clamp-2 text-xs">
-              {row.original.review_note || row.original.reviewed_by_user_name || "Chưa có ghi chú duyệt"}
-            </div>
+            {row.original.affiliate_account_status ? (
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Badge variant={getAffiliateAccountStatusVariant(row.original.affiliate_account_status)}>
+                  {getAffiliateAccountStatusLabel(row.original.affiliate_account_status)}
+                </Badge>
+                <span className="text-muted-foreground max-w-28 truncate text-xs" title={row.original.affiliate_code}>
+                  {row.original.affiliate_code}
+                </span>
+              </div>
+            ) : (
+              <div className="text-muted-foreground text-xs">Chưa có tài khoản affiliate</div>
+            )}
           </div>
         ),
         enableSorting: false,
@@ -235,29 +229,34 @@ export function AffiliateApplicationManager({
         header: ({ column }) => <DataTableColumnHeader column={column} title="Thời gian" />,
         cell: ({ row }) => (
           <div className="space-y-1 text-sm">
-            <div>Tạo: {formatDatabaseLocalDateTime(row.original.created_at)}</div>
-            <div className="text-muted-foreground text-xs">Duyệt: {formatDateTime(row.original.reviewed_at)}</div>
+            <div>{formatDatabaseLocalDateTime(row.original.created_at)}</div>
+            <div className="text-muted-foreground text-xs">
+              {row.original.reviewed_at ? `Duyệt: ${formatDateTime(row.original.reviewed_at)}` : "Chưa xử lý"}
+            </div>
           </div>
         ),
         enableSorting: false,
       },
       {
         id: "actions",
+        header: () => <span className="sr-only">Thao tác</span>,
         cell: ({ row }) => (
-          <div className="flex items-center justify-end">
+          <div className="flex justify-end">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => {
                 setEditingApplication(row.original);
                 setDialogOpen(true);
               }}
             >
-              Xem duyệt
+              <Eye className="size-4" />
+              Xem hồ sơ
             </Button>
           </div>
         ),
         enableSorting: false,
+        enableHiding: false,
       },
     ],
     [],
@@ -271,74 +270,65 @@ export function AffiliateApplicationManager({
   const tableRenderKey = `${searchTerm}|${statusFilter}|${filteredApplications.length}`;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Phê duyệt hồ sơ affiliate</h1>
-        <p className="text-muted-foreground">
-          Theo dõi và duyệt các hồ sơ đăng ký affiliate lấy trực tiếp từ bảng affiliate_applications của website SRX.
-        </p>
+    <div className="flex flex-col gap-5">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Phê duyệt hồ sơ affiliate</h1>
+        <p className="text-muted-foreground text-sm">Kiểm tra hồ sơ đăng ký và kích hoạt tài khoản affiliate SRX.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Tổng hồ sơ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{summary.total}</div>
-            <p className="text-muted-foreground text-xs">Toàn bộ hồ sơ đăng ký affiliate</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Chờ duyệt</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{summary.pending}</div>
-            <p className="text-muted-foreground text-xs">Cần admin xử lý trong hàng đợi</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Đã duyệt</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{summary.approved}</div>
-            <p className="text-muted-foreground text-xs">Hồ sơ đã kích hoạt affiliate cho người dùng</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Đã liên kết account</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{summary.linkedAccounts}</div>
-            <p className="text-muted-foreground text-xs">Hồ sơ đã có bản ghi affiliate account</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <SummaryCard
+          label="Tổng hồ sơ"
+          value={summary.total}
+          description="Tất cả đăng ký"
+          icon={<UsersRound className="size-5" />}
+          iconClassName="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        />
+        <SummaryCard
+          label="Chờ duyệt"
+          value={summary.pending}
+          description="Cần xử lý"
+          icon={<Clock3 className="size-5" />}
+          iconClassName="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+        />
+        <SummaryCard
+          label="Đã duyệt"
+          value={summary.approved}
+          description={`${summary.linkedAccounts} tài khoản đã liên kết`}
+          icon={<BadgeCheck className="size-5" />}
+          iconClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+        />
+        <SummaryCard
+          label="Từ chối"
+          value={summary.rejected}
+          description="Hồ sơ chưa đạt"
+          icon={<XCircle className="size-5" />}
+          iconClassName="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+        />
       </div>
 
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="relative max-w-sm flex-1">
+      <div className="bg-card/50 flex flex-col gap-3 rounded-xl border p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative w-full lg:max-w-md lg:flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
-            className="pl-10"
-            placeholder="Tìm theo tên, email, điện thoại, kênh..."
+            className="bg-background pl-10"
+            placeholder="Tìm tên, email, điện thoại, kênh..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {filteredApplications.length.toLocaleString("vi-VN")} / {applications.length.toLocaleString("vi-VN")} hồ sơ
+          </span>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
-            <SelectTrigger className="w-full md:w-[220px]">
-              <SelectValue placeholder="Lọc trạng thái hồ sơ" />
+            <SelectTrigger className="bg-background w-full sm:w-52">
+              <UserRoundCheck className="size-4" />
+              <SelectValue placeholder="Lọc trạng thái" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả trạng thái hồ sơ</SelectItem>
+              <SelectItem value="all">Tất cả trạng thái</SelectItem>
               {srxAffiliateApplicationStatusValues.map((status) => (
                 <SelectItem key={status} value={status}>
                   {getAffiliateApplicationStatusLabel(status)}
@@ -349,9 +339,16 @@ export function AffiliateApplicationManager({
         </div>
       </div>
 
-      <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable key={tableRenderKey} table={table} columns={columns} />
-      </div>
+      <DataTable
+        key={tableRenderKey}
+        table={table}
+        columns={columns}
+        tableClassName="min-w-[880px]"
+        headClassName="h-11"
+        rowClassName="h-[72px]"
+        cellClassName="px-3 py-2.5"
+        defaultPageSize={20}
+      />
 
       <AffiliateApplicationReviewDialog
         open={dialogOpen}

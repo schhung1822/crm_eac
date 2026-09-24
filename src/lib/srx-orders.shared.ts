@@ -27,6 +27,7 @@ export const srxOrderItemSchema = z.object({
   sku: z.string(),
   product_name: z.string(),
   variant_name: z.string(),
+  image_url: z.string(),
   unit_price: z.number(),
   quantity: z.number(),
   discount_amount: z.number(),

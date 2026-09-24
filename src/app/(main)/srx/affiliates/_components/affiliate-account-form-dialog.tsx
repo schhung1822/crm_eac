@@ -1,10 +1,11 @@
-/* eslint-disable max-lines */
+/* eslint-disable complexity, max-lines */
 "use client";
 
 import * as React from "react";
 
-import { Search } from "lucide-react";
+import { Banknote, CircleDollarSign, FileText, Search, Settings2, Share2, UserRound, WalletCards } from "lucide-react";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,12 +31,14 @@ import {
   type SrxAffiliateAccount,
   type SrxAffiliateUserOption,
 } from "@/lib/srx-affiliates.shared";
+import { getInitials } from "@/lib/utils";
 
 import {
   formatCurrency,
-  formatDateTime,
   getAffiliateAccountStatusLabel,
+  getAffiliateAccountStatusVariant,
   getAffiliateApplicationStatusLabel,
+  getAffiliateApplicationStatusVariant,
   getAffiliateCommissionTypeLabel,
   getAffiliateGenderLabel,
   getAffiliateUserStatusLabel,
@@ -76,6 +79,46 @@ export type AffiliateAccountFormState = {
 };
 
 const gridClass = "grid grid-cols-2 gap-4 max-[560px]:grid-cols-1";
+
+function FormSection({
+  title,
+  description,
+  icon,
+  children,
+}: {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-card/50 grid min-w-0 gap-4 rounded-xl border p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="font-semibold">{title}</div>
+          <div className="text-muted-foreground text-xs">{description}</div>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FormMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-background/70 min-w-0 rounded-lg border px-3 py-2.5">
+      <div className="text-muted-foreground text-xs">{label}</div>
+      <div className="truncate font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function textOrFallback(value: string | null | undefined, fallback: string): string {
+  return value?.trim() ? value : fallback;
+}
 
 const emptyFormState: AffiliateAccountFormState = {
   user_mode: "existing",
@@ -219,7 +262,7 @@ function AffiliateExistingUserFields({
   setForm: React.Dispatch<React.SetStateAction<AffiliateAccountFormState>>;
 }) {
   return (
-    <div className="grid gap-4 rounded-lg border p-4">
+    <div className="grid gap-4">
       <div className={gridClass}>
         <div className="grid gap-2">
           <Label htmlFor="affiliate-user-name">Họ và tên</Label>
@@ -337,7 +380,7 @@ function AffiliateUserSection({
   const selectedUser = userOptions.find((user) => user.id === form.user_id) ?? null;
 
   return (
-    <div className="grid gap-4 rounded-lg border p-4">
+    <div className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="affiliate-user-mode">Người dùng affiliate</Label>
         <Select
@@ -422,343 +465,408 @@ export function AffiliateAccountFormDialog({
     await onSubmit(form);
   }
 
+  const affiliateDisplayName = textOrFallback(initialValue?.user_name, "Affiliate");
+  const affiliateCode = textOrFallback(initialValue?.affiliate_code, "Chưa có mã");
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction={isMobile ? "bottom" : "right"}>
-      <DrawerContent className="min-h-0 data-[vaul-drawer-direction=bottom]:max-h-[92vh] data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:max-w-[640px]">
-        <DrawerHeader>
-          <DrawerTitle>{mode === "edit" ? "Chỉnh sửa affiliate" : "Thêm affiliate"}</DrawerTitle>
-          <DrawerDescription>
-            {mode === "edit"
-              ? "Cập nhật tài khoản, hoa hồng, hồ sơ cá nhân và tài khoản ngân hàng của affiliate."
-              : "Tạo tài khoản affiliate trực tiếp trong CRM cho người dùng website SRX."}
-          </DrawerDescription>
+      <DrawerContent className="min-h-0 data-[vaul-drawer-direction=bottom]:max-h-[94vh] data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:max-w-[min(820px,100vw)] data-[vaul-drawer-direction=right]:sm:max-w-[820px]">
+        <DrawerHeader className="shrink-0 border-b px-5 py-4 sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <Avatar className="size-11 shrink-0 border">
+              <AvatarImage src="/avatars/avatar.webp" alt={affiliateDisplayName} />
+              <AvatarFallback>{getInitials(affiliateDisplayName)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <DrawerTitle>{mode === "edit" ? "Chỉnh sửa affiliate" : "Thêm affiliate"}</DrawerTitle>
+                {mode === "edit" && initialValue ? (
+                  <>
+                    <Badge variant={getAffiliateAccountStatusVariant(initialValue.status)}>
+                      {getAffiliateAccountStatusLabel(initialValue.status)}
+                    </Badge>
+                    <Badge variant={getAffiliateApplicationStatusVariant(initialValue.application_status)}>
+                      {getAffiliateApplicationStatusLabel(initialValue.application_status)}
+                    </Badge>
+                  </>
+                ) : null}
+              </div>
+              <DrawerDescription className="mt-1">
+                {mode === "edit"
+                  ? `${affiliateDisplayName} · ${affiliateCode}`
+                  : "Tạo tài khoản affiliate trực tiếp cho người dùng website SRX."}
+              </DrawerDescription>
+            </div>
+          </div>
         </DrawerHeader>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
-          <div className="nice-scroll flex-1 overflow-y-auto px-4 pb-4">
+          <div className="nice-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-5 sm:px-6">
             {mode === "edit" && initialValue ? (
-              <div className="mb-4 grid gap-3 rounded-lg border p-4 text-sm md:grid-cols-2">
-                <div className="space-y-1">
-                  <div className="font-medium">{initialValue.user_name}</div>
-                  <div className="text-muted-foreground">Mã: {initialValue.affiliate_code}</div>
-                  <div className="text-muted-foreground">Duyệt lúc: {formatDateTime(initialValue.approved_at)}</div>
-                </div>
-                <div className="space-y-1 md:text-right">
-                  <div className="text-muted-foreground">
-                    Click: {initialValue.total_clicks} · Đơn: {initialValue.total_orders}
-                  </div>
-                  <div className="text-muted-foreground">
-                    Chờ duyệt: {formatCurrency(initialValue.pending_commission_amount)}
-                  </div>
-                  <div className="text-muted-foreground">
-                    Đã chi: {formatCurrency(initialValue.paid_commission_amount)}
-                  </div>
-                </div>
+              <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <FormMetric label="Lượt click" value={initialValue.total_clicks.toLocaleString("vi-VN")} />
+                <FormMetric label="Đơn hàng" value={initialValue.total_orders.toLocaleString("vi-VN")} />
+                <FormMetric label="Hoa hồng chờ" value={formatCurrency(initialValue.pending_commission_amount)} />
+                <FormMetric label="Đã chi" value={formatCurrency(initialValue.paid_commission_amount)} />
               </div>
             ) : null}
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="w-full">
-                <TabsTrigger value="account">Tài khoản</TabsTrigger>
-                <TabsTrigger value="profile">Hồ sơ</TabsTrigger>
-                <TabsTrigger value="bank">Ngân hàng</TabsTrigger>
-              </TabsList>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+              <div className="bg-background sticky top-0 z-10 -mx-1 pb-3">
+                <TabsList className="grid h-auto w-full grid-cols-3 p-1">
+                  <TabsTrigger value="account" className="gap-2 py-2">
+                    <Settings2 className="size-4" />
+                    <span className="hidden sm:inline">Tài khoản</span>
+                    <span className="sm:hidden">Cài đặt</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="profile" className="gap-2 py-2">
+                    <UserRound className="size-4" />
+                    Hồ sơ
+                  </TabsTrigger>
+                  <TabsTrigger value="bank" className="gap-2 py-2">
+                    <WalletCards className="size-4" />
+                    Ngân hàng
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="account" className="mt-4 grid gap-4">
-                <AffiliateUserSection mode={mode} form={form} setForm={setForm} userOptions={userOptions} />
+                <FormSection
+                  title="Người dùng affiliate"
+                  description={
+                    mode === "edit"
+                      ? "Thông tin đăng nhập được liên kết với affiliate."
+                      : "Chọn người dùng có sẵn hoặc tạo tài khoản mới."
+                  }
+                  icon={<UserRound className="size-4" />}
+                >
+                  <AffiliateUserSection mode={mode} form={form} setForm={setForm} userOptions={userOptions} />
+                </FormSection>
 
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-code">Mã affiliate</Label>
-                    <Input
-                      id="affiliate-code"
-                      value={form.affiliate_code}
-                      onChange={(event) => updateField("affiliate_code", event.target.value.toUpperCase())}
-                      placeholder={mode === "create" ? "Để trống để tự sinh" : "SRXABC123"}
-                    />
+                <FormSection
+                  title="Thiết lập affiliate"
+                  description="Cấu hình mã, trạng thái, mức hoa hồng và thời gian ghi nhận chuyển đổi."
+                  icon={<CircleDollarSign className="size-4" />}
+                >
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-code">Mã affiliate</Label>
+                      <Input
+                        id="affiliate-code"
+                        value={form.affiliate_code}
+                        onChange={(event) => updateField("affiliate_code", event.target.value.toUpperCase())}
+                        placeholder={mode === "create" ? "Để trống để tự sinh" : "SRXABC123"}
+                      />
+                      <p className="text-muted-foreground text-xs">Mã dùng trong liên kết giới thiệu của affiliate.</p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-status">Trạng thái tài khoản</Label>
+                      <Select
+                        value={form.status}
+                        onValueChange={(value) => updateField("status", value as AffiliateAccountFormState["status"])}
+                      >
+                        <SelectTrigger id="affiliate-status">
+                          <SelectValue placeholder="Chọn trạng thái" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {srxAffiliateAccountStatusValues.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {getAffiliateAccountStatusLabel(status)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-status">Trạng thái tài khoản</Label>
-                    <Select
-                      value={form.status}
-                      onValueChange={(value) => updateField("status", value as AffiliateAccountFormState["status"])}
-                    >
-                      <SelectTrigger id="affiliate-status">
-                        <SelectValue placeholder="Chọn trạng thái" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {srxAffiliateAccountStatusValues.map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {getAffiliateAccountStatusLabel(status)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-commission-type">Kiểu hoa hồng</Label>
+                      <Select
+                        value={form.commission_type}
+                        onValueChange={(value) =>
+                          updateField("commission_type", value as AffiliateAccountFormState["commission_type"])
+                        }
+                      >
+                        <SelectTrigger id="affiliate-commission-type">
+                          <SelectValue placeholder="Chọn kiểu hoa hồng" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {srxAffiliateCommissionTypeValues.map((commissionType) => (
+                            <SelectItem key={commissionType} value={commissionType}>
+                              {getAffiliateCommissionTypeLabel(commissionType)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-commission-type">Kiểu hoa hồng</Label>
-                    <Select
-                      value={form.commission_type}
-                      onValueChange={(value) =>
-                        updateField("commission_type", value as AffiliateAccountFormState["commission_type"])
-                      }
-                    >
-                      <SelectTrigger id="affiliate-commission-type">
-                        <SelectValue placeholder="Chọn kiểu hoa hồng" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {srxAffiliateCommissionTypeValues.map((commissionType) => (
-                          <SelectItem key={commissionType} value={commissionType}>
-                            {getAffiliateCommissionTypeLabel(commissionType)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-commission-rate">
+                        {form.commission_type === "percent" ? "Tỷ lệ hoa hồng (%)" : "Hoa hồng cố định (VND)"}
+                      </Label>
+                      <Input
+                        id="affiliate-commission-rate"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.commission_rate}
+                        onChange={(event) => updateField("commission_rate", event.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-commission-rate">
-                      {form.commission_type === "percent" ? "Tỷ lệ hoa hồng (%)" : "Hoa hồng cố định (VND)"}
-                    </Label>
-                    <Input
-                      id="affiliate-commission-rate"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.commission_rate}
-                      onChange={(event) => updateField("commission_rate", event.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-cookie">Thời hạn cookie (ngày)</Label>
+                      <Input
+                        id="affiliate-cookie"
+                        type="number"
+                        min="1"
+                        max="3650"
+                        value={form.cookie_duration_days}
+                        onChange={(event) => updateField("cookie_duration_days", event.target.value)}
+                        required
+                      />
+                    </div>
 
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-cookie">Thời hạn cookie (ngày)</Label>
-                    <Input
-                      id="affiliate-cookie"
-                      type="number"
-                      min="1"
-                      max="3650"
-                      value={form.cookie_duration_days}
-                      onChange={(event) => updateField("cookie_duration_days", event.target.value)}
-                      required
-                    />
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-application-status">Trạng thái hồ sơ</Label>
+                      <Select
+                        value={form.application_status}
+                        onValueChange={(value) =>
+                          updateField("application_status", value as AffiliateAccountFormState["application_status"])
+                        }
+                      >
+                        <SelectTrigger id="affiliate-application-status">
+                          <SelectValue placeholder="Chọn trạng thái hồ sơ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {srxAffiliateApplicationStatusValues.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {getAffiliateApplicationStatusLabel(status)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-application-status">Trạng thái hồ sơ</Label>
-                    <Select
-                      value={form.application_status}
-                      onValueChange={(value) =>
-                        updateField("application_status", value as AffiliateAccountFormState["application_status"])
-                      }
-                    >
-                      <SelectTrigger id="affiliate-application-status">
-                        <SelectValue placeholder="Chọn trạng thái hồ sơ" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {srxAffiliateApplicationStatusValues.map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {getAffiliateApplicationStatusLabel(status)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                </FormSection>
               </TabsContent>
 
               <TabsContent value="profile" className="mt-4 grid gap-4">
-                <div className={gridClass}>
+                <FormSection
+                  title="Thông tin pháp lý"
+                  description="Thông tin định danh và liên hệ chính thức của affiliate."
+                  icon={<UserRound className="size-4" />}
+                >
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-legal-name">Họ tên trên giấy tờ</Label>
+                      <Input
+                        id="affiliate-legal-name"
+                        value={form.legal_full_name}
+                        onChange={(event) => updateField("legal_full_name", event.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-national-id">Số CCCD/CMND</Label>
+                      <Input
+                        id="affiliate-national-id"
+                        value={form.national_id_number}
+                        onChange={(event) => updateField("national_id_number", event.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid gap-2">
-                    <Label htmlFor="affiliate-legal-name">Họ tên trên giấy tờ</Label>
+                    <Label htmlFor="affiliate-address">Địa chỉ thường trú</Label>
                     <Input
-                      id="affiliate-legal-name"
-                      value={form.legal_full_name}
-                      onChange={(event) => updateField("legal_full_name", event.target.value)}
+                      id="affiliate-address"
+                      value={form.permanent_address}
+                      onChange={(event) => updateField("permanent_address", event.target.value)}
+                    />
+                  </div>
+
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-gender">Giới tính</Label>
+                      <Select
+                        value={form.gender}
+                        onValueChange={(value) => updateField("gender", value as AffiliateAccountFormState["gender"])}
+                      >
+                        <SelectTrigger id="affiliate-gender">
+                          <SelectValue placeholder="Chọn giới tính" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {srxAffiliateGenderValues.map((gender) => (
+                            <SelectItem key={gender} value={gender}>
+                              {getAffiliateGenderLabel(gender)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-contact-phone">Điện thoại liên hệ</Label>
+                      <Input
+                        id="affiliate-contact-phone"
+                        value={form.contact_phone}
+                        onChange={(event) => updateField("contact_phone", event.target.value)}
+                      />
+                    </div>
+                  </div>
+                </FormSection>
+
+                <FormSection
+                  title="Liên hệ & kênh quảng bá"
+                  description="Các kênh affiliate sử dụng để tiếp cận khách hàng."
+                  icon={<Share2 className="size-4" />}
+                >
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-contact-email">Email liên hệ</Label>
+                      <Input
+                        id="affiliate-contact-email"
+                        value={form.contact_email}
+                        onChange={(event) => updateField("contact_email", event.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-social-channel">Kênh xã hội chính</Label>
+                      <Input
+                        id="affiliate-social-channel"
+                        value={form.social_channel}
+                        onChange={(event) => updateField("social_channel", event.target.value)}
+                        placeholder="Facebook, TikTok, Zalo..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-facebook">Facebook</Label>
+                      <Input
+                        id="affiliate-facebook"
+                        value={form.facebook_url}
+                        onChange={(event) => updateField("facebook_url", event.target.value)}
+                        placeholder="https://facebook.com/..."
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-tiktok">TikTok</Label>
+                      <Input
+                        id="affiliate-tiktok"
+                        value={form.tiktok_url}
+                        onChange={(event) => updateField("tiktok_url", event.target.value)}
+                        placeholder="https://tiktok.com/@..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="affiliate-website">Website</Label>
+                    <Input
+                      id="affiliate-website"
+                      value={form.website_url}
+                      onChange={(event) => updateField("website_url", event.target.value)}
+                      placeholder="https://..."
                     />
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="affiliate-national-id">Số CCCD/CMND</Label>
-                    <Input
-                      id="affiliate-national-id"
-                      value={form.national_id_number}
-                      onChange={(event) => updateField("national_id_number", event.target.value)}
+                    <Label htmlFor="affiliate-promotion-plan">Kế hoạch quảng bá</Label>
+                    <Textarea
+                      id="affiliate-promotion-plan"
+                      className="min-h-24 resize-y"
+                      value={form.promotion_plan}
+                      onChange={(event) => updateField("promotion_plan", event.target.value)}
+                      placeholder="Mô tả nội dung, nền tảng và cách affiliate dự kiến quảng bá..."
                     />
                   </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="affiliate-address">Địa chỉ thường trú</Label>
-                  <Input
-                    id="affiliate-address"
-                    value={form.permanent_address}
-                    onChange={(event) => updateField("permanent_address", event.target.value)}
-                  />
-                </div>
-
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-gender">Giới tính</Label>
-                    <Select
-                      value={form.gender}
-                      onValueChange={(value) => updateField("gender", value as AffiliateAccountFormState["gender"])}
-                    >
-                      <SelectTrigger id="affiliate-gender">
-                        <SelectValue placeholder="Chọn giới tính" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {srxAffiliateGenderValues.map((gender) => (
-                          <SelectItem key={gender} value={gender}>
-                            {getAffiliateGenderLabel(gender)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-contact-phone">Điện thoại liên hệ</Label>
-                    <Input
-                      id="affiliate-contact-phone"
-                      value={form.contact_phone}
-                      onChange={(event) => updateField("contact_phone", event.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-contact-email">Email liên hệ</Label>
-                    <Input
-                      id="affiliate-contact-email"
-                      value={form.contact_email}
-                      onChange={(event) => updateField("contact_email", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-social-channel">Kênh xã hội chính</Label>
-                    <Input
-                      id="affiliate-social-channel"
-                      value={form.social_channel}
-                      onChange={(event) => updateField("social_channel", event.target.value)}
-                      placeholder="Facebook, TikTok, Zalo..."
-                    />
-                  </div>
-                </div>
-
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-facebook">Facebook</Label>
-                    <Input
-                      id="affiliate-facebook"
-                      value={form.facebook_url}
-                      onChange={(event) => updateField("facebook_url", event.target.value)}
-                      placeholder="https://facebook.com/..."
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-tiktok">TikTok</Label>
-                    <Input
-                      id="affiliate-tiktok"
-                      value={form.tiktok_url}
-                      onChange={(event) => updateField("tiktok_url", event.target.value)}
-                      placeholder="https://tiktok.com/@..."
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="affiliate-website">Website</Label>
-                  <Input
-                    id="affiliate-website"
-                    value={form.website_url}
-                    onChange={(event) => updateField("website_url", event.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="affiliate-promotion-plan">Kế hoạch quảng bá</Label>
-                  <Textarea
-                    id="affiliate-promotion-plan"
-                    className="min-h-24"
-                    value={form.promotion_plan}
-                    onChange={(event) => updateField("promotion_plan", event.target.value)}
-                  />
-                </div>
+                </FormSection>
               </TabsContent>
 
               <TabsContent value="bank" className="mt-4 grid gap-4">
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-bank-holder">Chủ tài khoản</Label>
-                    <Input
-                      id="affiliate-bank-holder"
-                      value={form.bank_account_holder}
-                      onChange={(event) => updateField("bank_account_holder", event.target.value)}
-                    />
+                <FormSection
+                  title="Tài khoản nhận hoa hồng"
+                  description="Thông tin được sử dụng khi thực hiện thanh toán cho affiliate."
+                  icon={<Banknote className="size-4" />}
+                >
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-bank-holder">Chủ tài khoản</Label>
+                      <Input
+                        id="affiliate-bank-holder"
+                        value={form.bank_account_holder}
+                        onChange={(event) => updateField("bank_account_holder", event.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-bank-name">Ngân hàng</Label>
+                      <Input
+                        id="affiliate-bank-name"
+                        value={form.bank_name}
+                        onChange={(event) => updateField("bank_name", event.target.value)}
+                        placeholder="Vietcombank, Techcombank..."
+                      />
+                    </div>
                   </div>
 
+                  <div className={gridClass}>
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-bank-branch">Chi nhánh</Label>
+                      <Input
+                        id="affiliate-bank-branch"
+                        value={form.bank_branch}
+                        onChange={(event) => updateField("bank_branch", event.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="affiliate-bank-number">Số tài khoản</Label>
+                      <Input
+                        id="affiliate-bank-number"
+                        value={form.bank_account_number}
+                        onChange={(event) => updateField("bank_account_number", event.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-muted-foreground text-xs">
+                    Để trống toàn bộ nếu affiliate chưa cung cấp tài khoản ngân hàng. Khi đã nhập, cần đủ chủ tài khoản,
+                    tên ngân hàng và số tài khoản.
+                  </p>
+                </FormSection>
+
+                <FormSection
+                  title="Ghi chú nội bộ"
+                  description="Lưu thỏa thuận hoặc thông tin cần lưu ý cho đội vận hành."
+                  icon={<FileText className="size-4" />}
+                >
                   <div className="grid gap-2">
-                    <Label htmlFor="affiliate-bank-name">Ngân hàng</Label>
-                    <Input
-                      id="affiliate-bank-name"
-                      value={form.bank_name}
-                      onChange={(event) => updateField("bank_name", event.target.value)}
-                      placeholder="Vietcombank, Techcombank..."
+                    <Label htmlFor="affiliate-review-note">Nội dung ghi chú</Label>
+                    <Textarea
+                      id="affiliate-review-note"
+                      className="min-h-28 resize-y"
+                      value={form.review_note}
+                      onChange={(event) => updateField("review_note", event.target.value)}
+                      placeholder="Ghi chú duyệt hồ sơ, thỏa thuận hoa hồng..."
                     />
                   </div>
-                </div>
-
-                <div className={gridClass}>
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-bank-branch">Chi nhánh</Label>
-                    <Input
-                      id="affiliate-bank-branch"
-                      value={form.bank_branch}
-                      onChange={(event) => updateField("bank_branch", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="affiliate-bank-number">Số tài khoản</Label>
-                    <Input
-                      id="affiliate-bank-number"
-                      value={form.bank_account_number}
-                      onChange={(event) => updateField("bank_account_number", event.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <p className="text-muted-foreground text-xs">
-                  Để trống toàn bộ nếu affiliate chưa cung cấp tài khoản ngân hàng. Khi đã nhập, cần đủ chủ tài khoản,
-                  tên ngân hàng và số tài khoản.
-                </p>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="affiliate-review-note">Ghi chú nội bộ</Label>
-                  <Textarea
-                    id="affiliate-review-note"
-                    className="min-h-24"
-                    value={form.review_note}
-                    onChange={(event) => updateField("review_note", event.target.value)}
-                    placeholder="Ghi chú duyệt hồ sơ, thỏa thuận hoa hồng..."
-                  />
-                </div>
+                </FormSection>
               </TabsContent>
             </Tabs>
           </div>
 
-          <DrawerFooter className="border-t">
+          <DrawerFooter className="bg-background shrink-0 border-t px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Hủy
             </Button>

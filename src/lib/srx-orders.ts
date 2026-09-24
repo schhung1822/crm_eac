@@ -1,5 +1,4 @@
 /* eslint-disable max-lines */
-/* eslint-disable import/no-unresolved */
 import "server-only";
 
 import { prisma2 } from "@/lib/prisma2";
@@ -65,6 +64,8 @@ function mapOrder(order: {
     sku: string | null;
     product_name: string;
     variant_name: string | null;
+    products: { thumbnail_url: string | null } | null;
+    product_variants: { image_url: string | null } | null;
     unit_price: { toString(): string };
     quantity: number;
     discount_amount: { toString(): string };
@@ -131,6 +132,7 @@ function mapOrder(order: {
       sku: normalizeOptionalString(item.sku),
       product_name: item.product_name,
       variant_name: normalizeOptionalString(item.variant_name),
+      image_url: normalizeOptionalString(item.product_variants?.image_url ?? item.products?.thumbnail_url),
       unit_price: toNumber(item.unit_price),
       quantity: item.quantity,
       discount_amount: toNumber(item.discount_amount),
@@ -212,6 +214,16 @@ export async function getSrxOrders(): Promise<SrxOrder[]> {
             sku: true,
             product_name: true,
             variant_name: true,
+            products: {
+              select: {
+                thumbnail_url: true,
+              },
+            },
+            product_variants: {
+              select: {
+                image_url: true,
+              },
+            },
             unit_price: true,
             quantity: true,
             discount_amount: true,
@@ -275,6 +287,16 @@ export async function getSrxOrderById(orderId: string): Promise<SrxOrder | null>
             sku: true,
             product_name: true,
             variant_name: true,
+            products: {
+              select: {
+                thumbnail_url: true,
+              },
+            },
+            product_variants: {
+              select: {
+                image_url: true,
+              },
+            },
             unit_price: true,
             quantity: true,
             discount_amount: true,
