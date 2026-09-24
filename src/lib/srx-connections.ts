@@ -17,10 +17,10 @@ import {
 } from "@/lib/srx-connections.shared";
 
 /**
- * Secret của từng kết nối lưu trong bảng `token` (một dòng cấu hình duy nhất).
- * Tên cột là hằng số trong file này, không lấy từ input người dùng.
+ * Mỗi secret dùng một dòng riêng trong bảng `token`: `token_name` nhận tên cấu
+ * hình cố định, còn giá trị đã mã hoá được lưu ở `api_key`.
  */
-const secretColumns: Partial<Record<SrxConnectionId, string>> = {
+const secretTokenNames: Partial<Record<SrxConnectionId, string>> = {
   claude: "anthropic_api_key",
   chatgpt: "openai_api_key",
   gemini: "gemini_api_key",
@@ -29,43 +29,57 @@ const secretColumns: Partial<Record<SrxConnectionId, string>> = {
   facebook: "facebook_page_token",
 };
 
-type TokenSecretRow = Record<string, string | null> & { id: number };
+type TokenSecretRow = {
+  id: number;
+  token_name: string | null;
+  api_key: string | null;
+};
 
-async function readTokenSecretRow(): Promise<TokenSecretRow | null> {
-  const columns = Object.values(secretColumns).join(", ");
+async function readTokenSecretRows(): Promise<Map<string, TokenSecretRow>> {
+  const tokenNames = Object.values(secretTokenNames);
+  const placeholders = tokenNames.map(() => "?").join(", ");
 
   try {
     const rows = await prisma.$queryRawUnsafe<TokenSecretRow[]>(
-      `SELECT id, ${columns} FROM token ORDER BY id ASC LIMIT 1`,
+      `SELECT id, token_name, api_key FROM token WHERE token_name IN (${placeholders}) ORDER BY id ASC`,
+      ...tokenNames,
     );
+    const rowsByName = new Map<string, TokenSecretRow>();
 
-    return rows[0] ?? null;
+    for (const row of rows) {
+      if (row.token_name && !rowsByName.has(row.token_name)) {
+        rowsByName.set(row.token_name, row);
+      }
+    }
+
+    return rowsByName;
   } catch (error) {
     console.error("Không đọc được API key từ bảng token:", error);
-    return null;
+    return new Map();
   }
 }
 
 async function writeTokenSecret(id: SrxConnectionId, encrypted: string | null): Promise<void> {
-  const column = secretColumns[id];
+  const tokenName = secretTokenNames[id];
 
-  if (!column) {
+  if (!tokenName) {
     return;
   }
 
-  const row = await readTokenSecretRow();
+  const existing = (await readTokenSecretRows()).get(tokenName);
 
-  if (row) {
+  if (existing) {
     await prisma.$executeRawUnsafe(
-      `UPDATE token SET ${column} = ?, updated_at = NOW() WHERE id = ?`,
+      "UPDATE token SET api_key = ?, updated_at = NOW() WHERE id = ?",
       encrypted,
-      row.id,
+      existing.id,
     );
     return;
   }
 
   await prisma.$executeRawUnsafe(
-    `INSERT INTO token (${column}, created_at, updated_at) VALUES (?, NOW(), NOW())`,
+    "INSERT INTO token (token_name, api_key, created_at, updated_at) VALUES (?, ?, NOW(), NOW())",
+    tokenName,
     encrypted,
   );
 }
@@ -378,10 +392,10 @@ function readEnvSecret(id: SrxConnectionId): string {
 }
 
 /** Đọc secret đã mã hoá của một kết nối từ bảng token. Chỉ đọc, không ghi. */
-function readStoredSecret(id: SrxConnectionId, row: TokenSecretRow | null): string | null {
-  const column = secretColumns[id];
+function readStoredSecret(id: SrxConnectionId, rowsByName: Map<string, TokenSecretRow>): string | null {
+  const tokenName = secretTokenNames[id];
 
-  return column ? (row?.[column] ?? null) : null;
+  return tokenName ? (rowsByName.get(tokenName)?.api_key ?? null) : null;
 }
 
 /** Secret dạng plaintext còn sót trong các file cấu hình đời đầu. */
@@ -411,13 +425,12 @@ let migrationPromise: Promise<void> | null = null;
 async function migrateSecretsToDatabase(): Promise<void> {
   migrationPromise ??= (async () => {
     try {
-      const row = await readTokenSecretRow();
+      const rowsByName = await readTokenSecretRows();
       const store = await readStore();
       const pending: Array<{ id: SrxConnectionId; encrypted: string }> = [];
 
-      for (const [id, column] of Object.entries(secretColumns) as Array<[SrxConnectionId, string]>) {
-        // eslint-disable-next-line security/detect-object-injection
-        if (row?.[column]) {
+      for (const [id, tokenName] of Object.entries(secretTokenNames) as Array<[SrxConnectionId, string]>) {
+        if (rowsByName.get(tokenName)?.api_key) {
           continue;
         }
 
@@ -468,9 +481,9 @@ export async function getSrxConnectionSecret(id: SrxConnectionId): Promise<strin
 
   await migrateSecretsToDatabase();
 
-  const row = await readTokenSecretRow();
+  const rowsByName = await readTokenSecretRows();
 
-  return decryptSecret(readStoredSecret(id, row));
+  return decryptSecret(readStoredSecret(id, rowsByName));
 }
 
 export async function getSrxConnectionValues(id: SrxConnectionId): Promise<Record<string, string>> {
@@ -498,11 +511,11 @@ export async function getSrxSchedulerSecret(): Promise<string> {
 async function toConnectionState(
   id: SrxConnectionId,
   stored: StoredConnection | undefined,
-  row: TokenSecretRow | null,
+  rowsByName: Map<string, TokenSecretRow>,
 ): Promise<SrxConnectionState> {
   const definition = getSrxConnectionDefinition(id);
   const envSecret = readEnvSecret(id);
-  const storedSecret = await decryptSecret(readStoredSecret(id, row));
+  const storedSecret = await decryptSecret(readStoredSecret(id, rowsByName));
   const effectiveSecret = envSecret || storedSecret;
   const hasSecret = Boolean(effectiveSecret);
   const values = stored?.values ?? {};
@@ -527,9 +540,11 @@ export async function getSrxConnectionStates(): Promise<SrxConnectionState[]> {
   await migrateSecretsToDatabase();
 
   const store = await readStore();
-  const row = await readTokenSecretRow();
+  const rowsByName = await readTokenSecretRows();
 
-  return Promise.all(srxConnectionCatalog.map((item) => toConnectionState(item.id, store.connections[item.id], row)));
+  return Promise.all(
+    srxConnectionCatalog.map((item) => toConnectionState(item.id, store.connections[item.id], rowsByName)),
+  );
 }
 
 export async function saveSrxConnection({
@@ -566,7 +581,7 @@ export async function saveSrxConnection({
     return value;
   });
 
-  return toConnectionState(id, next, await readTokenSecretRow());
+  return toConnectionState(id, next, await readTokenSecretRows());
 }
 
 export async function deleteSrxConnection(id: SrxConnectionId): Promise<void> {
@@ -861,5 +876,5 @@ export async function testSrxConnection(id: SrxConnectionId): Promise<SrxConnect
     return value;
   });
 
-  return toConnectionState(id, next, await readTokenSecretRow());
+  return toConnectionState(id, next, await readTokenSecretRows());
 }

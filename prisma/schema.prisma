@@ -161,26 +161,19 @@ model product {
 }
 
 model token {
-  id                Int       @id @default(autoincrement()) @db.UnsignedInt
-  created_at        DateTime? @db.Timestamp(0)
-  updated_at        DateTime? @db.Timestamp(0)
-  created_by        String?   @db.VarChar(255)
-  updated_by        String?   @db.VarChar(255)
-  nc_order          Decimal?  @db.Decimal(10, 2)
-  access_token      String?   @db.Text
-  refresh_token     String?   @db.Text
-  user_kiot         String?   @db.Text
-  client_kiot       String?   @db.Text
-  key_secret_kiot   String?   @db.Text
-  access_token_kiot String?   @db.Text
-
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+  created_by    String?   @db.VarChar(255)
+  updated_by    String?   @db.VarChar(255)
+  nc_order      Decimal?  @db.Decimal(10, 2)
+  access_token  String?   @db.Text
+  refresh_token String?   @db.Text
+  user          String?   @db.Text
+  client        String?   @db.Text
+  token_name    String?   @db.Text
   // API key / credential của trang Quản lý kết nối (/ai), mã hoá AES-256-GCM.
-  anthropic_api_key       String? @db.Text
-  openai_api_key          String? @db.Text
-  gemini_api_key          String? @db.Text
-  deepseek_api_key        String? @db.Text
-  google_drive_credential String? @db.Text
-  facebook_page_token     String? @db.Text
+  api_key       String?   @db.Text
 
   @@index([nc_order], map: "toekn_order_idx")
 }
