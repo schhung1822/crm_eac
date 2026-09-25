@@ -23,7 +23,7 @@ export function ChannelPerformance({ channels }: { channels: ChannelSummary[] })
   const totalAverageOrderValue = totals.orders > 0 ? totals.revenue / totals.orders : 0;
 
   return (
-    <Card>
+    <Card className="h-full min-w-0">
       <CardHeader>
         <CardTitle>Hiệu suất theo kênh bán · Đơn hoàn thành</CardTitle>
       </CardHeader>
@@ -54,7 +54,7 @@ export function ChannelPerformance({ channels }: { channels: ChannelSummary[] })
             Chưa có dữ liệu kênh bán trong khoảng thời gian đã chọn.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border">
+          <div className="overflow-x-auto rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">

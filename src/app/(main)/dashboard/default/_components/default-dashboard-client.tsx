@@ -4,6 +4,7 @@ import { ChannelPerformance } from "./channel-performance";
 import { ChartAreaInteractive } from "./chart-area-interactive";
 import { DateRangeFilter } from "./date-range-filter";
 import { SectionCards } from "./section-cards";
+import { SegmentShareChart } from "./segment-share-chart";
 import { StatusSummary } from "./status-summary";
 import type { ChannelSummary, ChartPoint, DashboardStats, OrderStatusSummary } from "./types";
 
@@ -55,7 +56,10 @@ export default function DefaultDashboardClient({
         <StatusSummary data={statusSummary} />
       </div>
 
-      <ChannelPerformance channels={channelSummary} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[400px_minmax(0,1fr)]">
+        <SegmentShareChart channels={channelSummary} />
+        <ChannelPerformance channels={channelSummary} />
+      </div>
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function RulesExtendedSections() {
               "Database EAC",
               <>
                 <Path>/orders</Path>, <Path>/customers</Path>, <Path>/products</Path>, <Path>/zalo-oa</Path>,{" "}
-                <Path>/dashboard/crm</Path>
+                <Path>/dashboard/b2b</Path>, <Path>/dashboard/b2c</Path>, <Path>/dashboard/customers</Path>
               </>,
               "Nguồn chính cho báo cáo kinh doanh nội bộ.",
             ],

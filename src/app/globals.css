@@ -118,6 +118,35 @@ These serve as the fallback; there is no separate default.css file. */
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Bảng màu biểu đồ báo cáo B2B/B2C — thứ tự slot cố định, đã kiểm định mù màu + tương phản
+   cho nền card sáng (#fff) và tối (#171717). Không đổi thứ tự slot. Màu trạng thái là màu ngữ nghĩa,
+   không dùng cho series. */
+:root {
+  --report-series-1: #2a78d6;
+  --report-series-2: #eb6834;
+  --report-series-3: #1baf7a;
+  --report-series-4: #eda100;
+  --report-series-5: #e87ba4;
+  --report-series-6: #008300;
+  --report-series-other: #8a8984;
+  --report-status-good: #0ca30c;
+  --report-status-warning: #fab219;
+  --report-status-serious: #ec835a;
+  --report-status-critical: #d03b3b;
+  --report-status-neutral: #8a8984;
+}
+
+.dark {
+  --report-series-1: #3987e5;
+  --report-series-2: #d95926;
+  --report-series-3: #199e70;
+  --report-series-4: #c98500;
+  --report-series-5: #d55181;
+  --report-series-6: #008300;
+  --report-series-other: #75746f;
+  --report-status-neutral: #75746f;
+}
+
 @layer utilities {
   [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xs {
     box-shadow: var(--shadow-2xs);

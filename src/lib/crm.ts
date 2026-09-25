@@ -1,6 +1,14 @@
-import { OrderSchema, type Order } from "@/app/(main)/dashboard/crm/_components/schema";
+import { OrderSchema, type Order } from "@/app/(main)/dashboard/_components/reports/schema";
 import { getDB } from "@/lib/db";
 import { legacyEacTables } from "@/lib/legacy-db";
+
+function asText(value: unknown): string {
+  return String(value ?? "");
+}
+
+function asNumber(value: unknown): number {
+  return Number(value) || 0;
+}
 
 export async function getOrders(): Promise<Order[]> {
   const db = getDB();
@@ -32,28 +40,28 @@ export async function getOrders(): Promise<Order[]> {
   return (rows ?? []).map((r) =>
     OrderSchema.parse({
       order_ID: String(r.order_ID),
-      brand: String(r.brand ?? ""),
+      brand: asText(r.brand),
       create_time: r.create_time ? new Date(r.create_time) : new Date(0),
 
-      customer_ID: String(r.customer_ID ?? ""),
-      name_customer: String(r.name_customer ?? ""),
-      phone: String(r.phone ?? ""),
-      address: String(r.address ?? ""),
+      customer_ID: asText(r.customer_ID),
+      name_customer: asText(r.name_customer),
+      phone: asText(r.phone),
+      address: asText(r.address),
 
-      seller: String(r.seller ?? ""),
-      kenh_ban: String(r.kenh_ban ?? ""),
+      seller: asText(r.seller),
+      kenh_ban: asText(r.kenh_ban),
       note: r.note ? String(r.note) : null,
 
-      tien_hang: Number(r.tien_hang) || 0,
-      giam_gia: Number(r.giam_gia) || 0,
-      thanh_tien: Number(r.thanh_tien) || 0,
+      tien_hang: asNumber(r.tien_hang),
+      giam_gia: asNumber(r.giam_gia),
+      thanh_tien: asNumber(r.thanh_tien),
 
-      status: String(r.status ?? ""),
-      quantity: Number(r.quantity) || 0,
+      status: asText(r.status),
+      quantity: asNumber(r.quantity),
 
-      pro_ID: String(r.pro_ID ?? ""),
-      name_pro: String(r.name_pro ?? ""),
-      brand_pro: String(r.brand_pro ?? ""),
+      pro_ID: asText(r.pro_ID),
+      name_pro: asText(r.name_pro),
+      brand_pro: asText(r.brand_pro),
     }),
   );
 }

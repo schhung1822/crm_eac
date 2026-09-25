@@ -15,7 +15,7 @@ const EMPTY_STATS: DashboardStats = {
   totalQuantity: 0,
 };
 
-function normalizeStats(value: Awaited<ReturnType<typeof getCRMStats>> | null | undefined): DashboardStats {
+function normalizeStats(value: DashboardStats | null | undefined): DashboardStats {
   if (!value) {
     return EMPTY_STATS;
   }

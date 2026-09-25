@@ -1,8 +1,9 @@
 import {
   Banknote,
   BrainCircuit,
+  Building2,
   Calendar1Icon,
-  ChartBar,
+  Contact,
   Gauge,
   Handshake,
   LayoutDashboard,
@@ -10,6 +11,7 @@ import {
   PackageIcon,
   Scale,
   ShoppingBagIcon,
+  ShoppingCart,
   SquareArrowUpRight,
   Store,
   Link,
@@ -57,9 +59,19 @@ export const sidebarItems: NavGroup[] = [
         icon: LayoutDashboard,
       },
       {
-        title: "CRM",
-        url: "/dashboard/crm",
-        icon: ChartBar,
+        title: "Báo cáo B2B",
+        url: "/dashboard/b2b",
+        icon: Building2,
+      },
+      {
+        title: "Báo cáo B2C",
+        url: "/dashboard/b2c",
+        icon: ShoppingCart,
+      },
+      {
+        title: "Báo cáo khách hàng",
+        url: "/dashboard/customers",
+        icon: Contact,
       },
       {
         title: "SRX Việt Nam",

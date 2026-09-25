@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import "server-only";
 
+import { toSrxDbDateTime } from "@/lib/db-local-time";
 import { prisma2 } from "@/lib/prisma2";
 import { withSrxReadFallback } from "@/lib/srx-db-errors";
 import {
@@ -375,7 +376,8 @@ export async function updateSrxOrder(
 
   const actorUserId = await resolveExistingActorUserId(changedByUserId);
   const statusChanged = existing.order_status !== payload.order_status;
-  const now = new Date();
+  // DB SRX lưu giờ VN; Prisma ghi Date như UTC nên phải đổi trước khi ghi.
+  const now = toSrxDbDateTime(new Date());
 
   await prisma2.$transaction(async (tx) => {
     await tx.orders.update({

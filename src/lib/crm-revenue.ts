@@ -2,13 +2,12 @@ import { unstable_cache } from "next/cache";
 
 import {
   buildRevenueHorizontalBars,
-  buildRevenuePie,
   type RevenueGroupRow,
-} from "@/app/(main)/dashboard/crm/_components/crm.config";
+} from "@/app/(main)/dashboard/_components/reports/crm.config";
+import { buildWhere, CHANNEL_SQL, CUSTOMER_KEY_SQL } from "@/lib/crm-order-filters";
+import type { CrmSegment } from "@/lib/crm-segments";
 import { getDB } from "@/lib/db";
 import { legacyEacTables } from "@/lib/legacy-db";
-
-type ChartResult = ReturnType<typeof buildRevenuePie>;
 
 function mapRows(rows: any[]): RevenueGroupRow[] {
   return (rows ?? []).map((row) => ({
@@ -17,109 +16,66 @@ function mapRows(rows: any[]): RevenueGroupRow[] {
   }));
 }
 
-function buildDateFilter(from?: Date, to?: Date) {
-  if (!from && !to) return { clause: "", params: [] as (Date | number)[] };
-
-  const params: (Date | number)[] = [];
-  let clause = "";
-
-  if (from && to) {
-    clause = "create_time >= ? AND create_time <= ?";
-    params.push(from, to);
-  } else if (from) {
-    clause = "create_time >= ?";
-    params.push(from);
-  } else if (to) {
-    clause = "create_time <= ?";
-    params.push(to);
-  }
-
-  return { clause, params };
-}
-
-export const getRevenueByChannelChart = unstable_cache(
-  async (from?: Date, to?: Date): Promise<ChartResult> => {
-    const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
-
-    const [rows] = await db.query<any[]>(
-      `
-      SELECT COALESCE(kenh_ban, 'Khong ro') AS name,
-             SUM(COALESCE(thanh_tien, 0)) AS revenue
-      FROM ${legacyEacTables.orders}
-      WHERE ${whereClause}
-      GROUP BY COALESCE(kenh_ban, 'Khong ro')
-      ORDER BY revenue DESC
-      `,
-      dateFilter.params,
-    );
-
-    return buildRevenuePie(mapRows(rows), "Doanh thu");
-  },
-  ["crm-revenue-by-channel"],
-  { revalidate: 300 },
-);
-
 export const getRevenueByBranchBarChart = unstable_cache(
-  async (from?: Date, to?: Date, limit: number = 12) => {
+  async (from?: Date, to?: Date, limit: number = 12, segment?: CrmSegment) => {
     const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
+    const { where, params } = buildWhere(from, to, segment);
 
     const [rows] = await db.query<any[]>(
       `
       SELECT COALESCE(brand, 'Khong ro') AS name,
              SUM(COALESCE(thanh_tien, 0)) AS revenue
       FROM ${legacyEacTables.orders}
-      WHERE ${whereClause}
+      WHERE ${where}
       GROUP BY COALESCE(brand, 'Khong ro')
       ORDER BY revenue DESC
       LIMIT ?
       `,
-      [...dateFilter.params, limit],
+      [...params, limit],
     );
 
-    const mapped: RevenueGroupRow[] = (rows ?? []).map((row) => ({
-      name: String(row.name ?? "Khong ro"),
-      revenue: Number(row.revenue) || 0,
-    }));
-
-    return buildRevenueHorizontalBars(mapped);
+    return buildRevenueHorizontalBars(mapRows(rows));
   },
   ["crm-revenue-branch-bars"],
   { revalidate: 300 },
 );
 
+/*
+ * Mỗi dòng orders_eac là một sản phẩm trong đơn: `tien_hang` là đơn giá và `giam_gia` là mức giảm
+ * trên 1 sản phẩm, nên tổng phải nhân `quantity`. Thành tiền của dòng = (tien_hang - giam_gia) * quantity.
+ */
 export const getCRMStats = unstable_cache(
-  async (from?: Date, to?: Date) => {
+  async (from?: Date, to?: Date, segment?: CrmSegment) => {
     const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
+    const { where, params } = buildWhere(from, to, segment);
 
     const [rows] = await db.query<any[]>(
       `
       SELECT
         COUNT(DISTINCT order_ID) AS totalOrders,
+        COUNT(DISTINCT ${CUSTOMER_KEY_SQL}) AS totalCustomers,
         SUM(COALESCE(quantity, 0)) AS totalQuantity,
         SUM(COALESCE(tien_hang, 0) * COALESCE(quantity, 0)) AS totalTienHang,
-        SUM(COALESCE(giam_gia, 0)) AS totalDiscount,
+        SUM(COALESCE(giam_gia, 0) * COALESCE(quantity, 0)) AS totalDiscount,
         SUM(COALESCE(thanh_tien, 0)) AS totalThanhTien,
+        COUNT(DISTINCT CASE WHEN TRIM(status) = 'Hoàn thành' THEN order_ID END) AS completedOrders,
         SUM(CASE WHEN TRIM(status) = 'Hoàn thành' THEN COALESCE(thanh_tien, 0) ELSE 0 END) AS completedRevenue
       FROM ${legacyEacTables.orders}
-      WHERE ${whereClause}
+      WHERE ${where}
       `,
-      dateFilter.params,
+      params,
     );
 
     const row = rows[0] ?? {};
 
     return {
       totalOrders: Number(row.totalOrders) || 0,
+      totalCustomers: Number(row.totalCustomers) || 0,
       totalQuantity: Number(row.totalQuantity) || 0,
       totalTienHang: Number(row.totalTienHang) || 0,
       totalDiscount: Number(row.totalDiscount) || 0,
       totalThanhTien: Number(row.totalThanhTien) || 0,
+      completedOrders: Number(row.completedOrders) || 0,
       completedRevenue: Number(row.completedRevenue) || 0,
     };
   },
@@ -128,23 +84,22 @@ export const getCRMStats = unstable_cache(
 );
 
 export const getBrandConversionFunnel = unstable_cache(
-  async (from?: Date, to?: Date) => {
+  async (from?: Date, to?: Date, segment?: CrmSegment) => {
     const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
+    const { where, params } = buildWhere(from, to, segment);
 
     const [rows] = await db.query<any[]>(
       `
       SELECT
-        COALESCE(o.brand_pro, o.brand, 'Khong ro') AS brand,
-        COUNT(DISTINCT o.order_ID) AS orders
-      FROM ${legacyEacTables.orders} o
-      WHERE ${whereClause.replace("create_time", "o.create_time")}
-      GROUP BY COALESCE(o.brand_pro, o.brand, 'Khong ro')
+        COALESCE(brand_pro, brand, 'Khong ro') AS brand,
+        COUNT(DISTINCT order_ID) AS orders
+      FROM ${legacyEacTables.orders}
+      WHERE ${where}
+      GROUP BY COALESCE(brand_pro, brand, 'Khong ro')
       ORDER BY orders DESC
-      LIMIT 5
+      LIMIT 10
       `,
-      dateFilter.params,
+      params,
     );
 
     const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
@@ -160,28 +115,27 @@ export const getBrandConversionFunnel = unstable_cache(
 );
 
 export const getChannelSalesSummary = unstable_cache(
-  async (from?: Date, to?: Date, completedOnly = false) => {
+  async (from?: Date, to?: Date, completedOnly = false, segment?: CrmSegment) => {
     const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
+    const { where, params } = buildWhere(from, to, segment);
     const completedFilter = completedOnly ? "AND TRIM(status) = 'Hoàn thành'" : "";
 
     const [rows] = await db.query<any[]>(
       `
       SELECT
-        COALESCE(NULLIF(TRIM(kenh_ban), ''), 'Chưa xác định') AS kenh_ban,
+        ${CHANNEL_SQL} AS kenh_ban,
         COUNT(DISTINCT order_ID) AS orders,
         SUM(COALESCE(quantity, 0)) AS quantity,
         SUM(COALESCE(tien_hang, 0) * COALESCE(quantity, 0)) AS tien_hang,
-        SUM(COALESCE(giam_gia, 0)) AS giam_gia,
+        SUM(COALESCE(giam_gia, 0) * COALESCE(quantity, 0)) AS giam_gia,
         SUM(COALESCE(thanh_tien, 0)) AS thanh_tien
       FROM ${legacyEacTables.orders}
-      WHERE ${whereClause}
+      WHERE ${where}
         ${completedFilter}
-      GROUP BY COALESCE(NULLIF(TRIM(kenh_ban), ''), 'Chưa xác định')
+      GROUP BY ${CHANNEL_SQL}
       ORDER BY thanh_tien DESC
       `,
-      dateFilter.params,
+      params,
     );
 
     return (rows ?? []).map((row) => ({
@@ -198,23 +152,23 @@ export const getChannelSalesSummary = unstable_cache(
 );
 
 export const getTopProductsByQuantity = unstable_cache(
-  async (from?: Date, to?: Date, limit: number = 10) => {
+  async (from?: Date, to?: Date, limit: number = 10, segment?: CrmSegment) => {
     const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
+    const { where, params } = buildWhere(from, to, segment);
 
     const [rows] = await db.query<any[]>(
       `
       SELECT
         COALESCE(name_pro, 'Khong ro') AS product,
-        SUM(COALESCE(quantity, 0)) AS totalQuantity
+        SUM(COALESCE(quantity, 0)) AS totalQuantity,
+        SUM(COALESCE(thanh_tien, 0)) AS totalRevenue
       FROM ${legacyEacTables.orders}
-      WHERE ${whereClause}
+      WHERE ${where}
       GROUP BY COALESCE(name_pro, 'Khong ro')
       ORDER BY totalQuantity DESC
       LIMIT ?
       `,
-      [...dateFilter.params, limit],
+      [...params, limit],
     );
 
     const total = (rows ?? []).reduce((sum, row) => sum + (Number(row.totalQuantity) || 0), 0);
@@ -225,6 +179,7 @@ export const getTopProductsByQuantity = unstable_cache(
       return {
         product: String(row.product ?? "Khong ro"),
         quantity,
+        revenue: Number(row.totalRevenue) || 0,
         percentage: total > 0 ? Math.round((quantity / total) * 100) : 0,
       };
     });
@@ -234,10 +189,9 @@ export const getTopProductsByQuantity = unstable_cache(
 );
 
 export const getTopSalesByRevenue = unstable_cache(
-  async (from?: Date, to?: Date, limit?: number) => {
+  async (from?: Date, to?: Date, limit?: number, segment?: CrmSegment) => {
     const db = getDB();
-    const dateFilter = buildDateFilter(from, to);
-    const whereClause = dateFilter.clause || "1=1";
+    const { where, params } = buildWhere(from, to, segment);
     const normalizedLimit = typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null;
     const limitClause = normalizedLimit ? "LIMIT ?" : "";
 
@@ -248,12 +202,12 @@ export const getTopSalesByRevenue = unstable_cache(
         SUM(COALESCE(thanh_tien, 0)) AS totalRevenue,
         COUNT(DISTINCT order_ID) AS totalOrders
       FROM ${legacyEacTables.orders}
-      WHERE ${whereClause}
+      WHERE ${where}
       GROUP BY COALESCE(seller, 'Khong ro')
       ORDER BY totalRevenue DESC
       ${limitClause}
       `,
-      normalizedLimit ? [...dateFilter.params, normalizedLimit] : dateFilter.params,
+      normalizedLimit ? [...params, normalizedLimit] : params,
     );
 
     return (rows ?? []).map((row) => ({

@@ -60,7 +60,10 @@ const ROLE_ROUTE_MATCHERS: Record<Exclude<AppRole, "admin">, RouteMatcher[]> = {
     EXACT("/"),
     EXACT("/account"),
     EXACT("/dashboard"),
-    PREFIX("/dashboard/crm"),
+    EXACT("/dashboard/crm"),
+    EXACT("/dashboard/b2b"),
+    EXACT("/dashboard/b2c"),
+    EXACT("/dashboard/customers"),
     EXACT("/dashboard/default"),
     EXACT("/dashboard/srxvietnam"),
     PREFIX("/customers"),
@@ -98,7 +101,10 @@ export function isAppRole(value: string | null | undefined): value is AppRole {
     return false;
   }
 
-  const normalizedValue = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const normalizedValue = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
   return APP_ROLES.some((role) => role === normalizedValue);
 }
@@ -108,7 +114,10 @@ export function normalizeRole(value: string | null | undefined): AppRole {
     return "user";
   }
 
-  const normalizedValue = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const normalizedValue = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
   return APP_ROLES.find((role) => role === normalizedValue) ?? "user";
 }
@@ -148,35 +157,21 @@ export function canManageSrxSection(value: string | null | undefined, section: S
   return false;
 }
 
+/** Xét theo thứ tự: tiền tố khớp đầu tiên quyết định khu vực quản lý. */
+const SRX_SECTION_PREFIXES: ReadonlyArray<{ section: SrxManagementSection; prefixes: readonly string[] }> = [
+  { section: "news", prefixes: ["/api/srx/news", "/srx/news", "/srx/news_categories", "/srx/news_tags"] },
+  { section: "ladipage", prefixes: ["/api/srx/ladipage-events", "/srx/ladipage-events"] },
+  { section: "affiliate", prefixes: ["/api/srx/affiliate", "/srx/affiliates", "/srx/affiliate"] },
+  { section: "website", prefixes: ["/api/srx/", "/srx/"] },
+];
+
 export function inferSrxSectionFromPath(pathname: string): SrxManagementSection | null {
   const normalizedPath = normalizePath(pathname);
+  const match = SRX_SECTION_PREFIXES.find(({ prefixes }) =>
+    prefixes.some((prefix) => normalizedPath.startsWith(prefix)),
+  );
 
-  if (
-    normalizedPath.startsWith("/api/srx/news") ||
-    normalizedPath.startsWith("/srx/news") ||
-    normalizedPath.startsWith("/srx/news_categories") ||
-    normalizedPath.startsWith("/srx/news_tags")
-  ) {
-    return "news";
-  }
-
-  if (normalizedPath.startsWith("/api/srx/ladipage-events") || normalizedPath.startsWith("/srx/ladipage-events")) {
-    return "ladipage";
-  }
-
-  if (
-    normalizedPath.startsWith("/api/srx/affiliate") ||
-    normalizedPath.startsWith("/srx/affiliates") ||
-    normalizedPath.startsWith("/srx/affiliate")
-  ) {
-    return "affiliate";
-  }
-
-  if (normalizedPath.startsWith("/api/srx/") || normalizedPath.startsWith("/srx/")) {
-    return "website";
-  }
-
-  return null;
+  return match?.section ?? null;
 }
 
 export function canAccessPath(value: string | null | undefined, pathname: string): boolean {

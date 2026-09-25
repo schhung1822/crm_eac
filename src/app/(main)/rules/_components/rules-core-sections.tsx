@@ -73,9 +73,19 @@ export function RulesCoreSections() {
               "Chỉ số vận hành chung, mặc định lọc theo tháng hiện tại, có lối tắt xem tháng trước.",
             ],
             [
-              "CRM",
-              <Path key="p2">/dashboard/crm</Path>,
-              "Doanh thu, đơn hàng, khách hàng, hiệu suất sale, chi nhánh và sản phẩm bán chạy của EAC.",
+              "Báo cáo B2B",
+              <Path key="p2">/dashboard/b2b</Path>,
+              "Doanh thu các kênh ngoài TikTok, Shopee, Website SRX: đơn hàng, khách hàng/đại lý, sale, chi nhánh, sản phẩm bán chạy.",
+            ],
+            [
+              "Báo cáo B2C",
+              <Path key="p4">/dashboard/b2c</Path>,
+              "Doanh thu TikTok, Shopee, Website SRX: tỷ trọng theo sàn, trạng thái đơn, khách mới/quay lại, sản phẩm bán chạy.",
+            ],
+            [
+              "Báo cáo khách hàng",
+              <Path key="p5">/dashboard/customers</Path>,
+              "Tệp khách hàng CRM: phân hạng, chi nhánh, số ngày chưa giao dịch, khách mới theo thời gian, top khách VIP.",
             ],
             [
               "SRX Việt Nam",

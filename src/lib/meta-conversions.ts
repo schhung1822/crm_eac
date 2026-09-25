@@ -3,6 +3,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
+import { fromSrxDbDateTime } from "@/lib/db-local-time";
 import type { MetaDatasetEventLog, MetaDatasetEventStats, MetaOrderEventName } from "@/lib/meta-conversions.shared";
 import { prisma2 } from "@/lib/prisma2";
 
@@ -557,7 +558,8 @@ function buildMetaRegistrationEvent(
   const eventSlug = normalizeText(registration.event_slug);
   const eventName = normalizeText(registration.event_name) || eventSlug || "Đăng ký sự kiện SRX";
   const eventSourceUrl = normalizeText(registration.page_url) || fallbackEventSourceUrl;
-  const eventTime = registration.submit_time ?? registration.created_at ?? new Date();
+  const storedTime = registration.submit_time ?? registration.created_at;
+  const eventTime = storedTime ? fromSrxDbDateTime(storedTime) : new Date();
 
   return {
     action_source: "website",
@@ -580,8 +582,9 @@ export function buildMetaOrderEvent(
   order: NonNullable<MetaOrderRecord>,
   eventSourceUrl = defaultEventSourceUrl,
 ): MetaDatasetEventPayload {
-  const eventTime =
-    eventName === "Purchase" ? (order.paid_at ?? order.completed_at ?? order.updated_at) : order.placed_at;
+  const eventTime = fromSrxDbDateTime(
+    eventName === "Purchase" ? (order.paid_at ?? order.completed_at ?? order.updated_at) : order.placed_at,
+  );
 
   return {
     action_source: "website",
