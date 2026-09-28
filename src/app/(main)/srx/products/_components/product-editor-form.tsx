@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { SrxKiotVietLinkView } from "@/lib/srx-kiotviet-links.shared";
 import {
   srxProductStatusValues,
   type SrxProduct,
@@ -39,6 +40,7 @@ import {
 } from "@/lib/srx-products.shared";
 
 import { PriceInput } from "./price-input";
+import { ProductKiotVietLinksField, type KiotVietLinkTarget } from "./product-kiotviet-links-field";
 import { ProductMediaFields } from "./product-media-fields";
 
 type ProductFormState = SrxProductMutationInput;
@@ -283,13 +285,57 @@ function buildFormState(product: SrxProduct | null): ProductFormState {
   };
 }
 
+function buildKiotVietLinkTargets(form: ProductFormState): KiotVietLinkTarget[] {
+  const productTarget: KiotVietLinkTarget = {
+    sku: "",
+    label: form.has_variants ? "Chung cho mọi biến thể" : "Sản phẩm này",
+    fallbackCodes: [form.product_code.trim()],
+  };
+
+  if (!form.has_variants) {
+    return [productTarget];
+  }
+
+  return [
+    productTarget,
+    ...form.variants
+      .filter((variant) => variant.sku.trim())
+      .map((variant) => ({
+        sku: variant.sku.trim(),
+        label: variant.variant_name.trim() || "Biến thể",
+        fallbackCodes: [variant.barcode.trim(), variant.sku.trim()],
+      })),
+  ];
+}
+
+/** Lưu liên kết KiotViet sau khi đã lưu sản phẩm (sản phẩm mới chỉ có ID sau bước đó). */
+async function persistKiotVietLinks(productId: string, links: SrxKiotVietLinkView[], targets: KiotVietLinkTarget[]) {
+  const knownSkus = new Set(targets.map((target) => target.sku));
+  const response = await fetch(`/api/srx/products/${productId}/kiotviet-links`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      links: links
+        .filter((link) => knownSkus.has(link.variant_sku))
+        .map(({ variant_sku, procode, quantity }) => ({ variant_sku, procode, quantity })),
+    }),
+  });
+
+  if (!response.ok) {
+    const result = await response.json().catch(() => null);
+    throw new Error(getApiErrorMessage(result, "Không thể lưu liên kết KiotViet"));
+  }
+}
+
 export function ProductEditorForm({
   initialValue,
+  initialKiotVietLinks,
   brands,
   categories,
   tags,
 }: {
   initialValue: SrxProduct | null;
+  initialKiotVietLinks: SrxKiotVietLinkView[];
   brands: SrxProductBrand[];
   categories: SrxProductCategory[];
   tags: SrxProductTag[];
@@ -298,6 +344,8 @@ export function ProductEditorForm({
   const [form, setForm] = React.useState<ProductFormState>(() => buildFormState(initialValue));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [variantImagePickerIndex, setVariantImagePickerIndex] = React.useState<number | null>(null);
+  const [kiotVietLinks, setKiotVietLinks] = React.useState(initialKiotVietLinks);
+  const kiotVietLinkTargets = React.useMemo(() => buildKiotVietLinkTargets(form), [form]);
 
   const isEditing = initialValue !== null;
   const submitLabel = getSubmitLabel(isSubmitting, isEditing);
@@ -611,6 +659,16 @@ export function ProductEditorForm({
         throw new Error(getApiErrorMessage(result, "Không thể lưu sản phẩm"));
       }
 
+      try {
+        await persistKiotVietLinks(String(result.product.id), kiotVietLinks, kiotVietLinkTargets);
+      } catch (linkError) {
+        // Sản phẩm đã lưu; giữ nguyên trang để người dùng lưu lại phần liên kết.
+        toast.error(
+          `Đã lưu sản phẩm nhưng chưa lưu được liên kết KiotViet: ${linkError instanceof Error ? linkError.message : ""}`,
+        );
+        return;
+      }
+
       toast.success(isEditing ? "Đã cập nhật sản phẩm" : "Đã tạo sản phẩm mới");
       router.push("/srx/products");
       router.refresh();
@@ -720,6 +778,13 @@ export function ProductEditorForm({
               </div>
 
               {variantConfigurationSection}
+
+              <ProductKiotVietLinksField
+                disabled={isSubmitting}
+                links={kiotVietLinks}
+                onChange={setKiotVietLinks}
+                targets={kiotVietLinkTargets}
+              />
             </CardContent>
           </Card>
         </div>

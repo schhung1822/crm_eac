@@ -9,5 +9,13 @@ export default async function Page() {
     getSrxProductTags(),
   ]);
 
-  return <ProductEditorForm initialValue={null} brands={brands} categories={categories} tags={tags} />;
+  return (
+    <ProductEditorForm
+      initialValue={null}
+      initialKiotVietLinks={[]}
+      brands={brands}
+      categories={categories}
+      tags={tags}
+    />
+  );
 }

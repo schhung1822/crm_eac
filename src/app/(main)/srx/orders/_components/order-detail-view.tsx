@@ -39,7 +39,14 @@ import {
   getPaymentStatusLabel,
 } from "./order-presenters";
 
-export function OrderDetailView({ initialValue }: { initialValue: SrxOrder }) {
+export function OrderDetailView({
+  initialValue,
+  extraContent,
+}: {
+  initialValue: SrxOrder;
+  /** Thẻ bổ sung dưới lịch sử trạng thái (VD: đồng bộ KiotViet). */
+  extraContent?: React.ReactNode;
+}) {
   const router = useRouter();
   const [order, setOrder] = React.useState<SrxOrder>(initialValue);
   const [orderStatus, setOrderStatus] = React.useState<SrxOrder["order_status"]>(initialValue.order_status);
@@ -280,6 +287,8 @@ export function OrderDetailView({ initialValue }: { initialValue: SrxOrder }) {
               )}
             </CardContent>
           </Card>
+
+          {extraContent}
         </div>
 
         <div className="min-w-0">
