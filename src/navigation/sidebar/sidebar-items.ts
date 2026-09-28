@@ -129,6 +129,7 @@ export const sidebarItems: NavGroup[] = [
           { title: "Mã giảm giá", url: "/srx/voucher" },
           { title: "Quà tặng", url: "/srx/gift-rules" },
           { title: "Banner", url: "/srx/banner" },
+          { title: "Popup quảng cáo", url: "/srx/popup" },
         ],
       },
       {

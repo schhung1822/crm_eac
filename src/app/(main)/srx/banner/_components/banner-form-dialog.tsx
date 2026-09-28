@@ -64,9 +64,9 @@ function toLocalDateTimeInput(value: Date | null): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function buildFormState(banner: SrxBanner | null): BannerFormState {
+function buildFormState(banner: SrxBanner | null, fixedPosition?: SrxBanner["position"]): BannerFormState {
   if (!banner) {
-    return emptyFormState;
+    return fixedPosition ? { ...emptyFormState, position: fixedPosition } : emptyFormState;
   }
 
   return {
@@ -124,41 +124,70 @@ function getPositionLabel(value: BannerFormState["position"]): string {
   }
 }
 
+const variantCopy = {
+  banner: {
+    create: "Thêm banner",
+    edit: "Sửa banner",
+    description: "Quản lý banner hiển thị trên website SRX và lịch chạy của từng banner.",
+    submit: "Tạo banner",
+    titleLabel: "Tiêu đề",
+    titlePlaceholder: "",
+    buttonPlaceholder: "Xem ngay",
+    linkPlaceholder: "/san-pham/srx...",
+  },
+  popup: {
+    create: "Thêm nội dung popup",
+    edit: "Sửa nội dung popup",
+    description: "Mỗi nội dung là một ảnh trong popup quảng cáo, dùng chung cho trang chủ và trang chi tiết tin tức.",
+    submit: "Tạo nội dung",
+    titleLabel: "Tiêu đề ngắn",
+    titlePlaceholder: "VD: Ưu đãi Recovery Booster",
+    buttonPlaceholder: "Để trống sẽ dùng tiêu đề ngắn",
+    linkPlaceholder: "/products/srx-recovery-booster-50ml",
+  },
+} as const;
+
 export function BannerFormDialog({
   open,
   onOpenChange,
   initialValue,
   isSubmitting,
   onSubmit,
+  variant = "banner",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialValue: SrxBanner | null;
   isSubmitting: boolean;
   onSubmit: (value: BannerFormState) => Promise<void>;
+  /** "popup": khóa vị trí = popup và ẩn các trường popup không dùng. */
+  variant?: keyof typeof variantCopy;
 }) {
   const isMobile = useIsMobile();
-  const [form, setForm] = React.useState<BannerFormState>(() => buildFormState(initialValue));
+  const isPopup = variant === "popup";
+  const fixedPosition = isPopup ? "popup" : undefined;
+  const copy = variantCopy[variant];
+  const [form, setForm] = React.useState<BannerFormState>(() => buildFormState(initialValue, fixedPosition));
 
   React.useEffect(() => {
     if (!open) {
       return;
     }
 
-    setForm(buildFormState(initialValue));
-  }, [initialValue, open]);
+    setForm(buildFormState(initialValue, fixedPosition));
+  }, [fixedPosition, initialValue, open]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onSubmit(form);
+    await onSubmit(fixedPosition ? { ...form, position: fixedPosition } : form);
   }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction={isMobile ? "bottom" : "right"}>
       <DrawerContent className="min-h-0 data-[vaul-drawer-direction=bottom]:max-h-[92vh] data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:max-w-[600px]">
         <DrawerHeader>
-          <DrawerTitle>{initialValue ? "Sửa banner" : "Thêm banner"}</DrawerTitle>
-          <DrawerDescription>Quản lý banner hiển thị trên website SRX và lịch chạy của từng banner.</DrawerDescription>
+          <DrawerTitle>{initialValue ? copy.edit : copy.create}</DrawerTitle>
+          <DrawerDescription>{copy.description}</DrawerDescription>
         </DrawerHeader>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
@@ -166,11 +195,13 @@ export function BannerFormDialog({
             <div className="grid gap-4">
               <div className={compactGridClass}>
                 <div className="grid gap-2">
-                  <Label htmlFor="banner-title">Tiêu đề</Label>
+                  <Label htmlFor="banner-title">{copy.titleLabel}</Label>
                   <Input
                     id="banner-title"
                     value={form.title}
                     onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                    placeholder={copy.titlePlaceholder}
+                    maxLength={150}
                     required
                   />
                 </div>
@@ -186,15 +217,17 @@ export function BannerFormDialog({
                 </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="banner-description">Mô tả</Label>
-                <Textarea
-                  id="banner-description"
-                  className="min-h-24"
-                  value={form.description}
-                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                />
-              </div>
+              {isPopup ? null : (
+                <div className="grid gap-2">
+                  <Label htmlFor="banner-description">Mô tả</Label>
+                  <Textarea
+                    id="banner-description"
+                    className="min-h-24"
+                    value={form.description}
+                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                  />
+                </div>
+              )}
 
               <BannerImageFields
                 disabled={isSubmitting}
@@ -220,7 +253,7 @@ export function BannerFormDialog({
                     id="banner-button-label"
                     value={form.button_label}
                     onChange={(event) => setForm((current) => ({ ...current, button_label: event.target.value }))}
-                    placeholder="Xem ngay"
+                    placeholder={copy.buttonPlaceholder}
                   />
                 </div>
               </div>
@@ -253,13 +286,13 @@ export function BannerFormDialog({
                     id="banner-link-target"
                     value={form.link_target}
                     onChange={(event) => setForm((current) => ({ ...current, link_target: event.target.value }))}
-                    placeholder="/san-pham/srx..."
+                    placeholder={copy.linkPlaceholder}
                   />
                 </div>
               </div>
 
               <div className={compactGridClass}>
-                <div className="grid gap-2">
+                <div className={isPopup ? "hidden" : "grid gap-2"}>
                   <Label htmlFor="banner-position">Vị trí</Label>
                   <Select
                     value={form.position}
@@ -343,7 +376,7 @@ export function BannerFormDialog({
               Hủy
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Đang lưu..." : initialValue ? "Lưu thay đổi" : "Tạo banner"}
+              {isSubmitting ? "Đang lưu..." : initialValue ? "Lưu thay đổi" : copy.submit}
             </Button>
           </DrawerFooter>
         </form>
