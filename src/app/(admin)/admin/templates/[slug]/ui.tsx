@@ -260,7 +260,14 @@ function toColorInputValue(value: string) {
   return "#000000";
 }
 
-function Section({
+export type EditorExtraTab = {
+  value: string;
+  label: string;
+  icon: React.ReactNode;
+  content: React.ReactNode;
+};
+
+export function Section({
   title,
   description,
   icon: Icon,
@@ -294,7 +301,7 @@ function SubHeading({ children }: { children: React.ReactNode }) {
   return <h3 className="text-foreground mb-3 text-sm font-semibold">{children}</h3>;
 }
 
-function Field({
+export function Field({
   label,
   hint,
   className,
@@ -810,6 +817,7 @@ export default function AdminTemplateEditor({
   publicBaseUrl,
   publicPath,
   redirectToEditBasePath,
+  extraTabs = [],
 }: {
   slug: string;
   initialName: string;
@@ -820,6 +828,8 @@ export default function AdminTemplateEditor({
   publicBaseUrl?: string;
   publicPath?: string;
   redirectToEditBasePath?: string;
+  /** Tab riêng của từng nơi dùng trình sửa (VD: ZBS của Ladipage sự kiện), tự lưu độc lập với cấu hình trang. */
+  extraTabs?: EditorExtraTab[];
 }) {
   const router = useRouter();
   const [config, setConfig] = React.useState<FormTemplateConfig>(initialConfig);
@@ -1038,6 +1048,12 @@ export default function AdminTemplateEditor({
               <Plug />
               Tích hợp
             </TabsTrigger>
+            {extraTabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className={tabTriggerClassName}>
+                {tab.icon}
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="general" className="space-y-5">
@@ -1507,6 +1523,12 @@ export default function AdminTemplateEditor({
               </div>
             </Section>
           </TabsContent>
+
+          {extraTabs.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value} className="space-y-5">
+              {tab.content}
+            </TabsContent>
+          ))}
         </Tabs>
 
         <aside className="min-w-0">

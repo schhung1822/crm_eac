@@ -3,6 +3,7 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { sendCompleteRegistrationForLadipage } from "@/lib/meta-conversions";
+import { sendSrxLadipageRegistrationZbs } from "@/lib/srx-ladipage-zbs";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,15 @@ async function dispatchRegistrationEvent(registrationId: string): Promise<void> 
   }
 }
 
+// SRX_web gọi endpoint này sau mỗi lượt đăng ký Ladipage, nên ZBS xác nhận cũng được gửi từ đây.
+async function dispatchRegistrationZbs(registrationId: string): Promise<void> {
+  try {
+    await sendSrxLadipageRegistrationZbs(registrationId);
+  } catch (error) {
+    console.error("Ladipage ZBS confirmation error:", error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!isAuthorized(request)) {
@@ -38,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const { registrationId } = payloadSchema.parse(await request.json());
 
-    after(() => dispatchRegistrationEvent(registrationId));
+    after(() => Promise.all([dispatchRegistrationEvent(registrationId), dispatchRegistrationZbs(registrationId)]));
 
     return NextResponse.json({ message: "Đã tiếp nhận sự kiện đăng ký Ladipage." }, { status: 202 });
   } catch (error) {
