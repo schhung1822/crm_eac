@@ -7,9 +7,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ArrowLeft, Package2, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Images, Package2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import type { CkeditorContentEditorProps } from "@/components/ckeditor/ckeditor-content-editor";
 import {
   Breadcrumb,
@@ -37,6 +38,7 @@ import {
   srxProductVariantStatusValues,
 } from "@/lib/srx-products.shared";
 
+import { PriceInput } from "./price-input";
 import { ProductMediaFields } from "./product-media-fields";
 
 type ProductFormState = SrxProductMutationInput;
@@ -95,7 +97,13 @@ function normalizeProductBenefitIds(value: string): string[] {
   return productBenefitOptions.map((option) => option.id).filter((optionId) => selectedIds.includes(optionId));
 }
 
-function createEmptyVariantState(index: number, productCode = "", basePrice = "0", salePrice = "", imageUrl = ""): ProductVariantFormState {
+function createEmptyVariantState(
+  index: number,
+  productCode = "",
+  basePrice = "0",
+  salePrice = "",
+  imageUrl = "",
+): ProductVariantFormState {
   const normalizedProductCode = productCode.trim().toUpperCase() || "SP";
   return {
     id: "",
@@ -196,30 +204,40 @@ function getApiErrorMessage(result: unknown, fallbackMessage: string): string {
   }
 
   const message = "message" in result && typeof result.message === "string" ? result.message : "";
+  const issueSummary = "issues" in result && Array.isArray(result.issues) ? summarizeIssues(result.issues) : "";
 
-  if ("issues" in result && Array.isArray(result.issues) && result.issues.length > 0) {
-    const issueSummary = result.issues
-      .map((issue) => {
-        if (!issue || typeof issue !== "object" || !("message" in issue) || typeof issue.message !== "string") {
-          return "";
-        }
-
-        const fieldPath =
-          "path" in issue && Array.isArray(issue.path) && issue.path.length > 0
-            ? issue.path.map((segment: unknown) => String(segment)).join(".")
-            : "";
-
-        return fieldPath ? `${fieldPath}: ${issue.message}` : issue.message;
-      })
-      .filter(Boolean)
-      .join("\n");
-
-    if (issueSummary) {
-      return message ? `${message}\n${issueSummary}` : issueSummary;
-    }
+  if (issueSummary) {
+    return message ? `${message}\n${issueSummary}` : issueSummary;
   }
 
   return message || fallbackMessage;
+}
+
+/** Gộp lỗi zod từ API thành từng dòng "đường.dẫn: thông báo". */
+function summarizeIssues(issues: unknown[]): string {
+  return issues
+    .map((issue) => {
+      if (!issue || typeof issue !== "object" || !("message" in issue) || typeof issue.message !== "string") {
+        return "";
+      }
+
+      const fieldPath =
+        "path" in issue && Array.isArray(issue.path) && issue.path.length > 0
+          ? issue.path.map((segment: unknown) => String(segment)).join(".")
+          : "";
+
+      return fieldPath ? `${fieldPath}: ${issue.message}` : issue.message;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function getSubmitLabel(isSubmitting: boolean, isEditing: boolean): string {
+  if (isSubmitting) {
+    return "Đang lưu...";
+  }
+
+  return isEditing ? "Lưu thay đổi" : "Tạo sản phẩm";
 }
 
 function buildFormState(product: SrxProduct | null): ProductFormState {
@@ -279,9 +297,10 @@ export function ProductEditorForm({
   const router = useRouter();
   const [form, setForm] = React.useState<ProductFormState>(() => buildFormState(initialValue));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [variantImagePickerIndex, setVariantImagePickerIndex] = React.useState<number | null>(null);
 
   const isEditing = initialValue !== null;
-  const submitLabel = isSubmitting ? "Đang lưu..." : isEditing ? "Lưu thay đổi" : "Tạo sản phẩm";
+  const submitLabel = getSubmitLabel(isSubmitting, isEditing);
   const selectedBenefitIds = React.useMemo(() => normalizeProductBenefitIds(form.benefit), [form.benefit]);
 
   const handleTagChange = (tagId: string, checked: boolean) => {
@@ -401,7 +420,7 @@ export function ProductEditorForm({
       ) : (
         <div className="grid gap-4">
           {form.variants.map((variant, index) => (
-            <div key={variant.id || `variant-${index}`} className="rounded-lg border bg-background p-4">
+            <div key={variant.id || `variant-${index}`} className="bg-background rounded-lg border p-4">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="font-medium">Biến thể {index + 1}</div>
@@ -414,7 +433,7 @@ export function ProductEditorForm({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleRemoveVariant(index)}
-                  className="gap-2 text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive gap-2"
                 >
                   <Trash2 className="size-4" />
                   Xóa
@@ -452,30 +471,40 @@ export function ProductEditorForm({
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor={`variant-image-${index}`}>Ảnh biến thể</Label>
-                  <Input
-                    id={`variant-image-${index}`}
-                    value={variant.image_url}
-                    onChange={(event) => handleVariantChange(index, { image_url: event.target.value })}
-                    placeholder="https://..."
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id={`variant-image-${index}`}
+                      value={variant.image_url}
+                      onChange={(event) => handleVariantChange(index, { image_url: event.target.value })}
+                      placeholder="https://..."
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Chọn ảnh từ thư viện"
+                      aria-label={`Chọn ảnh cho biến thể ${index + 1}`}
+                      onClick={() => setVariantImagePickerIndex(index)}
+                    >
+                      <Images className="size-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor={`variant-price-${index}`}>Giá gốc</Label>
-                  <Input
+                  <PriceInput
                     id={`variant-price-${index}`}
-                    inputMode="decimal"
                     value={variant.price}
-                    onChange={(event) => handleVariantChange(index, { price: event.target.value })}
+                    onValueChange={(value) => handleVariantChange(index, { price: value })}
                     placeholder="0"
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor={`variant-sale-price-${index}`}>Giá khuyến mãi</Label>
-                  <Input
+                  <PriceInput
                     id={`variant-sale-price-${index}`}
-                    inputMode="decimal"
                     value={variant.sale_price}
-                    onChange={(event) => handleVariantChange(index, { sale_price: event.target.value })}
+                    onValueChange={(value) => handleVariantChange(index, { sale_price: value })}
                     placeholder="Để trống nếu không giảm giá"
                   />
                 </div>
@@ -513,7 +542,9 @@ export function ProductEditorForm({
                   <Label htmlFor={`variant-status-${index}`}>Trạng thái biến thể</Label>
                   <Select
                     value={variant.status}
-                    onValueChange={(value: ProductVariantFormState["status"]) => handleVariantChange(index, { status: value })}
+                    onValueChange={(value: ProductVariantFormState["status"]) =>
+                      handleVariantChange(index, { status: value })
+                    }
                   >
                     <SelectTrigger id={`variant-status-${index}`}>
                       <SelectValue placeholder="Chọn trạng thái" />
@@ -540,6 +571,22 @@ export function ProductEditorForm({
           ))}
         </div>
       )}
+
+      <MediaLibraryPickerDialog
+        uploadTarget="product"
+        open={variantImagePickerIndex !== null}
+        title="Chọn ảnh biến thể"
+        onConfirm={(urls) => {
+          if (variantImagePickerIndex !== null) {
+            handleVariantChange(variantImagePickerIndex, { image_url: urls[0] ?? "" });
+          }
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVariantImagePickerIndex(null);
+          }
+        }}
+      />
     </div>
   ) : null;
 
@@ -708,26 +755,21 @@ export function ProductEditorForm({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="product-base-price">Giá gốc</Label>
-                  <Input
+                  <PriceInput
                     id="product-base-price"
-                    type="number"
-                    min="0"
-                    step="0.01"
                     value={form.base_price}
-                    onChange={(event) => setForm((current) => ({ ...current, base_price: event.target.value }))}
+                    onValueChange={(value) => setForm((current) => ({ ...current, base_price: value }))}
+                    placeholder="0"
                     required
                   />
                 </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="product-sale-price">Giá khuyến mãi</Label>
-                  <Input
+                  <PriceInput
                     id="product-sale-price"
-                    type="number"
-                    min="0"
-                    step="0.01"
                     value={form.sale_price}
-                    onChange={(event) => setForm((current) => ({ ...current, sale_price: event.target.value }))}
+                    onValueChange={(value) => setForm((current) => ({ ...current, sale_price: value }))}
                     placeholder="Để trống nếu không có"
                   />
                 </div>
@@ -868,7 +910,7 @@ export function ProductEditorForm({
                   <span className="text-muted-foreground text-xs">{form.tag_ids.length} thành phần được chọn</span>
                 </div>
 
-                <div className="grid max-h-[360px] gap-2 overflow-y-auto rounded-md border p-4 md:grid-cols-2 lg:grid-cols-1 nice-scroll">
+                <div className="nice-scroll grid max-h-[360px] gap-2 overflow-y-auto rounded-md border p-4 md:grid-cols-2 lg:grid-cols-1">
                   {tags.length === 0 ? (
                     <div className="text-muted-foreground text-sm">
                       Chưa có thành phần nào. Hãy tạo mục trong Từ điển thành phần trước khi gắn cho sản phẩm.

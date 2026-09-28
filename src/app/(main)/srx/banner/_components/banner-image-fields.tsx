@@ -3,32 +3,14 @@
 
 import * as React from "react";
 
-import { Loader2, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { Images, Trash2 } from "lucide-react";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const imageGridClass = "grid grid-cols-2 gap-4 max-[520px]:grid-cols-1";
-
-async function uploadFile(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/srx/banners/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result?.message ?? "Không thể tải banner lên");
-  }
-
-  return String(result.url ?? "");
-}
 
 function BannerImageField({
   disabled,
@@ -43,29 +25,7 @@ function BannerImageField({
   placeholder: string;
   value: string;
 }) {
-  const inputReference = React.useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-
-  async function handleUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const url = await uploadFile(files[0]);
-      onChange(url);
-      toast.success(`Đã tải ${label.toLowerCase()}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Không thể tải ${label.toLowerCase()}`);
-    } finally {
-      setIsUploading(false);
-
-      if (inputReference.current) {
-        inputReference.current.value = "";
-      }
-    }
-  }
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
   return (
     <div className="grid gap-3 rounded-lg border p-3">
@@ -80,33 +40,13 @@ function BannerImageField({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={inputReference}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => void handleUpload(event.target.files)}
-        />
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled || isUploading}
-          onClick={() => inputReference.current?.click()}
-        >
-          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isUploading ? "Đang tải..." : "Tải ảnh"}
+        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => setIsPickerOpen(true)}>
+          <Images className="size-4" />
+          Chọn ảnh
         </Button>
 
         {value ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={disabled || isUploading}
-            onClick={() => onChange("")}
-          >
+          <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => onChange("")}>
             <Trash2 className="size-4" />
             Xóa
           </Button>
@@ -114,12 +54,26 @@ function BannerImageField({
       </div>
 
       {value ? (
-        <div className="overflow-hidden rounded-lg border">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setIsPickerOpen(true)}
+          title="Đổi ảnh"
+          className="overflow-hidden rounded-lg border"
+        >
           <div className="bg-muted/50 flex aspect-[4/3] items-center justify-center">
             <img src={value} alt={label} className="h-full w-full object-cover" />
           </div>
-        </div>
+        </button>
       ) : null}
+
+      <MediaLibraryPickerDialog
+        uploadTarget="banner"
+        open={isPickerOpen}
+        title={`Chọn ${label.toLowerCase()}`}
+        onOpenChange={setIsPickerOpen}
+        onConfirm={(urls) => onChange(urls[0] ?? "")}
+      />
     </div>
   );
 }

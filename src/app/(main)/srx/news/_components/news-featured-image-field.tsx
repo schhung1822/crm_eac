@@ -3,32 +3,13 @@
 
 import * as React from "react";
 
-import { Loader2, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { Images, Trash2 } from "lucide-react";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 import { AiImageDialog } from "./ai-image-dialog";
-
-async function uploadFile(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/srx/news/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result?.message ?? "Không thể tải ảnh bài viết lên");
-  }
-
-  return String(result.url ?? "");
-}
 
 export function NewsFeaturedImageField({
   disabled,
@@ -42,29 +23,7 @@ export function NewsFeaturedImageField({
   /** Ngữ cảnh bài viết để nút tạo ảnh AI vẽ đúng chủ đề. */
   aiContext?: { title: string; excerpt?: string; content?: string };
 }) {
-  const inputReference = React.useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-
-  async function handleUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const url = await uploadFile(files[0]);
-      onChange(url);
-      toast.success("Đã tải ảnh đại diện bài viết");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tải ảnh đại diện bài viết");
-    } finally {
-      setIsUploading(false);
-
-      if (inputReference.current) {
-        inputReference.current.value = "";
-      }
-    }
-  }
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
   return (
     <div className="grid gap-3">
@@ -79,22 +38,9 @@ export function NewsFeaturedImageField({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          ref={inputReference}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => void handleUpload(event.target.files)}
-        />
-
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled || isUploading}
-          onClick={() => inputReference.current?.click()}
-        >
-          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isUploading ? "Đang tải..." : "Tải ảnh đại diện"}
+        <Button type="button" variant="outline" disabled={disabled} onClick={() => setIsPickerOpen(true)}>
+          <Images className="size-4" />
+          Chọn ảnh đại diện
         </Button>
 
         {aiContext ? (
@@ -103,12 +49,12 @@ export function NewsFeaturedImageField({
             excerpt={aiContext.excerpt}
             content={aiContext.content}
             onUseAsFeatured={onChange}
-            disabled={disabled || isUploading}
+            disabled={disabled}
           />
         ) : null}
 
         {value ? (
-          <Button type="button" variant="ghost" disabled={disabled || isUploading} onClick={() => onChange("")}>
+          <Button type="button" variant="ghost" disabled={disabled} onClick={() => onChange("")}>
             <Trash2 className="size-4" />
             Xóa ảnh
           </Button>
@@ -122,6 +68,14 @@ export function NewsFeaturedImageField({
           </div>
         </div>
       ) : null}
+
+      <MediaLibraryPickerDialog
+        uploadTarget="news"
+        open={isPickerOpen}
+        title="Chọn ảnh đại diện bài viết"
+        onOpenChange={setIsPickerOpen}
+        onConfirm={(urls) => onChange(urls[0] ?? "")}
+      />
     </div>
   );
 }

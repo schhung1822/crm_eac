@@ -3,51 +3,35 @@
 
 import * as React from "react";
 
-import { ImagePlus, Loader2, Star, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { ImagePlus, Images, Star, Trash2, X } from "lucide-react";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-async function uploadFile(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
+type PickerTarget = "thumbnail" | "info" | "gallery";
 
-  const response = await fetch("/api/srx/products/upload", {
-    method: "POST",
-    body: formData,
-  });
+const pickerTitles: Record<PickerTarget, string> = {
+  thumbnail: "Chọn ảnh đại diện",
+  info: "Chọn ảnh thông tin",
+  gallery: "Thêm ảnh vào album",
+};
 
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result?.message ?? "Không thể tải ảnh lên");
-  }
-
-  return String(result.url ?? "");
-}
-
-function SingleImageUploadField({
+function SingleImageField({
   alt,
-  buttonLabel,
   disabled,
   id,
-  inputReference,
-  isUploading,
   label,
-  onUpload,
+  onPick,
   onValueChange,
   value,
 }: {
   alt: string;
-  buttonLabel: string;
   disabled: boolean;
   id: string;
-  inputReference: React.RefObject<HTMLInputElement | null>;
-  isUploading: boolean;
   label: string;
-  onUpload: (files: FileList | null) => Promise<void>;
+  onPick: () => void;
   onValueChange: (nextValue: string) => void;
   value: string;
 }) {
@@ -62,32 +46,32 @@ function SingleImageUploadField({
         disabled={disabled}
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          ref={inputReference}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => void onUpload(event.target.files)}
-        />
-
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled || isUploading}
-          onClick={() => inputReference.current?.click()}
-        >
-          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isUploading ? "Đang tải..." : buttonLabel}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" disabled={disabled} onClick={onPick}>
+          <Images className="size-4" />
+          Chọn ảnh
         </Button>
+
+        {value ? (
+          <Button type="button" variant="ghost" disabled={disabled} onClick={() => onValueChange("")}>
+            <X className="size-4" />
+            Bỏ ảnh
+          </Button>
+        ) : null}
       </div>
 
       {value ? (
-        <div className="overflow-hidden rounded-lg border">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onPick}
+          title="Đổi ảnh"
+          className="overflow-hidden rounded-lg border"
+        >
           <div className="bg-muted/50 flex aspect-[4/3] items-center justify-center">
             <img src={value} alt={alt} className="h-full w-full object-cover" />
           </div>
-        </div>
+        </button>
       ) : null}
     </div>
   );
@@ -110,12 +94,9 @@ export function ProductMediaFields({
   onThumbnailUrlChange: (nextValue: string) => void;
   thumbnailUrl: string;
 }) {
-  const thumbnailInputReference = React.useRef<HTMLInputElement | null>(null);
-  const infoImageInputReference = React.useRef<HTMLInputElement | null>(null);
-  const galleryInputReference = React.useRef<HTMLInputElement | null>(null);
-  const [isUploadingThumbnail, setIsUploadingThumbnail] = React.useState(false);
-  const [isUploadingInfoImage, setIsUploadingInfoImage] = React.useState(false);
-  const [isUploadingGallery, setIsUploadingGallery] = React.useState(false);
+  const [pickerTarget, setPickerTarget] = React.useState<PickerTarget | null>(null);
+  // Giữ tiêu đề khi hộp thoại đang đóng dần, tránh chữ bị đổi giữa hiệu ứng.
+  const [lastPickerTarget, setLastPickerTarget] = React.useState<PickerTarget>("thumbnail");
 
   const normalizedGalleryImageUrls = React.useMemo(() => {
     const seen = new Set<string>();
@@ -132,100 +113,46 @@ export function ProductMediaFields({
     });
   }, [galleryImageUrls]);
 
-  async function handleThumbnailUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploadingThumbnail(true);
-      const url = await uploadFile(files[0]);
-      onThumbnailUrlChange(url);
-      toast.success("Đã tải ảnh đại diện");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tải ảnh đại diện");
-    } finally {
-      setIsUploadingThumbnail(false);
-
-      if (thumbnailInputReference.current) {
-        thumbnailInputReference.current.value = "";
-      }
-    }
+  function openPicker(target: PickerTarget) {
+    setLastPickerTarget(target);
+    setPickerTarget(target);
   }
 
-  async function handleInfoImageUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploadingInfoImage(true);
-      const url = await uploadFile(files[0]);
-      onInfoImageUrlChange(url);
-      toast.success("Đã tải ảnh thông tin");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tải ảnh thông tin");
-    } finally {
-      setIsUploadingInfoImage(false);
-
-      if (infoImageInputReference.current) {
-        infoImageInputReference.current.value = "";
-      }
-    }
-  }
-
-  async function handleGalleryUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploadingGallery(true);
-      const uploadedUrls: string[] = [];
-
-      for (const file of Array.from(files)) {
-        const url = await uploadFile(file);
-        uploadedUrls.push(url);
-      }
-
-      onGalleryImageUrlsChange([...normalizedGalleryImageUrls, ...uploadedUrls]);
-      toast.success(`Đã tải ${uploadedUrls.length} ảnh album`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tải album ảnh");
-    } finally {
-      setIsUploadingGallery(false);
-
-      if (galleryInputReference.current) {
-        galleryInputReference.current.value = "";
-      }
+  function handlePickerConfirm(urls: string[]) {
+    switch (pickerTarget) {
+      case "thumbnail":
+        onThumbnailUrlChange(urls[0] ?? "");
+        break;
+      case "info":
+        onInfoImageUrlChange(urls[0] ?? "");
+        break;
+      case "gallery":
+        onGalleryImageUrlsChange([...normalizedGalleryImageUrls, ...urls]);
+        break;
+      default:
+        break;
     }
   }
 
   return (
     <div className="grid gap-5">
       <div className="grid gap-4 md:grid-cols-2">
-        <SingleImageUploadField
+        <SingleImageField
           alt="Ảnh đại diện sản phẩm"
-          buttonLabel="Tải ảnh đại diện"
           disabled={disabled}
           id="product-thumbnail-url"
-          inputReference={thumbnailInputReference}
-          isUploading={isUploadingThumbnail}
           label="Ảnh đại diện"
-          onUpload={handleThumbnailUpload}
+          onPick={() => openPicker("thumbnail")}
           onValueChange={onThumbnailUrlChange}
           value={thumbnailUrl}
         />
 
-        <SingleImageUploadField
+        <SingleImageField
           alt="Ảnh thông tin sản phẩm"
-          buttonLabel="Tải ảnh thông tin"
           disabled={disabled}
           id="product-info-image-url"
-          inputReference={infoImageInputReference}
-          isUploading={isUploadingInfoImage}
           label="Ảnh thông tin"
-          onUpload={handleInfoImageUpload}
+          onPick={() => openPicker("info")}
           onValueChange={onInfoImageUrlChange}
           value={infoImageUrl}
         />
@@ -235,26 +162,12 @@ export function ProductMediaFields({
         <div className="flex items-center justify-between gap-3">
           <div className="grid gap-1">
             <Label>Album ảnh</Label>
-            <p className="text-muted-foreground text-xs">Ảnh sẽ được lưu trong `upload/product`.</p>
+            <p className="text-muted-foreground text-xs">Chọn từ thư viện hoặc tải ảnh mới vào `upload/product`.</p>
           </div>
 
-          <input
-            ref={galleryInputReference}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(event) => void handleGalleryUpload(event.target.files)}
-          />
-
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled || isUploadingGallery}
-            onClick={() => galleryInputReference.current?.click()}
-          >
-            {isUploadingGallery ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-            {isUploadingGallery ? "Đang tải..." : "Thêm ảnh"}
+          <Button type="button" variant="outline" disabled={disabled} onClick={() => openPicker("gallery")}>
+            <ImagePlus className="size-4" />
+            Thêm ảnh
           </Button>
         </div>
 
@@ -301,6 +214,19 @@ export function ProductMediaFields({
           </div>
         )}
       </div>
+
+      <MediaLibraryPickerDialog
+        uploadTarget="product"
+        open={pickerTarget !== null}
+        multiple={lastPickerTarget === "gallery"}
+        title={pickerTitles[lastPickerTarget]}
+        onConfirm={handlePickerConfirm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPickerTarget(null);
+          }
+        }}
+      />
     </div>
   );
 }

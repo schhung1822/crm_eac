@@ -37,6 +37,8 @@ import {
 } from "ckeditor5";
 import viTranslations from "ckeditor5/translations/vi.js";
 
+import { CkeditorLibraryImageButton } from "@/components/ckeditor/ckeditor-library-image-button";
+
 export type CkeditorContentEditorProps = {
   disabled?: boolean;
   onChange: (value: string) => void;
@@ -213,6 +215,7 @@ export function CkeditorContentEditor({
 
   return (
     <div className={disabled ? "srx-ckeditor is-disabled" : "srx-ckeditor"}>
+      <CkeditorLibraryImageButton disabled={disabled} editorReference={editorReference} uploadTarget="news" />
       <div className="srx-ckeditor-shell">
         <CKEditor
           editor={ClassicEditor}

@@ -375,6 +375,23 @@ html {
   color: var(--muted-foreground);
 }
 
+/* Giao diện tối: nội dung dán vào thường mang chữ đen cố định, nên vùng soạn thảo dùng nền xám sáng
+   pha theo màu nền của preset đang chọn (thay vì nền tối) để chữ vẫn đọc được. Thanh công cụ giữ tông tối. */
+.dark .srx-ckeditor .ck.ck-editor__main > .ck-editor__editable {
+  --ck-color-base-text: var(--background);
+  --ck-color-text: var(--background);
+  --ck-color-image-caption-background: color-mix(in oklch, var(--foreground) 74%, var(--background));
+  --ck-color-image-caption-text: var(--background);
+  --ck-color-engine-placeholder-text: color-mix(in oklch, var(--background) 55%, var(--foreground));
+  background: color-mix(in oklch, var(--foreground) 84%, var(--background));
+  color: var(--background);
+}
+
+.dark .srx-ckeditor .ck.ck-editor__editable .ck-placeholder::before,
+.dark .srx-ckeditor .ck.ck-content.ck-editor__editable.ck-placeholder::before {
+  color: var(--ck-color-engine-placeholder-text);
+}
+
 .srx-ckeditor .ck.ck-powered-by {
   display: none;
 }

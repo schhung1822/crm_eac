@@ -159,7 +159,6 @@ export function ProductTagEditorForm({
   const router = useRouter();
   const [form, setForm] = React.useState<TagFormState>(() => buildFormState(initialValue));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isUploadingImage, setIsUploadingImage] = React.useState(false);
   const [classOptions, setClassOptions] = React.useState<string[]>(() =>
     mergeOptionValues(optionCatalog.classOptions, initialValue?.class ?? []),
   );
@@ -336,6 +335,7 @@ export function ProductTagEditorForm({
                 <Label>Mô tả chi tiết</Label>
                 <CkeditorContentEditor
                   disabled={isSubmitting}
+                  libraryUploadTarget="productTag"
                   value={form.desc_long}
                   onChange={(value) => setForm((current) => ({ ...current, desc_long: value }))}
                   placeholder="Nhập nội dung chi tiết cho thành phần"
@@ -393,7 +393,6 @@ export function ProductTagEditorForm({
                 disabled={isSubmitting}
                 value={form.image_url}
                 onChange={(imageUrl) => setForm((current) => ({ ...current, image_url: imageUrl }))}
-                onUploadingChange={setIsUploadingImage}
               />
 
               <OptionMultiSelectField
@@ -414,11 +413,11 @@ export function ProductTagEditorForm({
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/srx/product_tags")}
-                disabled={isSubmitting || isUploadingImage}
+                disabled={isSubmitting}
               >
                 Hủy
               </Button>
-              <Button type="submit" disabled={isSubmitting || isUploadingImage}>
+              <Button type="submit" disabled={isSubmitting}>
                 <Save className="size-4" />
                 {submitLabel}
               </Button>

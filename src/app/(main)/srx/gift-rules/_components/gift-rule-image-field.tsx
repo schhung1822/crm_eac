@@ -1,31 +1,14 @@
-﻿/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import * as React from "react";
 
-import { Loader2, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { Images, Trash2 } from "lucide-react";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-async function uploadGiftImage(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/srx/gift-rules/upload", {
-    method: "POST",
-    body: formData,
-  });
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result?.message ?? "Không thể tải ảnh quà tặng");
-  }
-
-  return String(result.url ?? "");
-}
 
 export function GiftRuleImageField({
   disabled,
@@ -36,29 +19,7 @@ export function GiftRuleImageField({
   onChange: (nextValue: string) => void;
   value: string;
 }) {
-  const inputReference = React.useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-
-  async function handleUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const url = await uploadGiftImage(files[0]);
-      onChange(url);
-      toast.success("Đã tải thumbnail quà tặng");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tải thumbnail quà tặng");
-    } finally {
-      setIsUploading(false);
-
-      if (inputReference.current) {
-        inputReference.current.value = "";
-      }
-    }
-  }
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
   return (
     <div className="grid gap-3 rounded-lg border p-3">
@@ -74,27 +35,13 @@ export function GiftRuleImageField({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={inputReference}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => void handleUpload(event.target.files)}
-        />
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled || isUploading}
-          onClick={() => inputReference.current?.click()}
-        >
-          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isUploading ? "Đang tải..." : "Tải ảnh"}
+        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => setIsPickerOpen(true)}>
+          <Images className="size-4" />
+          Chọn ảnh
         </Button>
 
         {value ? (
-          <Button type="button" variant="ghost" size="sm" disabled={disabled || isUploading} onClick={() => onChange("")}>
+          <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => onChange("")}>
             <Trash2 className="size-4" />
             Xóa
           </Button>
@@ -108,6 +55,14 @@ export function GiftRuleImageField({
           </div>
         </div>
       ) : null}
+
+      <MediaLibraryPickerDialog
+        uploadTarget="gift"
+        open={isPickerOpen}
+        title="Chọn thumbnail quà tặng"
+        onOpenChange={setIsPickerOpen}
+        onConfirm={(urls) => onChange(urls[0] ?? "")}
+      />
     </div>
   );
 }

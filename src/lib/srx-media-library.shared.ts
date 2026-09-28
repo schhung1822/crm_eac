@@ -41,7 +41,7 @@ function isValidRelativePath(value: string): boolean {
   return segments.every((segment) => segment !== "." && segment !== ".." && isValidDirectorySegment(segment));
 }
 
-export const srxMediaLibraryDefaultDirectories = ["product", "products", "banner", "ports", "events"] as const;
+export const srxMediaLibraryDefaultDirectories = ["product", "products", "banner", "ports", "events", "gift"] as const;
 
 export const srxMediaLibraryItemSchema = z.object({
   id: z.string(),

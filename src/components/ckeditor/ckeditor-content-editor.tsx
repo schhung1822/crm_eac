@@ -35,8 +35,14 @@ import {
 } from "ckeditor5";
 import viTranslations from "ckeditor5/translations/vi.js";
 
+import type { MediaLibraryUploadTarget } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
+
+import { CkeditorLibraryImageButton } from "./ckeditor-library-image-button";
+
 export type CkeditorContentEditorProps = {
   disabled?: boolean;
+  /** Thư mục lưu ảnh tải mới khi chèn ảnh từ thư viện. */
+  libraryUploadTarget?: MediaLibraryUploadTarget;
   onChange: (value: string) => void;
   placeholder?: string;
   value: string;
@@ -124,6 +130,7 @@ const baseConfig = {
 
 export function CkeditorContentEditor({
   disabled = false,
+  libraryUploadTarget = "product",
   onChange,
   placeholder = "Nhập nội dung",
   value,
@@ -155,6 +162,11 @@ export function CkeditorContentEditor({
 
   return (
     <div className={disabled ? "srx-ckeditor is-disabled" : "srx-ckeditor"}>
+      <CkeditorLibraryImageButton
+        disabled={disabled}
+        editorReference={editorReference}
+        uploadTarget={libraryUploadTarget}
+      />
       <div className="srx-ckeditor-shell">
         <CKEditor
           editor={ClassicEditor}

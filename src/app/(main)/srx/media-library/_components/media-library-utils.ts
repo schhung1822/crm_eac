@@ -4,6 +4,7 @@ const DIRECTORY_LABELS: Record<string, string> = {
   "": "Gốc upload",
   banner: "Banner",
   events: "Sự kiện",
+  gift: "Quà tặng",
   ports: "Tin tức",
   product: "Ảnh sản phẩm",
   products: "Ảnh thành phần",

@@ -3,69 +3,23 @@
 
 import * as React from "react";
 
-import { Loader2, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { Images, Trash2 } from "lucide-react";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-async function uploadFile(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/srx/product-tags/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result?.message ?? "Không thể tải ảnh thành phần lên");
-  }
-
-  return String(result.url ?? "");
-}
-
 export function TagImageField({
   disabled,
   onChange,
-  onUploadingChange,
   value,
 }: {
   disabled: boolean;
   onChange: (nextValue: string) => void;
-  onUploadingChange: (uploading: boolean) => void;
   value: string;
 }) {
-  const inputReference = React.useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-
-  React.useEffect(() => {
-    onUploadingChange(isUploading);
-  }, [isUploading, onUploadingChange]);
-
-  async function handleImageUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const url = await uploadFile(files[0]);
-      onChange(url);
-      toast.success("Đã tải ảnh thành phần");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tải thành phần");
-    } finally {
-      setIsUploading(false);
-
-      if (inputReference.current) {
-        inputReference.current.value = "";
-      }
-    }
-  }
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
   return (
     <div className="grid gap-3 rounded-lg border p-3">
@@ -76,31 +30,18 @@ export function TagImageField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="/upload/products/..."
-          disabled={disabled || isUploading}
+          disabled={disabled}
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          ref={inputReference}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => void handleImageUpload(event.target.files)}
-        />
-
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled || isUploading}
-          onClick={() => inputReference.current?.click()}
-        >
-          {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isUploading ? "Đang tải..." : "Tải ảnh nên"}
+        <Button type="button" variant="outline" disabled={disabled} onClick={() => setIsPickerOpen(true)}>
+          <Images className="size-4" />
+          Chọn ảnh
         </Button>
 
         {value ? (
-          <Button type="button" variant="ghost" disabled={disabled || isUploading} onClick={() => onChange("")}>
+          <Button type="button" variant="ghost" disabled={disabled} onClick={() => onChange("")}>
             <Trash2 className="size-4" />
             Xóa ảnh
           </Button>
@@ -114,6 +55,14 @@ export function TagImageField({
           </div>
         </div>
       ) : null}
+
+      <MediaLibraryPickerDialog
+        uploadTarget="productTag"
+        open={isPickerOpen}
+        title="Chọn ảnh thành phần"
+        onOpenChange={setIsPickerOpen}
+        onConfirm={(urls) => onChange(urls[0] ?? "")}
+      />
     </div>
   );
 }
