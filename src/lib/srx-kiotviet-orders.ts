@@ -200,7 +200,7 @@ async function pushOrder(orderId: bigint): Promise<SrxKiotVietSyncOutcome> {
   }
 }
 
-/** Đẩy một đơn website lên KiotViet thành "Phiếu tạm". Gọi nhiều lần cũng chỉ tạo một đơn. */
+/** Đẩy một đơn website lên KiotViet. Gọi nhiều lần cũng chỉ tạo một đơn. */
 export async function syncSrxOrderToKiotViet(orderRef: {
   id?: string;
   orderNumber?: string;

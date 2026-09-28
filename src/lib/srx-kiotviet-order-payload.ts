@@ -13,6 +13,10 @@ import { getKiotVietLinksForOrderItems, getProductEacByCodes } from "@/lib/srx-k
 
 /** Chi nhánh nhận đơn website: "EAC HCM". */
 export const KIOTVIET_WEB_ORDER_BRANCH_ID = 1000000082;
+/** Người bán gắn cho đơn website (tài khoản "Data M.Hùng"). */
+const KIOTVIET_WEB_ORDER_SOLD_BY = { id: 1000053951, name: "Data M.Hùng" } as const;
+/** Kênh bán "Website SRX" trên KiotViet. */
+const KIOTVIET_WEB_SALE_CHANNEL = { Id: 1000026834, Name: "Website SRX" } as const;
 
 const paymentMethodLabels: Record<string, string> = {
   cod: "COD",
@@ -96,7 +100,7 @@ async function loadOrder(orderRef: { id?: string; orderNumber?: string }) {
     `
       SELECT id, order_number, customer_name, customer_email, customer_phone, payment_method, payment_status,
              discount_total, shipping_total, grand_total, notes,
-             DATE_FORMAT(placed_at, '%Y-%m-%dT%H:%i:%s') AS placed_at
+             DATE_FORMAT(placed_at, '%H:%i %d/%m/%Y') AS placed_at
       FROM orders
       WHERE ${orderRef.id ? "id = ?" : "order_number = ?"}
       LIMIT 1
@@ -285,34 +289,43 @@ function buildFullAddress(address: AddressRow | null): string {
     .join(", ");
 }
 
-function buildDescription(order: OrderRow, warnings: string[]): string {
+function formatMoney(value: number): string {
+  return `${new Intl.NumberFormat("vi-VN").format(value)}đ`;
+}
+
+type DeliveryInfo = { receiver: string; phone: string; address: string };
+
+/** Đơn KiotViet không gửi orderDelivery (theo body đã test), nên người nhận, địa chỉ và phí ship nằm ở đây. */
+function buildDescription(order: OrderRow, delivery: DeliveryInfo, warnings: string[]): string {
   const paidSuffix = order.payment_status === "paid" ? " (đã thanh toán)" : "";
+  const shippingTotal = toNumber(order.shipping_total);
   const customerNote = order.notes?.trim() ?? "";
 
   return [
     `Đơn website ${order.order_number}`,
-    `Thanh toán: ${paymentMethodLabels[order.payment_method] ?? order.payment_method}${paidSuffix}`,
+    `Thanh toán ${paymentMethodLabels[order.payment_method] ?? order.payment_method}${paidSuffix}`,
+    `Đặt lúc ${order.placed_at}`,
+    `Giao: ${[delivery.receiver, delivery.phone, delivery.address].filter(Boolean).join(", ")}`,
+    shippingTotal > 0 ? `Phí ship ${formatMoney(shippingTotal)}` : "",
     customerNote ? `Ghi chú khách: ${customerNote}` : "",
     warnings.length > 0 ? `CẦN BỔ SUNG: ${warnings.join("; ")}` : "",
   ]
     .filter(Boolean)
-    .join("\n");
+    .join(" - ");
 }
 
 /** Đơn đã thanh toán trên web thì ghi nhận tiền khách trả luôn; còn lại để 0. */
 function buildPaymentFields(order: OrderRow): Record<string, unknown> {
-  if (order.payment_status !== "paid") {
-    return { totalPayment: 0 };
-  }
+  const isPaid = order.payment_status === "paid";
 
   return {
-    totalPayment: toNumber(order.grand_total),
-    method: order.payment_method === "bank_transfer" ? "Transfer" : "Cash",
+    method: isPaid && order.payment_method === "bank_transfer" ? "Transfer" : "Cash",
+    totalPayment: isPaid ? toNumber(order.grand_total) : 0,
   };
 }
 
 /**
- * Dựng dữ liệu đơn KiotViet từ đơn website.
+ * Dựng dữ liệu đơn KiotViet từ đơn website, theo body đã test thành công trên Postman.
  * createCustomer = false: chỉ đọc (xem trước), không tạo gì trên KiotViet.
  */
 export async function buildKiotVietOrderDraft(
@@ -329,24 +342,28 @@ export async function buildKiotVietOrderDraft(
   const warnings: string[] = [];
   const fullAddress = buildFullAddress(address);
   const phone = toKiotVietPhone(order.customer_phone.trim() ? order.customer_phone : (address?.recipient_phone ?? ""));
+  const delivery: DeliveryInfo = {
+    receiver: address?.recipient_name ?? order.customer_name,
+    phone: address ? toKiotVietPhone(address.recipient_phone) : phone,
+    address: fullAddress,
+  };
   const orderDetails = await buildOrderDetails(items, warnings);
   const { customer, note: customerNote } = await resolveCustomer(order, phone, fullAddress, createCustomer);
 
+  // Không gửi purchaseDate: shop tắt "Không cho phép thay đổi thời gian bán hàng" nên KiotViet từ chối
+  // (KvValidateOrderException). Giờ đặt trên web nằm trong description.
   const payload: Record<string, unknown> = {
     branchId: KIOTVIET_WEB_ORDER_BRANCH_ID,
-    purchaseDate: order.placed_at,
-    ...(customer ? { customerId: customer.id } : {}),
-    description: buildDescription(order, warnings),
-    usingCod: order.payment_method === "cod",
     discount: toNumber(order.discount_total),
+    description: buildDescription(order, delivery, warnings),
     ...buildPaymentFields(order),
+    ...(customer ? { customerId: customer.id } : {}),
+    soldById: KIOTVIET_WEB_ORDER_SOLD_BY.id,
+    soldByName: KIOTVIET_WEB_ORDER_SOLD_BY.name,
+    makeInvoice: true,
     orderDetails,
-    orderDelivery: {
-      receiver: address?.recipient_name ?? order.customer_name,
-      contactNumber: address ? toKiotVietPhone(address.recipient_phone) : phone,
-      address: fullAddress,
-      price: toNumber(order.shipping_total),
-    },
+    SaleChannelName: KIOTVIET_WEB_SALE_CHANNEL.Name,
+    SaleChannel: KIOTVIET_WEB_SALE_CHANNEL,
   };
 
   return {

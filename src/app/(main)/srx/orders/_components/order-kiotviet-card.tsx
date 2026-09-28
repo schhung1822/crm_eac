@@ -17,7 +17,13 @@ type PreviewDetail = { productCode: string; productName: string; quantity: numbe
 type Preview = {
   customerNote: string;
   warnings: string[];
-  payload: { orderDetails: PreviewDetail[]; discount: number; orderDelivery: { address: string; price: number } };
+  payload: {
+    orderDetails: PreviewDetail[];
+    discount: number;
+    description: string;
+    soldByName: string;
+    SaleChannelName: string;
+  };
 };
 
 const statusView: Record<
@@ -43,7 +49,7 @@ function PreviewDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Dữ liệu sẽ gửi KiotViet</DialogTitle>
-          <DialogDescription>Phiếu tạm tại chi nhánh EAC HCM. {preview?.customerNote}</DialogDescription>
+          <DialogDescription>Chi nhánh EAC HCM. {preview?.customerNote}</DialogDescription>
         </DialogHeader>
         {preview ? (
           <div className="grid gap-3 text-sm">
@@ -65,10 +71,10 @@ function PreviewDialog({
             </div>
             <div className="text-muted-foreground grid gap-1 text-xs">
               <span>
-                Giảm giá đơn: {moneyFormatter.format(preview.payload.discount)}đ · Phí giao:{" "}
-                {moneyFormatter.format(preview.payload.orderDelivery.price)}đ
+                Giảm giá đơn: {moneyFormatter.format(preview.payload.discount)}đ · Người bán:{" "}
+                {preview.payload.soldByName} · Kênh bán: {preview.payload.SaleChannelName}
               </span>
-              <span>Địa chỉ giao: {preview.payload.orderDelivery.address || "—"}</span>
+              <span className="break-words">Ghi chú: {preview.payload.description}</span>
             </div>
             {preview.warnings.length > 0 ? (
               <ul className="text-destructive list-disc space-y-1 pl-5 text-xs">
@@ -172,7 +178,7 @@ export function OrderKiotVietCard({
           <SyncStatusBadge sync={sync} />
         </CardTitle>
         <CardDescription>
-          Đơn website được tự đẩy về KiotViet (phiếu tạm, chi nhánh EAC HCM) ngay khi khách đặt.
+          Đơn website được tự đẩy về KiotViet (chi nhánh EAC HCM, kênh Website SRX) ngay khi khách đặt.
         </CardDescription>
         <CardAction className="flex gap-2">
           <Button
