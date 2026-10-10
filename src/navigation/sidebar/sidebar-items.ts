@@ -19,6 +19,7 @@ import {
   User,
   UserCog,
   Users,
+  Workflow,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -171,6 +172,12 @@ export const sidebarItems: NavGroup[] = [
         title: "Quản lý kết nối",
         url: "/ai",
         icon: Link,
+      },
+      {
+        // Chỉ admin thấy: /system-map không nằm trong danh sách route của các vai trò khác (src/lib/rbac.ts).
+        title: "Sơ đồ hệ thống",
+        url: "/system-map",
+        icon: Workflow,
       },
       {
         title: "Tài khoản",

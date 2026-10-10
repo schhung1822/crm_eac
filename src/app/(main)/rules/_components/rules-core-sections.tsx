@@ -5,7 +5,7 @@ import { Callout, Path, Section, Table } from "./rules-layout";
 
 const highlights = [
   { label: "Nhóm menu", value: "4", hint: "Dashboards · Quản lý · Website SRX · Khác" },
-  { label: "Trang chức năng", value: "25", hint: "Chưa tính các trang tạo/sửa chi tiết" },
+  { label: "Trang chức năng", value: "26", hint: "Chưa tính các trang tạo/sửa chi tiết" },
   { label: "Vai trò", value: "4", hint: "Admin · Chủ cửa hàng · Biên tập viên · User" },
   { label: "Nguồn dữ liệu", value: "2", hint: "Database EAC và database SRX" },
 ];
@@ -208,6 +208,11 @@ export function RulesCoreSections() {
               "Tài khoản",
               <Path key="p24">/account</Path>,
               "Thông tin cá nhân và đổi mật khẩu. Admin tạo tài khoản và phân quyền tại đây.",
+            ],
+            [
+              "Sơ đồ hệ thống",
+              <Path key="p26">/system-map</Path>,
+              "Chỉ admin. Sơ đồ tương tác mô tả dữ liệu đi từ nguồn khách hàng qua website, CRM, các dịch vụ bên ngoài, nơi lưu trữ, thông báo và báo cáo.",
             ],
             ["Quy tắc", <Path key="p25">/rules</Path>, "Chính là trang bạn đang đọc."],
           ]}
