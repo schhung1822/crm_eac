@@ -20,6 +20,11 @@ export type TemplateTheme = {
   text: string;
   muted: string;
   ring: string;
+  /**
+   * Template 2: dải màu loang ở giữa 2 khối nội dung (sau ảnh banner và quanh form đăng ký).
+   * Config cũ chưa có giá trị này: web giữ màu đỏ sẫm mặc định.
+   */
+  sectionTint?: string;
 };
 
 export type FooterConfig = {

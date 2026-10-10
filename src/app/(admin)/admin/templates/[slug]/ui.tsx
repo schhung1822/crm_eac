@@ -19,6 +19,7 @@ import {
   FormInput,
   Globe,
   Image as ImageIcon,
+  Images,
   Link2,
   ListOrdered,
   Loader2,
@@ -35,11 +36,11 @@ import {
   SlidersHorizontal,
   Trash2,
   Type,
-  Upload,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MediaLibraryPickerDialog } from "@/app/(main)/srx/media-library/_components/media-library-picker-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +62,6 @@ import { cn } from "@/lib/utils";
 
 import { saveTemplateAction } from "./actions";
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const PUBLIC_LADIPAGE_BASE_URL = "https://srx.vn";
 // Giữ khớp với MAX_AGENDA_ITEMS / LEGACY_AGENDA_ITEMS_LIMIT trong SRX_web StarryEventLanding.jsx.
 const MAX_AGENDA_ITEMS = 6;
@@ -181,32 +181,20 @@ const templateCopy: Record<TemplateStyle, TemplateCopy> = {
       { key: "primary2", label: "Màu chính 2" },
       { key: "muted", label: "Màu nhấn (số, icon)" },
       { key: "bg", label: "Nền trang" },
+      { key: "sectionTint", label: "Dải màu giữa trang" },
     ],
   },
 };
+
+// Màu chưa có trong config cũ (VD sectionTint) hiển thị theo màu mặc định của template, đúng như web đang vẽ.
+function getThemeColor(theme: TemplateTheme, key: keyof TemplateTheme, templateStyle: TemplateStyle): string {
+  return theme[key] ?? templateThemePresets[templateStyle].theme[key] ?? "";
+}
 
 type DefaultFieldConfig = FormTemplateConfig["fields"]["full_name"];
 type HiddenFieldConfig = FormTemplateConfig["fields"]["hidden"][HiddenFieldKey];
 type QuestionConfig = FormTemplateConfig["questions"][number];
 type LadipageStatus = "draft" | "published" | "archived";
-
-async function uploadEventImage(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/srx/ladipage-events/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result?.message ?? "Không thể tải ảnh ladipage");
-  }
-
-  return String(result.url ?? "");
-}
 
 // Config cũ chưa có agendaItems: web tự lấy nhãn câu hỏi đang bật, không có thì lấy headline/motto/organizer.
 function getLegacyAgendaItems(config: FormTemplateConfig): string[] {
@@ -404,41 +392,7 @@ function ImageField({
   layout?: "row" | "stack";
   previewClassName?: string;
 }) {
-  const inputReference = React.useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-
-  async function handleUpload(files: FileList | null) {
-    if (!files?.length) {
-      return;
-    }
-
-    const file = files[0];
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("File tải lên phải là ảnh");
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error("Ảnh vượt quá 10MB");
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const url = await uploadEventImage(file);
-      onChange(url);
-      toast.success(`Đã tải ${label.toLowerCase()} lên`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Không thể tải ${label.toLowerCase()}`);
-    } finally {
-      setIsUploading(false);
-
-      if (inputReference.current) {
-        inputReference.current.value = "";
-      }
-    }
-  }
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
   return (
     <div className="min-w-0 space-y-1.5">
@@ -465,29 +419,15 @@ function ImageField({
             className="font-mono text-xs"
           />
           <div className="flex flex-wrap gap-2">
-            <input
-              ref={inputReference}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => void handleUpload(event.target.files)}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={isUploading}
-              onClick={() => inputReference.current?.click()}
-            >
-              {isUploading ? <Loader2 className="animate-spin" /> : <Upload />}
-              {isUploading ? "Đang tải..." : value ? "Đổi ảnh" : "Tải ảnh"}
+            <Button type="button" size="sm" variant="outline" onClick={() => setIsPickerOpen(true)}>
+              <Images />
+              {value ? "Đổi ảnh" : "Chọn ảnh"}
             </Button>
             {value ? (
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                disabled={isUploading}
                 className="text-muted-foreground hover:text-destructive"
                 onClick={() => onChange("")}
               >
@@ -499,6 +439,14 @@ function ImageField({
         </div>
       </div>
       {hint ? <p className="text-muted-foreground text-xs leading-5">{hint}</p> : null}
+      {/* Chọn ảnh có sẵn trong thư viện trước; chưa có ảnh ưng ý thì tải lên ngay trong hộp thoại (lưu vào thư mục Sự kiện). */}
+      <MediaLibraryPickerDialog
+        uploadTarget="ladipage"
+        open={isPickerOpen}
+        title={`Chọn ${label.toLowerCase()}`}
+        onOpenChange={setIsPickerOpen}
+        onConfirm={(urls) => onChange(urls[0] ?? "")}
+      />
     </div>
   );
 }
@@ -883,7 +831,10 @@ export default function AdminTemplateEditor({
     [config.fields, config.questions],
   );
   const summarySwatches = [
-    ...copy.themeTokens.map((token) => ({ label: token.label, color: config.theme[token.key] })),
+    ...copy.themeTokens.map((token) => ({
+      label: token.label,
+      color: getThemeColor(config.theme, token.key, currentTemplateStyle),
+    })),
     { label: "Footer - màu đầu", color: config.footer.gradientFrom },
     { label: "Footer - màu cuối", color: config.footer.gradientTo },
   ];
@@ -1205,7 +1156,7 @@ export default function AdminTemplateEditor({
                       <ColorField
                         key={token.key}
                         label={token.label}
-                        value={config.theme[token.key]}
+                        value={getThemeColor(config.theme, token.key, currentTemplateStyle)}
                         onChange={(value) => update({ theme: { ...config.theme, [token.key]: value } })}
                       />
                     ))}

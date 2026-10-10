@@ -33,6 +33,7 @@ const uploadTargets = {
   news: { directory: "ports", endpoint: "/api/srx/news/upload" },
   productTag: { directory: "products", endpoint: "/api/srx/product-tags/upload" },
   gift: { directory: "gift", endpoint: "/api/srx/gift-rules/upload" },
+  ladipage: { directory: "events", endpoint: "/api/srx/ladipage-events/upload" },
 } as const;
 
 export type MediaLibraryUploadTarget = keyof typeof uploadTargets;

@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { getCurrentUser } from "@/lib/auth";
+import { canManageSrxSection, type SrxManagementSection } from "@/lib/rbac";
 import {
   createSrxMediaLibraryItem,
   deleteSrxMediaLibraryItem,
@@ -17,9 +19,29 @@ const deletePayloadSchema = z.object({
   relative_path: z.string().trim().min(1),
 });
 
-export async function GET(request: NextRequest) {
+/**
+ * Khu vực có trình soạn thảo mở hộp thoại chọn ảnh từ thư viện. Biên tập viên chỉ quản lý Tin tức và
+ * Ladipage nhưng vẫn cần xem danh sách ảnh để chọn; tải lên / sửa / xoá trong thư viện vẫn theo quyền website.
+ */
+const MEDIA_PICKER_SECTIONS: SrxManagementSection[] = ["website", "news", "ladipage"];
+
+async function ensureMediaLibraryReadAccess(): Promise<NextResponse | null> {
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser) {
+    return NextResponse.json({ message: "Chua dang nhap" }, { status: 401 });
+  }
+
+  if (MEDIA_PICKER_SECTIONS.some((section) => canManageSrxSection(currentUser.role, section))) {
+    return null;
+  }
+
+  return NextResponse.json({ message: "Bạn không có quyền xem thư viện ảnh" }, { status: 403 });
+}
+
+export async function GET() {
   try {
-    const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý thư viện ảnh");
+    const accessError = await ensureMediaLibraryReadAccess();
 
     if (accessError) {
       return accessError;

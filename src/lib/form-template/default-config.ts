@@ -26,6 +26,8 @@ export const templateThemePresets: Record<
       text: "#ffffff",
       muted: "#ffd7a2",
       ring: "rgba(236,74,81,.35)",
+      // Giữ khớp với màu mặc định của --lp-section trong SRX_web StarryEventLanding.jsx.
+      sectionTint: "#210609",
     },
     footerFrom: "#090304",
     footerTo: "#180608",
