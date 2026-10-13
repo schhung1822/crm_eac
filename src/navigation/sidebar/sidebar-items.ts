@@ -75,7 +75,7 @@ export const sidebarItems: NavGroup[] = [
         icon: Contact,
       },
       {
-        title: "SRX Việt Nam",
+        title: "Báo cáo web SRX",
         url: "/dashboard/srxvietnam",
         icon: Gauge,
       },
@@ -131,6 +131,7 @@ export const sidebarItems: NavGroup[] = [
           { title: "Quà tặng", url: "/srx/gift-rules" },
           { title: "Banner", url: "/srx/banner" },
           { title: "Popup quảng cáo", url: "/srx/popup" },
+          { title: "Vòng quay may mắn", url: "/srx/lucky-wheel" },
         ],
       },
       {

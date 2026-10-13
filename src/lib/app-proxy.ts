@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = [
   "/api/srx/meta-events-web",
   "/api/srx/orders_web",
   "/api/srx/affiliate-applications-web",
+  "/api/srx/lucky-wheel-web",
 ];
 const AUTH_ROUTES = ["/auth/v2/login"];
 
