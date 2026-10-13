@@ -1,13 +1,15 @@
+import { getLuckyWheelCodeSources, withStackFlags } from "@/lib/srx-discount-code-extras";
 import { getSrxProductCategories, getSrxProducts } from "@/lib/srx-products";
 import { getSrxDiscountCodes } from "@/lib/srx-website";
 
 import { DiscountCodesManager } from "./_components/discount-codes-manager";
 
 export default async function Page() {
-  const [discountCodes, products, categories] = await Promise.all([
-    getSrxDiscountCodes(),
+  const [discountCodes, products, categories, codeSources] = await Promise.all([
+    getSrxDiscountCodes().then(withStackFlags),
     getSrxProducts(),
     getSrxProductCategories(),
+    getLuckyWheelCodeSources(),
   ]);
 
   const productOptions = products.map((product) => ({
@@ -25,6 +27,7 @@ export default async function Page() {
       initialDiscountCodes={discountCodes}
       productOptions={productOptions}
       categoryOptions={categoryOptions}
+      codeSources={codeSources}
     />
   );
 }

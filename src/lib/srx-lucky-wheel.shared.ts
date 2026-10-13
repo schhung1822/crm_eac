@@ -69,6 +69,8 @@ export const srxLuckyWheelVoucherConfigSchema = z.object({
   /** Chỉ dùng với giảm theo %. */
   max_discount_amount: optionalAmount,
   min_order_amount: optionalAmount,
+  /** Mã riêng sinh ra được dùng cùng 1 mã chung trong cùng đơn hàng (lưu vào discount_codes.stack_with_public). */
+  stack_with_public: z.boolean().default(false),
 });
 
 const srxLuckyWheelPrizeBaseSchema = z.object({

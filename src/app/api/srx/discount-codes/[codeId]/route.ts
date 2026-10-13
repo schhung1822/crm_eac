@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { resolveStackWithPublic, saveDiscountCodeStackFlag } from "@/lib/srx-discount-code-extras";
 import { deleteSrxDiscountCode, parseSrxDiscountCodeInput, updateSrxDiscountCode } from "@/lib/srx-website";
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ codeId: string }> },
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ codeId: string }> }) {
   try {
     const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý mã giảm giá SRX");
 
@@ -17,11 +15,17 @@ export async function PATCH(
 
     const { codeId } = await params;
     const payload = parseSrxDiscountCodeInput(await request.json());
-    const discountCode = await updateSrxDiscountCode(codeId, payload);
+    const updated = await updateSrxDiscountCode(codeId, payload);
 
-    if (!discountCode) {
+    if (!updated) {
       return NextResponse.json({ message: "Không tìm thấy mã giảm giá" }, { status: 404 });
     }
+
+    const stackWithPublic = resolveStackWithPublic(payload);
+
+    await saveDiscountCodeStackFlag(updated.id, stackWithPublic);
+
+    const discountCode = { ...updated, stack_with_public: stackWithPublic };
 
     return NextResponse.json({
       message: "Đã cập nhật mã giảm giá",
@@ -32,10 +36,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ codeId: string }> },
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ codeId: string }> }) {
   try {
     const accessError = await ensureAdminApiAccess(request, "Bạn không có quyền quản lý mã giảm giá SRX");
 
@@ -53,4 +54,3 @@ export async function DELETE(
     return buildApiErrorResponse(error, "Không thể xóa mã giảm giá");
   }
 }
-

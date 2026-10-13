@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   formatVnd,
@@ -20,6 +21,7 @@ export type VoucherFormState = {
   discount_value: string;
   max_discount_amount: string;
   min_order_amount: string;
+  stack_with_public: boolean;
 };
 
 export function buildVoucherFormState(config: SrxLuckyWheelVoucherConfig | null): VoucherFormState {
@@ -28,6 +30,7 @@ export function buildVoucherFormState(config: SrxLuckyWheelVoucherConfig | null)
     discount_value: config ? String(config.discount_value) : "",
     max_discount_amount: config?.max_discount_amount ? String(config.max_discount_amount) : "",
     min_order_amount: config?.min_order_amount ? String(config.min_order_amount) : "",
+    stack_with_public: config?.stack_with_public ?? false,
   };
 }
 
@@ -41,6 +44,7 @@ export function toVoucherConfig(state: VoucherFormState): SrxLuckyWheelVoucherCo
     discount_value: Number(state.discount_value || 0),
     max_discount_amount: state.discount_type === "percentage" ? toAmount(state.max_discount_amount) : null,
     min_order_amount: toAmount(state.min_order_amount),
+    stack_with_public: state.stack_with_public,
   };
 }
 
@@ -60,7 +64,9 @@ function describeVoucher(state: VoucherFormState): string {
   const condition =
     Number(state.min_order_amount) > 0 ? `đơn hàng từ ${formatVnd(Number(state.min_order_amount))}` : "mọi đơn hàng";
 
-  return `Khách nhận mã giảm ${amount}${cap} cho ${condition}.`;
+  const stacking = state.stack_with_public ? " Dùng chung được với 1 mã chung." : " Phải dùng một mình.";
+
+  return `Khách nhận mã riêng giảm ${amount}${cap} cho ${condition}.${stacking}`;
 }
 
 function AmountField({
@@ -111,8 +117,9 @@ function VoucherConfigFields({
       <div className="grid gap-1">
         <div className="text-sm font-medium">Voucher tự sinh</div>
         <p className="text-muted-foreground text-xs leading-5">
-          Mỗi lần trúng, hệ thống tạo một mã 8 chữ số ngẫu nhiên không trùng mã có sẵn, chỉ dùng được 1 lần, hiệu lực từ
-          lúc trúng tới hết ngày sau 3 tháng. Mã hiện cho khách và được gửi qua tin ZBS tới Zalo của khách.
+          Mỗi lần trúng, hệ thống tạo một mã riêng 8 chữ số ngẫu nhiên không trùng mã có sẵn, chỉ dùng được 1 lần, hiệu
+          lực từ lúc trúng tới hết ngày sau 3 tháng. Mã được gửi qua tin ZBS tới Zalo của khách và lưu ở Mã giảm giá →
+          tab Mã riêng.
         </p>
       </div>
 
@@ -161,6 +168,20 @@ function VoucherConfigFields({
           onChange={(next) => onChange({ min_order_amount: next })}
         />
       </div>
+
+      <label className="flex items-start gap-3 rounded-md border bg-white/60 px-3 py-2.5 dark:bg-transparent">
+        <Switch
+          className="mt-0.5"
+          checked={value.stack_with_public}
+          onCheckedChange={(checked) => onChange({ stack_with_public: checked })}
+        />
+        <span className="grid gap-0.5">
+          <span className="text-sm font-medium">Cho phép dùng chung với mã chung</span>
+          <span className="text-muted-foreground text-xs leading-5">
+            Khách áp được mã trúng thưởng cùng 1 mã chung (mã hiện trong giỏ hàng) trong cùng đơn hàng.
+          </span>
+        </span>
+      </label>
 
       <p className="text-sm font-medium">{describeVoucher(value)}</p>
     </div>

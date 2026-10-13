@@ -47,6 +47,7 @@ const emptyFormState: DiscountCodeFormState = {
   per_user_limit: "",
   scope_type: "all_orders",
   class: "public",
+  stack_with_public: false,
   starts_at: "",
   ends_at: "",
   is_active: true,
@@ -69,9 +70,12 @@ function toLocalDateTimeInput(value: Date | null): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function buildFormState(discountCode: SrxDiscountCode | null): DiscountCodeFormState {
+function buildFormState(
+  discountCode: SrxDiscountCode | null,
+  defaultClass: DiscountCodeFormState["class"],
+): DiscountCodeFormState {
   if (!discountCode) {
-    return emptyFormState;
+    return { ...emptyFormState, class: defaultClass };
   }
 
   return {
@@ -86,6 +90,7 @@ function buildFormState(discountCode: SrxDiscountCode | null): DiscountCodeFormS
     per_user_limit: discountCode.per_user_limit === null ? "" : String(discountCode.per_user_limit),
     scope_type: discountCode.scope_type,
     class: discountCode.class,
+    stack_with_public: discountCode.stack_with_public,
     starts_at: toLocalDateTimeInput(discountCode.starts_at),
     ends_at: toLocalDateTimeInput(discountCode.ends_at),
     is_active: discountCode.is_active,
@@ -123,9 +128,9 @@ function getScopeLabel(value: DiscountCodeFormState["scope_type"]): string {
 function getClassLabel(value: DiscountCodeFormState["class"]): string {
   switch (value) {
     case "public":
-      return "Công khai";
+      return "Mã chung (hiện cho mọi khách)";
     case "private":
-      return "Riêng tư";
+      return "Mã riêng (chỉ người được gửi mã)";
     default:
       return value;
   }
@@ -139,6 +144,7 @@ export function DiscountCodeFormDialog({
   onSubmit,
   productOptions,
   categoryOptions,
+  defaultClass,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -147,17 +153,19 @@ export function DiscountCodeFormDialog({
   onSubmit: (value: DiscountCodeFormState) => Promise<void>;
   productOptions: ReferenceOption[];
   categoryOptions: ReferenceOption[];
+  /** Loại mã khi tạo mới: theo tab đang mở (Mã chung / Mã riêng). */
+  defaultClass: DiscountCodeFormState["class"];
 }) {
   const isMobile = useIsMobile();
-  const [form, setForm] = React.useState<DiscountCodeFormState>(() => buildFormState(initialValue));
+  const [form, setForm] = React.useState<DiscountCodeFormState>(() => buildFormState(initialValue, defaultClass));
 
   React.useEffect(() => {
     if (!open) {
       return;
     }
 
-    setForm(buildFormState(initialValue));
-  }, [initialValue, open]);
+    setForm(buildFormState(initialValue, defaultClass));
+  }, [defaultClass, initialValue, open]);
 
   function toggleProduct(productId: string, checked: boolean) {
     setForm((current) => ({
@@ -372,6 +380,24 @@ export function DiscountCodeFormDialog({
                   </Select>
                 </div>
               </div>
+
+              {form.class === "private" ? (
+                <label className="flex items-start gap-3 rounded-md border px-3 py-2">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={form.stack_with_public}
+                    onCheckedChange={(checked) =>
+                      setForm((current) => ({ ...current, stack_with_public: checked === true }))
+                    }
+                  />
+                  <span className="grid gap-0.5">
+                    <span className="text-sm">Cho phép dùng chung với 1 mã chung</span>
+                    <span className="text-muted-foreground text-xs">
+                      Khách áp được mã này cùng một mã chung trong cùng đơn hàng. Tắt thì mã này phải dùng một mình.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
 
               <label className="flex items-center gap-3 rounded-md border px-3 py-2">
                 <Checkbox

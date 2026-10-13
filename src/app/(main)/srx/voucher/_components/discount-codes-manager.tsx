@@ -13,8 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 import { filterBySearchTerm } from "@/lib/search-utils";
+import type { DiscountCodeSource } from "@/lib/srx-discount-code-extras";
 import {
   parseSrxDiscountCode,
   type SrxDiscountCode,
@@ -66,15 +68,38 @@ function getScopeLabel(scopeType: SrxDiscountCode["scope_type"]): string {
   }
 }
 
-function getClassLabel(classValue: SrxDiscountCode["class"]): string {
-  switch (classValue) {
-    case "public":
-      return "Công khai";
-    case "private":
-      return "Riêng tư";
-    default:
-      return classValue;
-  }
+type CodeClassTab = SrxDiscountCode["class"];
+
+const tabCopy: Record<CodeClassTab, { label: string; description: string; empty: string }> = {
+  public: {
+    label: "Mã chung",
+    description: "Hiện trong danh sách mã của giỏ hàng, khách nào cũng chọn được.",
+    empty: "Chưa có mã chung nào.",
+  },
+  private: {
+    label: "Mã riêng",
+    description:
+      "Không hiện công khai, chỉ người được gửi mã mới dùng được (vd. mã 8 số trúng vòng quay may mắn). Mã riêng có thể được phép dùng chung với 1 mã chung.",
+    empty: "Chưa có mã riêng nào.",
+  },
+};
+
+function SourceCell({ discountCode, source }: { discountCode: SrxDiscountCode; source?: DiscountCodeSource }) {
+  return (
+    <div className="grid justify-items-start gap-1">
+      {source ? (
+        <div>
+          <div className="font-medium">Vòng quay may mắn</div>
+          <div className="text-muted-foreground text-xs">
+            {[source.customerName || "Khách hàng", source.customerPhone].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+      ) : (
+        <div className="text-muted-foreground">Tạo thủ công</div>
+      )}
+      {discountCode.stack_with_public ? <Badge variant="outline">Dùng chung với mã chung</Badge> : null}
+    </div>
+  );
 }
 
 function sortDiscountCodes(discountCodes: SrxDiscountCode[]): SrxDiscountCode[] {
@@ -85,10 +110,13 @@ export function DiscountCodesManager({
   initialDiscountCodes,
   productOptions,
   categoryOptions,
+  codeSources,
 }: {
   initialDiscountCodes: SrxDiscountCode[];
   productOptions: ReferenceOption[];
   categoryOptions: ReferenceOption[];
+  /** Mã riêng sinh tự động (vòng quay may mắn): id mã → khách nhận mã. */
+  codeSources: Record<string, DiscountCodeSource>;
 }) {
   const [discountCodes, setDiscountCodes] = React.useState<SrxDiscountCode[]>(sortDiscountCodes(initialDiscountCodes));
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -96,17 +124,32 @@ export function DiscountCodesManager({
   const [editingDiscountCode, setEditingDiscountCode] = React.useState<SrxDiscountCode | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<CodeClassTab>("public");
+  const tabCounts = React.useMemo(
+    () => ({
+      public: discountCodes.filter((discountCode) => discountCode.class === "public").length,
+      private: discountCodes.filter((discountCode) => discountCode.class === "private").length,
+    }),
+    [discountCodes],
+  );
 
   const filteredDiscountCodes = React.useMemo(() => {
-    return filterBySearchTerm(discountCodes, searchTerm, (discountCode) => [
-      discountCode.code,
-      discountCode.name,
-      discountCode.description,
-      getClassLabel(discountCode.class),
-      discountCode.product_names,
-      discountCode.category_names,
-    ]);
-  }, [discountCodes, searchTerm]);
+    const codesInTab = discountCodes.filter((discountCode) => discountCode.class === activeTab);
+
+    return filterBySearchTerm(codesInTab, searchTerm, (discountCode) => {
+      const source = codeSources[discountCode.id] as DiscountCodeSource | undefined;
+
+      return [
+        discountCode.code,
+        discountCode.name,
+        discountCode.description,
+        source?.customerName ?? "",
+        source?.customerPhone ?? "",
+        discountCode.product_names,
+        discountCode.category_names,
+      ];
+    });
+  }, [activeTab, codeSources, discountCodes, searchTerm]);
 
   const handleSubmit = React.useCallback(
     async (value: SrxDiscountCodeMutationInput) => {
@@ -248,16 +291,16 @@ export function DiscountCodesManager({
         ),
         enableSorting: false,
       },
-      {
-        accessorKey: "class",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Loại voucher" />,
-        cell: ({ row }) => (
-          <Badge variant={row.original.class === "public" ? "outline" : "secondary"}>
-            {getClassLabel(row.original.class)}
-          </Badge>
-        ),
-        enableSorting: false,
-      },
+      ...(activeTab === "private"
+        ? [
+            {
+              id: "source",
+              header: ({ column }) => <DataTableColumnHeader column={column} title="Nguồn" />,
+              cell: ({ row }) => <SourceCell discountCode={row.original} source={codeSources[row.original.id]} />,
+              enableSorting: false,
+            } satisfies ColumnDef<SrxDiscountCode>,
+          ]
+        : []),
       {
         accessorKey: "usage_count",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Sử dụng" />,
@@ -324,7 +367,7 @@ export function DiscountCodesManager({
         enableSorting: false,
       },
     ],
-    [handleDelete],
+    [activeTab, codeSources, handleDelete],
   );
 
   const table = useDataTableInstance({
@@ -332,7 +375,7 @@ export function DiscountCodesManager({
     columns,
     getRowId: (row) => row.id,
   });
-  const tableRenderKey = `${searchTerm}|${filteredDiscountCodes.length}`;
+  const tableRenderKey = `${activeTab}|${searchTerm}|${filteredDiscountCodes.length}`;
 
   const rowSelection = table.getState().rowSelection;
   const selectedDiscountCodes = React.useMemo(
@@ -391,6 +434,25 @@ export function DiscountCodesManager({
         <p className="text-muted-foreground">Quản lý voucher, phạm vi áp dụng và giới hạn sử dụng cho website SRX.</p>
       </div>
 
+      <div className="grid gap-2">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            setActiveTab(value as CodeClassTab);
+            table.resetRowSelection();
+          }}
+        >
+          <TabsList>
+            {(["public", "private"] as const).map((tab) => (
+              <TabsTrigger key={tab} value={tab}>
+                {tabCopy[tab].label} ({tabCounts[tab]})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <p className="text-muted-foreground text-sm">{tabCopy[activeTab].description}</p>
+      </div>
+
       <div className="flex items-center justify-between gap-4">
         <div className="relative max-w-sm flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
@@ -417,13 +479,19 @@ export function DiscountCodesManager({
             }}
           >
             <Plus className="size-4" />
-            Thêm mã giảm giá
+            {activeTab === "private" ? "Thêm mã riêng" : "Thêm mã chung"}
           </Button>
         </div>
       </div>
 
       <div className="nice-scroll overflow-hidden rounded-lg">
-        <DataTable key={tableRenderKey} table={table} columns={columns} />
+        {filteredDiscountCodes.length || searchTerm ? (
+          <DataTable key={tableRenderKey} table={table} columns={columns} />
+        ) : (
+          <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+            {tabCopy[activeTab].empty}
+          </div>
+        )}
       </div>
 
       <DiscountCodeFormDialog
@@ -434,6 +502,7 @@ export function DiscountCodesManager({
         onSubmit={handleSubmit}
         productOptions={productOptions}
         categoryOptions={categoryOptions}
+        defaultClass={activeTab}
       />
     </div>
   );

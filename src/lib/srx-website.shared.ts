@@ -44,6 +44,8 @@ export const srxDiscountCodeSchema = z.object({
   per_user_limit: z.number().nullable(),
   scope_type: srxDiscountCodeScopeSchema,
   class: srxDiscountCodeClassSchema,
+  /** Mã riêng được dùng cùng 1 mã chung trong cùng đơn hàng (cột ngoài Prisma, xem srx-discount-code-extras). */
+  stack_with_public: z.boolean().default(false),
   starts_at: z.coerce.date().nullable(),
   ends_at: z.coerce.date().nullable(),
   is_active: z.boolean(),
@@ -147,6 +149,7 @@ const srxDiscountCodeMutationSchema = z.object({
   per_user_limit: z.string().trim().max(10).optional().default(""),
   scope_type: srxDiscountCodeScopeSchema,
   class: srxDiscountCodeClassSchema.optional().default("public"),
+  stack_with_public: z.boolean().optional().default(false),
   starts_at: z.string().trim().optional().default(""),
   ends_at: z.string().trim().optional().default(""),
   is_active: z.boolean().optional().default(true),

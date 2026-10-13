@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ensureAdminApiAccess } from "@/lib/admin-api";
 import { buildApiErrorResponse } from "@/lib/api-errors";
+import { resolveStackWithPublic, saveDiscountCodeStackFlag } from "@/lib/srx-discount-code-extras";
 import { createSrxDiscountCode, parseSrxDiscountCodeInput } from "@/lib/srx-website";
 
 export async function POST(request: NextRequest) {
@@ -13,7 +14,12 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = parseSrxDiscountCodeInput(await request.json());
-    const discountCode = await createSrxDiscountCode(payload);
+    const created = await createSrxDiscountCode(payload);
+    const stackWithPublic = resolveStackWithPublic(payload);
+
+    await saveDiscountCodeStackFlag(created.id, stackWithPublic);
+
+    const discountCode = { ...created, stack_with_public: stackWithPublic };
 
     return NextResponse.json(
       {
@@ -26,4 +32,3 @@ export async function POST(request: NextRequest) {
     return buildApiErrorResponse(error, "Không thể tạo mã giảm giá");
   }
 }
-
