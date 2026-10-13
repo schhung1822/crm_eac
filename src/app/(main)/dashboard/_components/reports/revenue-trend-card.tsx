@@ -94,10 +94,13 @@ export function RevenueTrendCard({
   trend,
   title,
   splitByChannel = false,
+  scopeLabel,
 }: {
   trend: RevenueTrend;
   title: string;
   splitByChannel?: boolean;
+  /** Ghi chú phạm vi đơn được tính, ví dụ "Đơn hoàn thành". */
+  scopeLabel?: string;
 }) {
   const [metric, setMetric] = useState<Metric>("revenue");
   const { series, rows } = useMemo(() => buildSeries(trend, metric, splitByChannel), [trend, metric, splitByChannel]);
@@ -156,7 +159,8 @@ export function RevenueTrendCard({
       className="h-full"
       description={
         <span>
-          {trend.granularity === "day" ? "Theo ngày" : "Theo tháng"} · Tổng kỳ{" "}
+          {trend.granularity === "day" ? "Theo ngày" : "Theo tháng"}
+          {scopeLabel ? ` · ${scopeLabel}` : ""} · Tổng kỳ{" "}
           <span className="text-foreground font-medium">
             {metric === "revenue" ? (
               <FullValue fullValue={formatCurrency(grandTotal)}>{formatCompactCurrency(grandTotal)}</FullValue>

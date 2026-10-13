@@ -40,6 +40,10 @@ function listPeriods(start: Date, end: Date, granularity: RevenueTrendGranularit
   return periods;
 }
 
+function pickGranularity(from?: Date, to?: Date): RevenueTrendGranularity {
+  return from && to && differenceInCalendarDays(to, from) <= 92 ? "day" : "month";
+}
+
 function parsePeriod(period: string, granularity: RevenueTrendGranularity) {
   return new Date(granularity === "day" ? `${period}T00:00:00` : `${period}-01T00:00:00`);
 }
@@ -80,11 +84,11 @@ function aggregateTrendRows(rows: any[]) {
 }
 
 export const getRevenueTrend = unstable_cache(
-  async (from?: Date, to?: Date, segment?: CrmSegment): Promise<RevenueTrend> => {
+  async (from?: Date, to?: Date, segment?: CrmSegment, completedOnly = false): Promise<RevenueTrend> => {
     const db = getDB();
     const { where, params } = buildWhere(from, to, segment);
-    const granularity: RevenueTrendGranularity =
-      from && to && differenceInCalendarDays(to, from) <= 92 ? "day" : "month";
+    const completedFilter = completedOnly ? "AND TRIM(status) = 'Hoàn thành'" : "";
+    const granularity = pickGranularity(from, to);
     const periodFormat = granularity === "day" ? "%Y-%m-%d" : "%Y-%m";
 
     const [rows] = await db.query<any[]>(
@@ -97,6 +101,7 @@ export const getRevenueTrend = unstable_cache(
       FROM ${legacyEacTables.orders}
       WHERE ${where}
         AND create_time IS NOT NULL
+        ${completedFilter}
       GROUP BY period, channel
       ORDER BY period
       `,

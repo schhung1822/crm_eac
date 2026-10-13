@@ -124,7 +124,7 @@ export async function loadB2bDashboard(from?: Date, to?: Date) {
 export async function loadB2cDashboard(from?: Date, to?: Date) {
   const [stats, trend, orderStatuses, retention, topProducts, brands, channelSummary] = await Promise.all([
     settle("stats", getCRMStats(from, to, "b2c"), EMPTY_STATS),
-    settle("trend", getRevenueTrend(from, to, "b2c"), EMPTY_TREND),
+    settle("trend", getRevenueTrend(from, to, "b2c", true), EMPTY_TREND),
     settle("orderStatuses", getOrderStatusBreakdown(from, to, "b2c"), []),
     settle("retention", getCustomerRetention(from, to, "b2c"), EMPTY_RETENTION),
     settle("topProducts", getTopProductsByQuantity(from, to, 10, "b2c"), []),

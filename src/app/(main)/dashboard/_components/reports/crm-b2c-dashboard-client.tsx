@@ -52,7 +52,12 @@ export default function CRMB2cDashboardClient({
 
       <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-3">
         <div className="min-w-0 @5xl/main:col-span-2">
-          <RevenueTrendCard trend={trend} title="Xu hướng bán hàng theo sàn" splitByChannel />
+          <RevenueTrendCard
+            trend={trend}
+            title="Xu hướng bán hàng theo sàn"
+            scopeLabel="Đơn hoàn thành"
+            splitByChannel
+          />
         </div>
         <OrderStatusCard statuses={orderStatuses} />
       </div>
