@@ -4,10 +4,9 @@ import { z } from "zod";
 
 import { sendCompleteRegistrationForLadipage } from "@/lib/meta-conversions";
 import { sendSrxLadipageRegistrationZbs } from "@/lib/srx-ladipage-zbs";
+import { isWebApiRequestAuthorized } from "@/lib/web-api-auth";
 
 export const runtime = "nodejs";
-
-const apiToken = process.env.SRX_META_EVENTS_WEB_API_TOKEN?.trim() ?? "";
 
 const payloadSchema = z
   .object({
@@ -16,11 +15,7 @@ const payloadSchema = z
   .strict();
 
 function isAuthorized(request: NextRequest): boolean {
-  if (!apiToken) {
-    return true;
-  }
-
-  return request.headers.get("authorization")?.trim() === `Bearer ${apiToken}`;
+  return isWebApiRequestAuthorized(request, "SRX_META_EVENTS_WEB_API_TOKEN");
 }
 
 async function dispatchRegistrationEvent(registrationId: string): Promise<void> {

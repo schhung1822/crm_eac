@@ -4,17 +4,12 @@ import { ZodError } from "zod";
 
 import { dispatchSrxAffiliateApplicationsWebNotifications } from "@/lib/srx-affiliate-applications-web";
 import { parseSrxAffiliateApplicationsWebPayload } from "@/lib/srx-affiliate-applications-web-payload";
+import { isWebApiRequestAuthorized } from "@/lib/web-api-auth";
 
 export const runtime = "nodejs";
 
-const apiToken = process.env.SRX_AFFILIATE_APPLICATIONS_WEB_API_TOKEN?.trim() ?? "";
-
 function isAuthorized(request: NextRequest): boolean {
-  if (!apiToken) {
-    return true;
-  }
-
-  return request.headers.get("authorization")?.trim() === `Bearer ${apiToken}`;
+  return isWebApiRequestAuthorized(request, "SRX_AFFILIATE_APPLICATIONS_WEB_API_TOKEN");
 }
 
 export async function POST(request: NextRequest) {

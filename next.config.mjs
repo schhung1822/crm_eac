@@ -9,7 +9,8 @@ const nextConfig = {
     ignoreBuildErrors: process.env.NEXT_SKIP_TYPECHECK === "1",
   },
   compiler: {
-    removeConsole: process.env.NODE_ENV === "production",
+    // Giữ lại error và warn để lỗi trên server còn xuất hiện trong log production.
+    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },
   async redirects() {
     return [

@@ -4,17 +4,12 @@ import { ZodError } from "zod";
 
 import { dispatchSrxLeadFormsWebNotifications } from "@/lib/srx-lead-forms-web";
 import { parseSrxLeadFormsWebPayload } from "@/lib/srx-lead-forms-web-payload";
+import { isWebApiRequestAuthorized } from "@/lib/web-api-auth";
 
 export const runtime = "nodejs";
 
-const apiToken = process.env.SRX_LEAD_FORMS_WEB_API_TOKEN?.trim() ?? "";
-
 function isAuthorized(request: NextRequest): boolean {
-  if (!apiToken) {
-    return true;
-  }
-
-  return request.headers.get("authorization")?.trim() === `Bearer ${apiToken}`;
+  return isWebApiRequestAuthorized(request, "SRX_LEAD_FORMS_WEB_API_TOKEN");
 }
 
 export async function POST(request: NextRequest) {

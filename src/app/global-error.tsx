@@ -7,7 +7,7 @@ type GlobalErrorProps = {
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body
         style={{
           margin: 0,
@@ -30,12 +30,12 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             background: "rgba(255,255,255,0.04)",
           }}
         >
-          <h1 style={{ margin: 0, fontSize: "24px", lineHeight: 1.2 }}>Application Error</h1>
+          <h1 style={{ margin: 0, fontSize: "24px", lineHeight: 1.2 }}>Ứng dụng gặp lỗi</h1>
           <p style={{ marginTop: "12px", marginBottom: "8px", color: "rgba(255,255,255,0.8)" }}>
-            The application hit an unexpected error while rendering this page.
+            Đã có lỗi không mong muốn khi hiển thị trang này. Dữ liệu của bạn không bị mất.
           </p>
           {error.digest ? (
-            <p style={{ marginTop: "8px", color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>Digest: {error.digest}</p>
+            <p style={{ marginTop: "8px", color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>Mã lỗi: {error.digest}</p>
           ) : null}
           <div style={{ marginTop: "20px", display: "flex", gap: "12px" }}>
             <button
@@ -51,7 +51,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 cursor: "pointer",
               }}
             >
-              Try again
+              Thử lại
             </button>
           </div>
         </main>

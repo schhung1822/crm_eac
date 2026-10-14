@@ -3,10 +3,9 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { sendSrxLuckyWheelSpinZbs } from "@/lib/srx-lucky-wheel-zbs";
+import { isWebApiRequestAuthorized } from "@/lib/web-api-auth";
 
 export const runtime = "nodejs";
-
-const apiToken = process.env.SRX_LUCKY_WHEEL_WEB_API_TOKEN?.trim() ?? "";
 
 const payloadSchema = z
   .object({
@@ -15,11 +14,7 @@ const payloadSchema = z
   .strict();
 
 function isAuthorized(request: NextRequest): boolean {
-  if (!apiToken) {
-    return true;
-  }
-
-  return request.headers.get("authorization")?.trim() === `Bearer ${apiToken}`;
+  return isWebApiRequestAuthorized(request, "SRX_LUCKY_WHEEL_WEB_API_TOKEN");
 }
 
 /**

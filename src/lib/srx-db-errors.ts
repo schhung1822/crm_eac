@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-unresolved -- `server-only` is a Next.js virtual module.
 import "server-only";
 
 import { resetSrxDB } from "@/lib/srx-db";
@@ -87,10 +86,15 @@ export async function withSrxReadFallback<T>(scope: string, fallback: T, action:
 
     if (isUnavailableSrxConnectionError(error)) {
       await resetSrxDB();
-      console.warn(
-        `[SRX] ${scope} is unavailable because the SRX database connection failed: ${getErrorMessage(error)}`,
-      );
-      return fallback;
+      console.warn(`[SRX] ${scope}: connection failed, retrying once: ${getErrorMessage(error)}`);
+
+      try {
+        return await action();
+      } catch (retryError) {
+        // Không trả dữ liệu rỗng khi mất kết nối: để trang hiện lỗi có nút thử lại thay vì tưởng dữ liệu đã mất.
+        console.error(`[SRX] ${scope} failed after retry: ${getErrorMessage(retryError)}`);
+        throw retryError;
+      }
     }
 
     throw error;
