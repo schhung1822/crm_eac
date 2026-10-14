@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
 import type { ManagedUserAccount } from "@/lib/account-management.shared";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canCreateUsers, isAppRole, normalizeRole } from "@/lib/rbac";
+import { invalidateTtlCache } from "@/lib/ttl-cache";
 
 const paramsSchema = z.object({
   userId: z.string().regex(/^\d+$/),
@@ -151,6 +152,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       },
     });
 
+    invalidateTtlCache("auth:user:");
+
     return NextResponse.json(
       {
         message: "Da cap nhat quyen tai khoan",
@@ -200,6 +203,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     await prisma.user.delete({
       where: { id: userId },
     });
+    invalidateTtlCache("auth:user:");
 
     return NextResponse.json({ message: "Da xoa tai khoan" }, { status: 200 });
   } catch (error) {

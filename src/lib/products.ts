@@ -3,6 +3,7 @@ import type { RowDataPacket } from "mysql2";
 import { productSchema, type Product } from "@/app/(main)/products/_components/schema";
 import { getDB } from "@/lib/db";
 import { legacyEacTables } from "@/lib/legacy-db";
+import { ttlCached } from "@/lib/ttl-cache";
 
 type ProductColumnRow = RowDataPacket & {
   Field: string;
@@ -45,14 +46,27 @@ function normalizeProductStatus(value: unknown): boolean {
   return ["1", "true", "active", "đang bán", "dang ban", "published"].includes(normalized);
 }
 
-async function getProductColumns(): Promise<Set<string>> {
-  const db = getDB();
-  const [rows] = await db.query<ProductColumnRow[]>(`SHOW COLUMNS FROM ${legacyEacTables.product}`);
+// Cấu trúc bảng gần như không đổi nên không cần đọc lại mỗi lần mở trang.
+const PRODUCT_COLUMNS_TTL_MS = 10 * 60_000;
+// Danh sách sản phẩm kèm doanh số quét cả bảng đơn hàng, nên giữ kết quả trong thời gian ngắn.
+const PRODUCTS_TTL_MS = 60_000;
 
-  return new Set(rows.map((row) => String(row.Field)));
+function getProductColumns(): Promise<Set<string>> {
+  return ttlCached("products:columns", PRODUCT_COLUMNS_TTL_MS, async () => {
+    const db = getDB();
+    const [rows] = await db.query<ProductColumnRow[]>(`SHOW COLUMNS FROM ${legacyEacTables.product}`);
+
+    return new Set(rows.map((row) => String(row.Field)));
+  });
 }
 
-export async function getProducts({ brands = [] }: { brands?: string[] } = {}): Promise<Product[]> {
+export function getProducts({ brands = [] }: { brands?: string[] } = {}): Promise<Product[]> {
+  const cacheKey = `products:list:${[...brands].sort().join("|")}`;
+
+  return ttlCached(cacheKey, PRODUCTS_TTL_MS, () => loadProducts({ brands }));
+}
+
+async function loadProducts({ brands = [] }: { brands?: string[] } = {}): Promise<Product[]> {
   const db = getDB();
   const columns = await getProductColumns();
   const productIdColumn = pickColumn(columns, ["procode", "pro_ID", "product_ID", "product_id", "sku"]);

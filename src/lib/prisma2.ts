@@ -1,3 +1,4 @@
+import { withPrismaPoolParams } from "@/lib/db-pool";
 import { ensureSrxDatabaseEnv } from "@/lib/srx-env";
 
 import { PrismaClient } from "../../prisma/generated/srx-app-client";
@@ -16,9 +17,10 @@ function createPrisma2Client(): PrismaClient {
     globalForPrisma2.prisma2 = new PrismaClient({
       datasources: {
         db: {
-          url: srxDatabaseUrl,
+          url: withPrismaPoolParams(srxDatabaseUrl),
         },
       },
+      log: ["warn", "error"],
     });
     globalForPrisma2.prisma2Url = srxDatabaseUrl;
   }

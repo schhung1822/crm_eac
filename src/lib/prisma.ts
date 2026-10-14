@@ -1,6 +1,7 @@
-import { PrismaClient } from "../../prisma/generated/legacy-client";
-
 import { ensurePrimaryDatabaseEnv } from "@/lib/database-env";
+import { withPrismaPoolParams } from "@/lib/db-pool";
+
+import { PrismaClient } from "../../prisma/generated/legacy-client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -16,10 +17,11 @@ function createPrismaClient(): PrismaClient {
     globalForPrisma.prisma = new PrismaClient({
       datasources: {
         db: {
-          url: primaryDatabaseUrl,
+          url: withPrismaPoolParams(primaryDatabaseUrl),
         },
       },
-      log: ["query"],
+      // Ghi log từng câu truy vấn làm chậm và đầy log production, chỉ bật khi cần gỡ lỗi.
+      log: process.env.PRISMA_LOG_QUERIES === "1" ? ["query", "warn", "error"] : ["warn", "error"],
     });
     globalForPrisma.prismaUrl = primaryDatabaseUrl;
   }

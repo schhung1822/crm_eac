@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 
@@ -6,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { createToken, verifyToken, type JWTPayload } from "@/lib/auth-token";
 import { prisma } from "@/lib/prisma";
 import { normalizeRole } from "@/lib/rbac";
+import { ttlCached } from "@/lib/ttl-cache";
 
 const COOKIE_NAME = "auth-token";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -69,7 +72,29 @@ export function removeAuthCookie(response: NextResponse, request?: RequestLike):
   });
 }
 
-export async function getCurrentUser(): Promise<JWTPayload | null> {
+// Quyền người dùng được kiểm tra lại trong khoảng thời gian này, thay vì truy vấn DB ở mọi lần chuyển trang.
+const CURRENT_USER_TTL_MS = 30_000;
+
+function findUserRecord(userId: number) {
+  return ttlCached(`auth:user:${userId}`, CURRENT_USER_TTL_MS, () =>
+    prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        user: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+      },
+    }),
+  );
+}
+
+// cache() gộp các lần gọi trong cùng một request (layout lồng nhau và trang) thành một lần kiểm tra.
+export const getCurrentUser = cache(async (): Promise<JWTPayload | null> => {
   const token = await getAuthCookie();
   if (!token) return null;
 
@@ -79,19 +104,7 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
     return null;
   }
 
-  const userRecord = await prisma.user.findUnique({
-    where: {
-      id: payload.userId,
-    },
-    select: {
-      id: true,
-      user: true,
-      email: true,
-      name: true,
-      phone: true,
-      role: true,
-    },
-  });
+  const userRecord = await findUserRecord(payload.userId);
 
   if (!userRecord) {
     return null;
@@ -106,7 +119,7 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
     phone: userRecord.phone ?? undefined,
     avatar: payload.avatar,
   };
-}
+});
 
 export async function isAuthenticated(): Promise<boolean> {
   const user = await getCurrentUser();

@@ -1,7 +1,16 @@
+/* eslint-disable complexity -- hàm ánh xạ dòng dữ liệu cũ có nhiều giá trị mặc định */
 import { userSchema, Users } from "@/app/(main)/customers/_components/schema";
 import { getDB } from "@/lib/db";
+import { ttlCached } from "@/lib/ttl-cache";
 
-export async function getUser(): Promise<Users[]> {
+// Danh sách khách đồng bộ từ hệ thống khác nên giữ kết quả ngắn hạn để các lần mở trang liên tiếp không truy vấn lại.
+const CUSTOMERS_TTL_MS = 60_000;
+
+export function getUser(): Promise<Users[]> {
+  return ttlCached("customers:all", CUSTOMERS_TTL_MS, loadUsers);
+}
+
+async function loadUsers(): Promise<Users[]> {
   const db = getDB();
 
   const [rows] = await db.query<any[]>(`

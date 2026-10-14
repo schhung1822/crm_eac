@@ -1,5 +1,6 @@
 import mysql, { Pool } from "mysql2/promise";
 
+import { getMysqlPoolOptions } from "@/lib/db-pool";
 import { getSrxDbConfig } from "@/lib/srx-env";
 
 const globalForSrxDb = globalThis as unknown as {
@@ -19,12 +20,7 @@ export function getSrxDB(): Pool {
     user: config.user,
     password: config.password,
     database: config.database,
-    connectTimeout: 30_000,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    charset: "utf8mb4",
-    decimalNumbers: true,
+    ...getMysqlPoolOptions(),
   });
 
   globalForSrxDb.srxDbPool = pool;

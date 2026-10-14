@@ -3,9 +3,9 @@ import type { Channel } from "./schema";
 function normalizeSearchValue(value: unknown) {
   return String(value ?? "")
     .toLowerCase()
-    .replace(/\u0111/g, "d")
+    .replace(/đ/g, "d")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .trim()
     .replace(/\s+/g, " ");
 }
@@ -36,6 +36,29 @@ function getOrderSearchFields(item: Channel) {
   ];
 }
 
+type SearchFieldIndex = { text: string; compact: string; code: string };
+
+// Chuẩn hoá chữ (bỏ dấu, rút gọn mã) là phần tốn nhất, nên chỉ làm một lần cho mỗi dòng
+// thay vì lặp lại cho từng dòng sau mỗi phím gõ.
+const searchIndexCache = new WeakMap<Channel, SearchFieldIndex[]>();
+
+function getSearchIndex(item: Channel): SearchFieldIndex[] {
+  const cached = searchIndexCache.get(item);
+
+  if (cached) {
+    return cached;
+  }
+
+  const index = getOrderSearchFields(item).map((field) => ({
+    text: normalizeSearchValue(field),
+    compact: normalizeCompactSearchValue(field),
+    code: normalizeCodeSearchValue(field),
+  }));
+
+  searchIndexCache.set(item, index);
+  return index;
+}
+
 export function filterOrdersBySearchTerm(data: Channel[], searchTerm: string) {
   const normalizedTerm = normalizeSearchValue(searchTerm);
 
@@ -46,25 +69,12 @@ export function filterOrdersBySearchTerm(data: Channel[], searchTerm: string) {
   const compactTerm = normalizeCompactSearchValue(searchTerm);
   const codeTerm = normalizeCodeSearchValue(searchTerm);
 
-  return data.filter((item) => {
-    const fields = getOrderSearchFields(item);
-
-    return fields.some((field) => {
-      const normalizedField = normalizeSearchValue(field);
-
-      if (normalizedField.includes(normalizedTerm)) {
-        return true;
-      }
-
-      if (compactTerm && normalizeCompactSearchValue(field).includes(compactTerm)) {
-        return true;
-      }
-
-      if (codeTerm && normalizeCodeSearchValue(field).includes(codeTerm)) {
-        return true;
-      }
-
-      return false;
-    });
-  });
+  return data.filter((item) =>
+    getSearchIndex(item).some(
+      (field) =>
+        field.text.includes(normalizedTerm) ||
+        (compactTerm !== "" && field.compact.includes(compactTerm)) ||
+        (codeTerm !== "" && field.code.includes(codeTerm)),
+    ),
+  );
 }

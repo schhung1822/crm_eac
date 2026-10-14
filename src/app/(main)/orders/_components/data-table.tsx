@@ -16,10 +16,20 @@ import { exportData, filterDataByDateRange } from "@/lib/export-utils";
 
 // ⬇️ import thêm Stats + columns factory
 import { dashboardColumns as makeColumns, type Stats } from "./columns";
+import { OrdersRangeFilter } from "./range-filter";
+import type { OrderRangeKey } from "./range-options";
 import type { Channel } from "./schema";
 import { filterOrdersBySearchTerm } from "./search-utils";
 
-export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
+export function DataTable({
+  data: initialData = [],
+  range,
+  rowLimit,
+}: {
+  data?: Channel[];
+  range: OrderRangeKey;
+  rowLimit: number;
+}) {
   const [data, setData] = React.useState<Channel[]>(() => initialData);
   const [exportDialogOpen, setExportDialogOpen] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -38,7 +48,12 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
   const columns = React.useMemo(() => withDndColumn(makeColumns(stats)), [stats]);
   const [searchTerm, setSearchTerm] = React.useState("");
 
-  const filteredData = React.useMemo(() => filterOrdersBySearchTerm(data, searchTerm), [data, searchTerm]);
+  // Hoãn việc lọc để ô tìm kiếm luôn phản hồi ngay khi gõ, kể cả khi có hàng nghìn dòng.
+  const deferredSearchTerm = React.useDeferredValue(searchTerm);
+  const filteredData = React.useMemo(
+    () => filterOrdersBySearchTerm(data, deferredSearchTerm),
+    [data, deferredSearchTerm],
+  );
 
   const table = useDataTableInstance({
     data: filteredData,
@@ -49,7 +64,7 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
           `${row.order_ID}-${row.pro_ID}-${row.create_time instanceof Date ? row.create_time.toISOString() : row.create_time}-${index}`,
       ),
   });
-  const tableRenderKey = `${searchTerm}|${filteredData.length}`;
+  const tableRenderKey = `${deferredSearchTerm}|${filteredData.length}`;
 
   const handleExport = React.useCallback(
     (format: ExportFormat, dateRange: DateRange) => {
@@ -107,6 +122,14 @@ export function DataTable({ data: initialData = [] }: { data?: Channel[] }) {
 
   return (
     <div className="flex w-full flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <OrdersRangeFilter value={range} />
+        {initialData.length >= rowLimit ? (
+          <p className="text-muted-foreground text-xs">
+            Chỉ hiển thị {rowLimit.toLocaleString("vi-VN")} dòng mới nhất. Chọn khoảng thời gian ngắn hơn để xem đủ.
+          </p>
+        ) : null}
+      </div>
       <div className="flex items-center justify-between gap-4">
         <div className="relative max-w-sm flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
