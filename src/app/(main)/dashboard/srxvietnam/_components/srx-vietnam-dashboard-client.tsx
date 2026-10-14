@@ -1,8 +1,10 @@
 /* eslint-disable max-lines */
 "use client";
 
+import type { ReactNode } from "react";
+
 import { format, parseISO } from "date-fns";
-import { BadgePercent, ShoppingCart, UserPlus, Wallet } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -18,124 +20,31 @@ import {
   YAxis,
 } from "recharts";
 
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import type { SrxDashboardData, SrxDashboardGranularity } from "@/lib/srx-dashboard";
 import { cn } from "@/lib/utils";
 
 import { DateRangeFilter } from "./date-range-filter";
 
-type SrxVietnamDashboardClientProps = {
-  data: {
-    summary: {
-      totalRevenue: number;
-      totalOrders: number;
-      newCustomers: number;
-      averageOrderValue: number;
-      registeredOrderRate: number;
-      repeatCustomers: number;
-    };
-    operations: Array<{
-      label: string;
-      value: number;
-      hint: string;
-    }>;
-    performance: Array<{
-      date: string;
-      revenue: number;
-      orders: number;
-      customers: number;
-      applications: number;
-    }>;
-    orderStatus: Array<{
-      label: string;
-      count: number;
-      revenue: number;
-      fill: string;
-    }>;
-    customerMix: Array<{
-      label: string;
-      count: number;
-      revenue: number;
-      fill: string;
-    }>;
-    productCategories: Array<{
-      label: string;
-      count: number;
-      fill: string;
-    }>;
-    contentCategories: Array<{
-      label: string;
-      count: number;
-      fill: string;
-    }>;
-    affiliateStatus: Array<{
-      label: string;
-      count: number;
-      fill: string;
-    }>;
-    topProducts: Array<{
-      name: string;
-      soldCount: number;
-      price: number;
-      share: number;
-    }>;
-    latestOrders: Array<{
-      orderNumber: string;
-      customerName: string;
-      orderStatus: string;
-      paymentStatus: string;
-      total: number;
-      placedAt: string;
-    }>;
-    recentPosts: Array<{
-      title: string;
-      categoryName: string;
-      publishedAt: string;
-    }>;
-  };
-};
+type DashboardProps = { data: SrxDashboardData };
 
 const performanceChartConfig = {
-  revenue: {
-    label: "Doanh thu",
-    color: "var(--chart-1)",
-  },
-  orders: {
-    label: "Đơn hàng",
-    color: "var(--chart-2)",
-  },
+  revenue: { label: "Doanh thu", color: "#6366f1" },
+  orders: { label: "Đơn hàng", color: "#f59e0b" },
 } satisfies ChartConfig;
 
 const acquisitionChartConfig = {
-  customers: {
-    label: "Khách hàng mới",
-    color: "var(--chart-3)",
-  },
-  applications: {
-    label: "Hồ sơ affiliate",
-    color: "var(--chart-4)",
-  },
+  customers: { label: "Khách hàng mới", color: "#10b981" },
+  applications: { label: "Hồ sơ affiliate", color: "#0ea5e9" },
 } satisfies ChartConfig;
 
 const countChartConfig = {
-  count: {
-    label: "Số lượng",
-    color: "var(--chart-1)",
-  },
+  count: { label: "Số lượng", color: "#6366f1" },
 } satisfies ChartConfig;
 
-const mixChartConfig = {
-  count: {
-    label: "Đơn hàng",
-    color: "var(--chart-2)",
-  },
-} satisfies ChartConfig;
-
-function getChartLabel(config: ChartConfig, key: string) {
-  const entry = Object.entries(config).find(([configKey]) => configKey === key);
-  return entry ? (entry[1].label ?? key) : key;
-}
+const ROW_HEIGHT = 34;
 
 function formatCurrency(value: number) {
   return `${Math.round(value).toLocaleString("vi-VN")}đ`;
@@ -152,15 +61,27 @@ function formatCompactCurrency(value: number) {
 
   if (absoluteValue >= 1_000_000) {
     const scaled = numericValue / 1_000_000;
-    return `${scaled.toLocaleString("vi-VN", { maximumFractionDigits: scaled >= 10 ? 0 : 1 })} triệu`;
+    return `${scaled.toLocaleString("vi-VN", { maximumFractionDigits: scaled >= 10 ? 0 : 1 })} tr`;
   }
 
-  return `${numericValue.toLocaleString("vi-VN")}đ`;
+  if (absoluteValue >= 1_000) {
+    return `${Math.round(numericValue / 1_000).toLocaleString("vi-VN")}k`;
+  }
+
+  return numericValue.toLocaleString("vi-VN");
 }
 
-function formatShortDate(value: string) {
+function formatPeriod(value: string, granularity: SrxDashboardGranularity) {
   const parsed = parseISO(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? value : format(parsed, "dd/MM");
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return format(parsed, granularity === "month" ? "MM/yyyy" : "dd/MM");
+}
+
+function periodLabel(value: unknown, granularity: SrxDashboardGranularity) {
+  return `${granularity === "month" ? "Tháng" : "Ngày"} ${formatPeriod(String(value), granularity)}`;
 }
 
 function formatPercent(value: number) {
@@ -169,263 +90,320 @@ function formatPercent(value: number) {
 
 function getOrderStatusTone(status: string) {
   if (status.includes("Chờ")) {
-    return "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+    return "bg-amber-500/10 text-amber-700 dark:text-amber-300";
   }
 
-  if (status.includes("Hoàn tất") || status.includes("Đã xác nhận")) {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+  if (status.includes("Hoàn tất")) {
+    return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
   }
 
   if (status.includes("Hủy") || status.includes("Hoàn tiền")) {
-    return "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+    return "bg-rose-500/10 text-rose-700 dark:text-rose-300";
   }
 
-  return "border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300";
+  return "bg-sky-500/10 text-sky-700 dark:text-sky-300";
 }
 
-function getPaymentStatusLabel(status: string) {
-  if (status === "pending") {
-    return "Thanh toán chờ";
-  }
+const paymentStatusLabels: Record<string, string> = {
+  pending: "Chưa thanh toán",
+  paid: "Đã thanh toán",
+  refunded: "Đã hoàn tiền",
+  failed: "Thanh toán lỗi",
+};
 
-  if (status === "paid") {
-    return "Đã thanh toán";
-  }
-
-  if (status === "refunded") {
-    return "Đã hoàn tiền";
-  }
-
-  if (status === "failed") {
-    return "Thanh toán lỗi";
-  }
-
-  return status;
-}
-
-function EmptyCardState({ message }: { message: string }) {
+function EmptyState({ message }: { message: string }) {
   return (
-    <div className="text-muted-foreground flex h-full min-h-48 items-center justify-center rounded-xl border border-dashed text-sm">
+    <div className="text-muted-foreground flex min-h-40 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm">
       {message}
     </div>
   );
 }
 
-function KpiCards({ summary }: Pick<SrxVietnamDashboardClientProps["data"], "summary">) {
-  const cards = [
-    {
-      title: "Doanh thu",
-      value: formatCurrency(summary.totalRevenue),
-      description: "Doanh thu đơn hoàn tất và đã thanh toán trong phạm vi lọc",
-      icon: Wallet,
-    },
-    {
-      title: "Đơn hàng",
-      value: summary.totalOrders.toLocaleString("vi-VN"),
-      description: "Số đơn hoàn tất và đã thanh toán từ website SRX",
-      icon: ShoppingCart,
-    },
-    {
-      title: "Khách hàng mới",
-      value: summary.newCustomers.toLocaleString("vi-VN"),
-      description: "Tài khoản mới đăng ký trong kỳ",
-      icon: UserPlus,
-    },
-    {
-      title: "AOV",
-      value: formatCurrency(summary.averageOrderValue),
-      description: "Giá trị trung bình mỗi đơn hoàn tất và đã thanh toán",
-      icon: BadgePercent,
-    },
+function findSeries(config: ChartConfig, name: string) {
+  return Object.entries(config).find(([key]) => key === name)?.[1];
+}
+
+function Dot({ color }: { color: string }) {
+  return <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />;
+}
+
+function TooltipRow({ color, label, value }: { color?: string; label: string; value: string }) {
+  return (
+    <div className="flex w-full items-center justify-between gap-4">
+      <span className="text-muted-foreground flex items-center gap-2">
+        {color ? <Dot color={color} /> : null}
+        {label}
+      </span>
+      <span className="font-medium tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function ChartLegend({ items }: { items: Array<{ label: string; color: string; hint?: string }> }) {
+  return (
+    <div className="text-muted-foreground mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+      {items.map((item) => (
+        <span key={item.label} className="flex items-center gap-1.5">
+          <Dot color={item.color} />
+          {item.label}
+          {item.hint ? <span className="opacity-60">({item.hint})</span> : null}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function KpiCards({ summary }: Pick<DashboardProps["data"], "summary">) {
+  const items = [
+    { label: "Doanh thu", value: formatCurrency(summary.totalRevenue) },
+    { label: "Đơn hàng", value: summary.totalOrders.toLocaleString("vi-VN") },
+    { label: "Giá trị TB / đơn", value: formatCurrency(summary.averageOrderValue) },
+    { label: "Khách hàng mới", value: summary.newCustomers.toLocaleString("vi-VN") },
+    { label: "Đơn của thành viên", value: formatPercent(summary.registeredOrderRate) },
+    { label: "Khách mua lại", value: summary.repeatCustomers.toLocaleString("vi-VN") },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card) => (
-        <Card key={card.title} className="overflow-hidden">
-          <CardHeader className="gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-2xl">
-                <card.icon className="size-5" />
-              </div>
-              <Badge variant="outline">{card.title}</Badge>
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="text-2xl font-semibold tracking-tight">{card.value}</CardTitle>
-              <CardDescription>{card.description}</CardDescription>
-            </div>
-          </CardHeader>
-        </Card>
-      ))}
-    </div>
+    <Card className="py-0">
+      <div className="bg-border grid grid-cols-2 gap-px overflow-hidden rounded-xl lg:grid-cols-3 xl:grid-cols-6">
+        {items.map((item) => (
+          <div key={item.label} className="bg-card space-y-1 px-5 py-4">
+            <div className="text-muted-foreground text-xs">{item.label}</div>
+            <div className="truncate text-xl font-semibold tracking-tight tabular-nums">{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
-function OperationalMetrics({
-  operations,
-  summary,
-}: Pick<SrxVietnamDashboardClientProps["data"], "operations" | "summary">) {
+function OperationsStrip({ operations }: Pick<DashboardProps["data"], "operations">) {
+  if (operations.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-      <Card className="border-dashed">
-        <CardHeader className="gap-2">
-          <CardDescription>Tỷ lệ đơn từ tài khoản đã đăng nhập</CardDescription>
-          <CardTitle className="text-xl">{formatPercent(summary.registeredOrderRate)}</CardTitle>
-          <p className="text-muted-foreground text-sm">
-            Tính trên đơn hoàn tất và đã thanh toán, đo mức chuyển đổi từ khách lẻ sang khách có tài khoản.
-          </p>
-        </CardHeader>
-      </Card>
-      <Card className="border-dashed">
-        <CardHeader className="gap-2">
-          <CardDescription>Khách hàng thân thiết</CardDescription>
-          <CardTitle className="text-xl">{summary.repeatCustomers.toLocaleString("vi-VN")}</CardTitle>
-          <p className="text-muted-foreground text-sm">Số khách có trên 1 đơn hoàn tất và đã thanh toán.</p>
-        </CardHeader>
-      </Card>
-      {operations.map((metric) => (
-        <Card key={metric.label} className="border-dashed">
-          <CardHeader className="gap-2">
-            <CardDescription>{metric.label}</CardDescription>
-            <CardTitle className="text-xl">{metric.value.toLocaleString("vi-VN")}</CardTitle>
-            <p className="text-muted-foreground text-sm">{metric.hint}</p>
-          </CardHeader>
-        </Card>
-      ))}
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-medium">Vận hành hiện tại</h2>
+        <span className="text-muted-foreground text-xs">Tại thời điểm xem, không theo bộ lọc ngày</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+        {operations.map((metric) => {
+          const needsAttention = metric.label.includes("chờ") && metric.value > 0;
+
+          return (
+            <div
+              key={metric.label}
+              title={metric.hint}
+              className={cn("rounded-lg border px-3 py-2.5", needsAttention && "border-amber-500/40 bg-amber-500/5")}
+            >
+              <div className="text-muted-foreground truncate text-xs">{metric.label}</div>
+              <div className="text-lg font-semibold tabular-nums">{metric.value.toLocaleString("vi-VN")}</div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function PerformanceCard({ performance }: Pick<SrxVietnamDashboardClientProps["data"], "performance">) {
+function PerformanceCard({
+  performance,
+  granularity,
+}: Pick<DashboardProps["data"], "performance"> & { granularity: SrxDashboardGranularity }) {
+  const showDots = performance.length <= 31;
+
   return (
     <Card className="xl:col-span-2">
       <CardHeader>
-        <CardTitle>Nhịp doanh thu và đơn hàng</CardTitle>
+        <CardTitle>Doanh thu và đơn hàng</CardTitle>
         <CardDescription>
-          Xu hướng doanh thu và số đơn theo ngày, chỉ tính đơn hoàn tất và đã thanh toán.
+          Theo {granularity === "month" ? "tháng" : "ngày"}, chỉ tính đơn hoàn tất và đã thanh toán.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {performance.length === 0 ? (
-          <EmptyCardState message="Chưa có dữ liệu đơn hàng trong khoảng thời gian đã chọn." />
+          <EmptyState message="Chưa có đơn hàng trong khoảng thời gian đã chọn." />
         ) : (
-          <ChartContainer config={performanceChartConfig} className="h-[320px] w-full">
-            <ComposedChart data={performance} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={32} tickFormatter={formatShortDate} />
+          <ChartContainer config={performanceChartConfig} className="h-[280px] w-full">
+            <ComposedChart data={performance} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                minTickGap={24}
+                tickFormatter={(value) => formatPeriod(String(value), granularity)}
+              />
               <YAxis
                 yAxisId="left"
                 tickLine={false}
                 axisLine={false}
-                width={88}
+                width={52}
                 tickFormatter={(value) => formatCompactCurrency(Number(value))}
               />
-              <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} allowDecimals={false} />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+                width={28}
+              />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(value) => `Ngày ${formatShortDate(String(value))}`}
+                    hideIndicator
+                    labelFormatter={(value) => periodLabel(value, granularity)}
                     formatter={(value, name) => {
+                      const config = findSeries(performanceChartConfig, String(name));
                       const numericValue = Number(value);
-                      const label = getChartLabel(performanceChartConfig, String(name));
 
                       return (
-                        <div className="flex w-full items-center justify-between gap-4">
-                          <span className="text-muted-foreground">{label}</span>
-                          <span className="font-medium">
-                            {name === "revenue" ? formatCurrency(numericValue) : numericValue.toLocaleString("vi-VN")}
-                          </span>
-                        </div>
+                        <TooltipRow
+                          color={config?.color}
+                          label={String(config?.label ?? name)}
+                          value={
+                            name === "revenue" ? formatCurrency(numericValue) : numericValue.toLocaleString("vi-VN")
+                          }
+                        />
                       );
                     }}
                   />
                 }
               />
-              <Bar yAxisId="left" dataKey="revenue" fill="var(--color-revenue)" radius={[10, 10, 0, 0]} />
+              <Bar yAxisId="left" dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} maxBarSize={36} />
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="orders"
                 stroke="var(--color-orders)"
-                strokeWidth={3}
-                dot={{ r: 4, fill: "var(--color-orders)" }}
-                activeDot={{ r: 6 }}
+                strokeWidth={2}
+                dot={showDots ? { r: 3, fill: "var(--color-orders)" } : false}
+                activeDot={{ r: 5 }}
               />
             </ComposedChart>
           </ChartContainer>
         )}
+        <ChartLegend
+          items={[
+            { label: performanceChartConfig.revenue.label, color: performanceChartConfig.revenue.color, hint: "cột" },
+            { label: performanceChartConfig.orders.label, color: performanceChartConfig.orders.color, hint: "đường" },
+          ]}
+        />
       </CardContent>
     </Card>
   );
 }
 
-function OrderStatusCard({ orderStatus }: Pick<SrxVietnamDashboardClientProps["data"], "orderStatus">) {
+function DonutChart({
+  data,
+  centerLabel,
+  tooltipValueLabel,
+  valueLabel,
+}: {
+  data: Array<{ label: string; count: number; revenue: number; fill: string }>;
+  centerLabel: string;
+  tooltipValueLabel: string;
+  valueLabel: string;
+}) {
+  const total = data.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <ChartContainer config={countChartConfig} className="mx-auto h-[190px] w-full">
+      <PieChart>
+        <ChartTooltip
+          cursor={false}
+          content={
+            <ChartTooltipContent
+              hideLabel
+              hideIndicator
+              formatter={(value, _name, item) => {
+                const row = item.payload as { label: string; revenue: number; fill: string };
+
+                return (
+                  <div className="w-full space-y-1">
+                    <div className="flex items-center gap-2 font-medium">
+                      <Dot color={row.fill} />
+                      {row.label}
+                    </div>
+                    <TooltipRow label={tooltipValueLabel} value={Number(value).toLocaleString("vi-VN")} />
+                    <TooltipRow label={valueLabel} value={formatCurrency(row.revenue)} />
+                  </div>
+                );
+              }}
+            />
+          }
+        />
+        <Pie
+          data={data}
+          dataKey="count"
+          nameKey="label"
+          innerRadius={56}
+          outerRadius={84}
+          paddingAngle={2}
+          strokeWidth={0}
+        >
+          {data.map((item) => (
+            <Cell key={item.label} fill={item.fill} />
+          ))}
+          <Label
+            content={({ viewBox }) => {
+              if (!viewBox || !("cx" in viewBox) || !("cy" in viewBox)) {
+                return null;
+              }
+
+              const centerX = typeof viewBox.cx === "number" ? viewBox.cx : 0;
+              const centerY = typeof viewBox.cy === "number" ? viewBox.cy : 0;
+
+              return (
+                <text x={centerX} y={centerY} textAnchor="middle" dominantBaseline="middle">
+                  <tspan x={centerX} y={centerY - 4} className="fill-foreground text-xl font-semibold">
+                    {total.toLocaleString("vi-VN")}
+                  </tspan>
+                  <tspan x={centerX} y={centerY + 14} className="fill-muted-foreground text-xs">
+                    {centerLabel}
+                  </tspan>
+                </text>
+              );
+            }}
+          />
+        </Pie>
+      </PieChart>
+    </ChartContainer>
+  );
+}
+
+function OrderStatusCard({ orderStatus }: Pick<DashboardProps["data"], "orderStatus">) {
+  const totalOrders = orderStatus.reduce((sum, item) => sum + item.count, 0);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Trạng thái đơn hàng</CardTitle>
-        <CardDescription>Nhóm backlog trên toàn bộ đơn để ưu tiên xử lý vận hành.</CardDescription>
+        <CardDescription>Mọi đơn đặt trong kỳ, kể cả chưa hoàn tất.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {orderStatus.length === 0 ? (
-          <EmptyCardState message="Chưa có dữ liệu trạng thái đơn hàng." />
+          <EmptyState message="Chưa có đơn hàng trong khoảng thời gian đã chọn." />
         ) : (
           <>
-            <ChartContainer config={countChartConfig} className="h-[320px] w-full">
-              <BarChart
-                data={orderStatus}
-                layout="vertical"
-                margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
-                barCategoryGap={18}
-              >
-                <CartesianGrid horizontal={false} />
-                <YAxis
-                  dataKey="label"
-                  type="category"
-                  tickLine={false}
-                  axisLine={false}
-                  width={108}
-                  tick={{ fontSize: 11 }}
-                />
-                <XAxis type="number" hide />
-                <ChartTooltip
-                  cursor={false}
-                  content={
-                    <ChartTooltipContent
-                      hideLabel
-                      formatter={(value, _name, item) => {
-                        const row = item.payload as { label: string; revenue: number };
-
-                        return (
-                          <div className="space-y-1">
-                            <div className="font-medium">{row.label}</div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Số đơn</span>
-                              <span>{Number(value).toLocaleString("vi-VN")}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Doanh thu</span>
-                              <span>{formatCurrency(row.revenue)}</span>
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-                  }
-                />
-                <Bar dataKey="count" radius={8}>
-                  {orderStatus.map((item) => (
-                    <Cell key={item.label} fill={item.fill} />
-                  ))}
-                  <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-            <div className="grid gap-2">
+            <DonutChart data={orderStatus} centerLabel="đơn" tooltipValueLabel="Số đơn" valueLabel="Giá trị đơn" />
+            <div className="divide-y text-sm">
               {orderStatus.map((item) => (
-                <div key={item.label} className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
-                  <span className="font-medium">{item.label}</span>
-                  <span className="text-muted-foreground">{formatCurrency(item.revenue)}</span>
+                <div key={item.label} className="flex items-center justify-between gap-3 py-2">
+                  <span className="flex items-center gap-2">
+                    <Dot color={item.fill} />
+                    {item.label}
+                    <span className="text-muted-foreground text-xs">
+                      {formatPercent(totalOrders > 0 ? (item.count / totalOrders) * 100 : 0)}
+                    </span>
+                  </span>
+                  <span className="text-right tabular-nums">
+                    <span className="font-medium">{item.count.toLocaleString("vi-VN")}</span>
+                    <span className="text-muted-foreground ml-2 text-xs">{formatCurrency(item.revenue)}</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -436,142 +414,114 @@ function OrderStatusCard({ orderStatus }: Pick<SrxVietnamDashboardClientProps["d
   );
 }
 
-function AcquisitionCard({ performance }: Pick<SrxVietnamDashboardClientProps["data"], "performance">) {
+function AcquisitionCard({
+  performance,
+  granularity,
+}: Pick<DashboardProps["data"], "performance"> & { granularity: SrxDashboardGranularity }) {
+  const showDots = performance.length <= 31;
+
   return (
     <Card className="xl:col-span-2">
       <CardHeader>
-        <CardTitle>Tăng trưởng khách hàng và affiliate</CardTitle>
-        <CardDescription>So sánh user mới với số hồ sơ affiliate phát sinh theo ngày.</CardDescription>
+        <CardTitle>Khách hàng mới và hồ sơ affiliate</CardTitle>
+        <CardDescription>
+          Tài khoản đăng ký và hồ sơ cộng tác viên phát sinh theo {granularity === "month" ? "tháng" : "ngày"}.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {performance.length === 0 ? (
-          <EmptyCardState message="Chưa có dữ liệu tăng trưởng để hiển thị." />
+          <EmptyState message="Chưa có dữ liệu tăng trưởng để hiển thị." />
         ) : (
-          <ChartContainer config={acquisitionChartConfig} className="h-[300px] w-full">
-            <ComposedChart data={performance} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={32} tickFormatter={formatShortDate} />
-              <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+          <ChartContainer config={acquisitionChartConfig} className="h-[240px] w-full">
+            <ComposedChart data={performance} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                minTickGap={24}
+                tickFormatter={(value) => formatPeriod(String(value), granularity)}
+              />
+              <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={28} />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(value) => `Ngày ${formatShortDate(String(value))}`}
+                    hideIndicator
+                    labelFormatter={(value) => periodLabel(value, granularity)}
                     formatter={(value, name) => {
-                      const label = getChartLabel(acquisitionChartConfig, String(name));
+                      const config = findSeries(acquisitionChartConfig, String(name));
+
                       return (
-                        <div className="flex w-full items-center justify-between gap-4">
-                          <span className="text-muted-foreground">{label}</span>
-                          <span className="font-medium">{Number(value).toLocaleString("vi-VN")}</span>
-                        </div>
+                        <TooltipRow
+                          color={config?.color}
+                          label={String(config?.label ?? name)}
+                          value={Number(value).toLocaleString("vi-VN")}
+                        />
                       );
                     }}
                   />
                 }
               />
-              <Bar dataKey="applications" fill="var(--color-applications)" radius={[10, 10, 0, 0]} />
+              <Bar dataKey="applications" fill="var(--color-applications)" radius={[4, 4, 0, 0]} maxBarSize={36} />
               <Line
                 type="monotone"
                 dataKey="customers"
                 stroke="var(--color-customers)"
-                strokeWidth={3}
-                dot={{ r: 4, fill: "var(--color-customers)" }}
-                activeDot={{ r: 6 }}
+                strokeWidth={2}
+                dot={showDots ? { r: 3, fill: "var(--color-customers)" } : false}
+                activeDot={{ r: 5 }}
               />
             </ComposedChart>
           </ChartContainer>
         )}
+        <ChartLegend
+          items={[
+            {
+              label: acquisitionChartConfig.customers.label,
+              color: acquisitionChartConfig.customers.color,
+              hint: "đường",
+            },
+            {
+              label: acquisitionChartConfig.applications.label,
+              color: acquisitionChartConfig.applications.color,
+              hint: "cột",
+            },
+          ]}
+        />
       </CardContent>
     </Card>
   );
 }
 
-function CustomerMixCard({ customerMix }: Pick<SrxVietnamDashboardClientProps["data"], "customerMix">) {
+function CustomerMixCard({ customerMix }: Pick<DashboardProps["data"], "customerMix">) {
   const totalOrders = customerMix.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Cơ cấu khách mua</CardTitle>
-        <CardDescription>
-          Phân biệt khách lẻ và khách có tài khoản trên các đơn hoàn tất và đã thanh toán.
-        </CardDescription>
+        <CardDescription>Khách lẻ và thành viên, trên đơn hoàn tất đã thanh toán.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {customerMix.length === 0 ? (
-          <EmptyCardState message="Chưa có dữ liệu cơ cấu khách mua." />
+          <EmptyState message="Chưa có dữ liệu cơ cấu khách mua." />
         ) : (
           <>
-            <ChartContainer config={mixChartConfig} className="h-[260px] w-full">
-              <PieChart>
-                <ChartTooltip
-                  cursor={false}
-                  content={
-                    <ChartTooltipContent
-                      hideLabel
-                      formatter={(value, _name, item) => {
-                        const row = item.payload as { label: string; revenue: number };
-                        return (
-                          <div className="space-y-1">
-                            <div className="font-medium">{row.label}</div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Đơn hàng</span>
-                              <span>{Number(value).toLocaleString("vi-VN")}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Doanh thu</span>
-                              <span>{formatCurrency(row.revenue)}</span>
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-                  }
-                />
-                <Pie
-                  data={customerMix}
-                  dataKey="count"
-                  nameKey="label"
-                  innerRadius={62}
-                  outerRadius={96}
-                  paddingAngle={3}
-                >
-                  {customerMix.map((item) => (
-                    <Cell key={item.label} fill={item.fill} />
-                  ))}
-                  <Label
-                    content={({ viewBox }) => {
-                      if (!viewBox || !("cx" in viewBox) || !("cy" in viewBox)) {
-                        return null;
-                      }
-
-                      const centerY = typeof viewBox.cy === "number" ? viewBox.cy : 0;
-
-                      return (
-                        <text x={viewBox.cx} y={centerY} textAnchor="middle" dominantBaseline="middle">
-                          <tspan x={viewBox.cx} y={centerY} className="fill-foreground text-2xl font-semibold">
-                            {totalOrders.toLocaleString("vi-VN")}
-                          </tspan>
-                          <tspan x={viewBox.cx} y={centerY + 20} className="fill-muted-foreground text-xs">
-                            tổng đơn
-                          </tspan>
-                        </text>
-                      );
-                    }}
-                  />
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-            <div className="space-y-2">
+            <DonutChart data={customerMix} centerLabel="đơn" tooltipValueLabel="Đơn hàng" valueLabel="Doanh thu" />
+            <div className="divide-y text-sm">
               {customerMix.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="size-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                    <span className="font-medium">{item.label}</span>
-                  </div>
-                  <div className="text-right text-sm">
-                    <div>{item.count.toLocaleString("vi-VN")} đơn</div>
-                    <div className="text-muted-foreground">{formatCurrency(item.revenue)}</div>
-                  </div>
+                <div key={item.label} className="flex items-center justify-between gap-3 py-2">
+                  <span className="flex items-center gap-2">
+                    <Dot color={item.fill} />
+                    {item.label}
+                    <span className="text-muted-foreground text-xs">
+                      {formatPercent(totalOrders > 0 ? (item.count / totalOrders) * 100 : 0)}
+                    </span>
+                  </span>
+                  <span className="text-right tabular-nums">
+                    <span className="font-medium">{item.count.toLocaleString("vi-VN")}</span>
+                    <span className="text-muted-foreground ml-2 text-xs">{formatCurrency(item.revenue)}</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -585,12 +535,17 @@ function CustomerMixCard({ customerMix }: Pick<SrxVietnamDashboardClientProps["d
 function CategoryCard({
   title,
   description,
+  emptyMessage,
   data,
 }: {
   title: string;
   description: string;
+  emptyMessage: string;
   data: Array<{ label: string; count: number; fill: string }>;
 }) {
+  // Chiều cao theo số dòng để nhãn không bị chồng hoặc cắt khi có nhiều danh mục.
+  const height = Math.max(120, data.length * ROW_HEIGHT + 16);
+
   return (
     <Card>
       <CardHeader>
@@ -599,26 +554,31 @@ function CategoryCard({
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <EmptyCardState message="Không có đủ dữ liệu để dựng biểu đồ." />
+          <EmptyState message={emptyMessage} />
         ) : (
-          <ChartContainer config={countChartConfig} className="h-[300px] w-full">
-            <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 4 }}>
-              <CartesianGrid horizontal={false} />
+          <ChartContainer config={countChartConfig} className="w-full" style={{ height }}>
+            <BarChart
+              data={data}
+              layout="vertical"
+              margin={{ top: 0, right: 32, left: 0, bottom: 0 }}
+              barCategoryGap={8}
+            >
               <YAxis
                 dataKey="label"
                 type="category"
                 tickLine={false}
                 axisLine={false}
-                width={108}
-                tick={{ fontSize: 11 }}
+                width={120}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value: string) => (value.length > 18 ? `${value.slice(0, 17)}…` : value)}
               />
               <XAxis type="number" hide />
-              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-              <Bar dataKey="count" radius={8}>
+              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel hideIndicator nameKey="label" />} />
+              <Bar dataKey="count" radius={4} maxBarSize={18}>
                 {data.map((item) => (
                   <Cell key={item.label} fill={item.fill} />
                 ))}
-                <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
+                <LabelList dataKey="count" position="right" style={{ fontSize: 12 }} className="fill-foreground" />
               </Bar>
             </BarChart>
           </ChartContainer>
@@ -628,191 +588,173 @@ function CategoryCard({
   );
 }
 
-function AffiliateStatusCard({ affiliateStatus }: Pick<SrxVietnamDashboardClientProps["data"], "affiliateStatus">) {
+function ListRow({ children }: { children: ReactNode }) {
+  return <div className="py-3 first:pt-0 last:pb-0">{children}</div>;
+}
+
+function TopProductsCard({ topProducts }: Pick<DashboardProps["data"], "topProducts">) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Trạng thái hồ sơ affiliate</CardTitle>
-        <CardDescription>Theo dõi pipeline duyệt cộng tác viên từ website.</CardDescription>
+        <CardTitle>Sản phẩm bán chạy</CardTitle>
+        <CardDescription>Top 5 theo số lượng đã bán, toàn bộ thời gian.</CardDescription>
       </CardHeader>
       <CardContent>
-        {affiliateStatus.length === 0 ? (
-          <EmptyCardState message="Chưa có hồ sơ affiliate trong khoảng thời gian đã chọn." />
-        ) : (
-          <ChartContainer config={countChartConfig} className="h-[300px] w-full">
-            <BarChart data={affiliateStatus} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} />
-              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-              <Bar dataKey="count" radius={[10, 10, 0, 0]}>
-                {affiliateStatus.map((item) => (
-                  <Cell key={item.label} fill={item.fill} />
-                ))}
-                <LabelList dataKey="count" position="top" style={{ fontSize: 11 }} />
-              </Bar>
-            </BarChart>
-          </ChartContainer>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function TopProductsCard({ topProducts }: Pick<SrxVietnamDashboardClientProps["data"], "topProducts">) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Top sản phẩm bán tốt</CardTitle>
-        <CardDescription>Lấy theo `sold_count` của catalog SRX để nhìn nhanh nhóm SKU chủ lực.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
         {topProducts.length === 0 ? (
-          <EmptyCardState message="Chưa có dữ liệu sản phẩm." />
+          <EmptyState message="Chưa có dữ liệu sản phẩm." />
         ) : (
-          topProducts.map((product, index) => (
-            <div key={product.name} className="rounded-2xl border p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <div className="text-muted-foreground text-xs font-medium">#{index + 1}</div>
-                  <div className="line-clamp-2 text-sm font-medium">{product.name}</div>
+          <div className="divide-y">
+            {topProducts.map((product, index) => (
+              <ListRow key={product.name}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 gap-2.5">
+                    <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">{index + 1}</span>
+                    <span className="line-clamp-2 text-sm">{product.name}</span>
+                  </div>
+                  <div className="shrink-0 text-right text-sm tabular-nums">
+                    <div className="font-medium">{product.soldCount.toLocaleString("vi-VN")}</div>
+                    <div className="text-muted-foreground text-xs">{formatCurrency(product.price)}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold">{product.soldCount.toLocaleString("vi-VN")}</div>
-                  <div className="text-muted-foreground text-xs">đã bán</div>
-                </div>
-              </div>
-              <div className="mt-3 space-y-2">
-                <div className="bg-muted h-2 overflow-hidden rounded-full">
+                <div className="bg-muted mt-2 ml-6 h-1 overflow-hidden rounded-full">
                   <div
                     className="bg-primary h-full rounded-full"
                     style={{ width: `${Math.min(product.share, 100)}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{formatPercent(product.share)} trong top 5</span>
-                  <span>{formatCurrency(product.price)}</span>
-                </div>
-              </div>
-            </div>
-          ))
+              </ListRow>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function LatestOrdersCard({ latestOrders }: Pick<SrxVietnamDashboardClientProps["data"], "latestOrders">) {
+function LatestOrdersCard({ latestOrders }: Pick<DashboardProps["data"], "latestOrders">) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Đơn hàng mới nhất</CardTitle>
-        <CardDescription>Giúp đội vận hành bám sát các đơn vừa phát sinh từ website.</CardDescription>
+        <CardDescription>5 đơn gần nhất trong kỳ, mọi trạng thái.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent>
         {latestOrders.length === 0 ? (
-          <EmptyCardState message="Chưa có đơn hàng trong khoảng thời gian đã chọn." />
+          <EmptyState message="Chưa có đơn hàng trong khoảng thời gian đã chọn." />
         ) : (
-          latestOrders.map((order) => (
-            <div key={order.orderNumber} className="rounded-2xl border p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="font-medium">{order.orderNumber}</div>
-                  <div className="text-muted-foreground text-sm">{order.customerName}</div>
+          <div className="divide-y">
+            {latestOrders.map((order) => (
+              <ListRow key={order.orderNumber}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{order.orderNumber}</div>
+                    <div className="text-muted-foreground truncate text-xs">{order.customerName}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-sm font-medium tabular-nums">{formatCurrency(order.total)}</div>
+                    <div className="text-muted-foreground text-xs">{order.placedAt}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold">{formatCurrency(order.total)}</div>
-                  <div className="text-muted-foreground text-xs">{order.placedAt}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                  <span className={cn("rounded-full px-2 py-0.5 font-medium", getOrderStatusTone(order.orderStatus))}>
+                    {order.orderStatus}
+                  </span>
+                  <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5">
+                    {paymentStatusLabels[order.paymentStatus] ?? order.paymentStatus}
+                  </span>
                 </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span
-                  className={cn(
-                    "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-                    getOrderStatusTone(order.orderStatus),
-                  )}
-                >
-                  {order.orderStatus}
-                </span>
-                <span className="bg-muted text-muted-foreground inline-flex rounded-full px-2.5 py-1 text-xs font-medium">
-                  {getPaymentStatusLabel(order.paymentStatus)}
-                </span>
-              </div>
-            </div>
-          ))
+              </ListRow>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function RecentPostsCard({ recentPosts }: Pick<SrxVietnamDashboardClientProps["data"], "recentPosts">) {
+function RecentPostsCard({ recentPosts }: Pick<DashboardProps["data"], "recentPosts">) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Bài viết mới nhất</CardTitle>
-        <CardDescription>Kiểm tra nhịp xuất bản và cơ cấu nội dung của website SRX.</CardDescription>
+        <CardDescription>5 bài xuất bản gần nhất trong kỳ.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent>
         {recentPosts.length === 0 ? (
-          <EmptyCardState message="Chưa có bài viết trong khoảng thời gian đã chọn." />
+          <EmptyState message="Chưa có bài viết trong khoảng thời gian đã chọn." />
         ) : (
-          recentPosts.map((post) => (
-            <div key={`${post.title}-${post.publishedAt}`} className="rounded-2xl border p-4">
-              <div className="line-clamp-2 text-sm font-medium">{post.title}</div>
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                <span className="bg-primary/10 text-primary inline-flex rounded-full px-2.5 py-1 font-medium">
-                  {post.categoryName}
-                </span>
-                <span className="text-muted-foreground">{post.publishedAt}</span>
-              </div>
-            </div>
-          ))
+          <div className="divide-y">
+            {recentPosts.map((post) => (
+              <ListRow key={`${post.title}-${post.publishedAt}`}>
+                <div className="line-clamp-2 text-sm">{post.title}</div>
+                <div className="text-muted-foreground mt-1.5 flex items-center justify-between gap-3 text-xs">
+                  <span className="bg-muted rounded-full px-2 py-0.5">{post.categoryName}</span>
+                  <span>{post.publishedAt}</span>
+                </div>
+              </ListRow>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-export default function SrxVietnamDashboardClient({ data }: SrxVietnamDashboardClientProps) {
+export default function SrxVietnamDashboardClient({ data }: DashboardProps) {
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <CardHeader className="gap-4 lg:flex lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-semibold tracking-tight">
-              Báo cáo vận hành website SRX Việt Nam
-            </CardTitle>
-          </div>
+    <div className="flex flex-col gap-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Báo cáo website SRX Việt Nam</h1>
+          <p className="text-muted-foreground text-sm">
+            Doanh thu và đơn hàng chỉ tính đơn đã hoàn tất và đã thanh toán.
+          </p>
         </div>
-        <div className="rounded-2xl bg-white/5 p-1">
-          <DateRangeFilter />
-        </div>
-      </CardHeader>
+        <DateRangeFilter />
+      </header>
+
+      {data.unavailable ? (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>Không đọc được dữ liệu website SRX</AlertTitle>
+          <AlertDescription>
+            Cơ sở dữ liệu SRX đang thiếu bảng hoặc cột cần thiết, nên các số 0 bên dưới chưa phản ánh thực tế. Hãy kiểm
+            tra lại cấu trúc cơ sở dữ liệu.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <KpiCards summary={data.summary} />
-      <OperationalMetrics operations={data.operations} summary={data.summary} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <PerformanceCard performance={data.performance} />
+        <PerformanceCard performance={data.performance} granularity={data.performanceGranularity} />
         <OrderStatusCard orderStatus={data.orderStatus} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-        <AcquisitionCard performance={data.performance} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <AcquisitionCard performance={data.performance} granularity={data.performanceGranularity} />
         <CustomerMixCard customerMix={data.customerMix} />
-        <AffiliateStatusCard affiliateStatus={data.affiliateStatus} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <OperationsStrip operations={data.operations} />
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <CategoryCard
-          title="Cơ cấu danh mục sản phẩm"
-          description="Cho biết catalog active đang tập trung ở nhóm điều trị nào."
+          title="Hồ sơ affiliate"
+          description="Theo trạng thái duyệt, trong kỳ."
+          emptyMessage="Chưa có hồ sơ affiliate trong khoảng thời gian đã chọn."
+          data={data.affiliateStatus}
+        />
+        <CategoryCard
+          title="Sản phẩm theo danh mục"
+          description="Sản phẩm đang bán, toàn bộ thời gian."
+          emptyMessage="Chưa có sản phẩm đang bán."
           data={data.productCategories}
         />
         <CategoryCard
-          title="Cơ cấu danh mục bài viết"
-          description="Theo dõi trọng tâm nội dung đang xuất bản trên website."
+          title="Bài viết theo danh mục"
+          description="Bài đã xuất bản, trong kỳ."
+          emptyMessage="Chưa có bài viết trong khoảng thời gian đã chọn."
           data={data.contentCategories}
         />
       </div>

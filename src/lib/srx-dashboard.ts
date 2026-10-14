@@ -75,7 +75,12 @@ export type SrxDashboardPostSnapshot = {
   publishedAt: string;
 };
 
+export type SrxDashboardGranularity = "day" | "month";
+
 export type SrxDashboardData = {
+  /** true khi không đọc được CSDL SRX (mất kết nối hoặc thiếu bảng) và đang hiển thị dữ liệu rỗng. */
+  unavailable: boolean;
+  performanceGranularity: SrxDashboardGranularity;
   summary: SrxDashboardSummary;
   operations: SrxDashboardOperationalMetric[];
   performance: SrxDashboardPerformancePoint[];
@@ -157,7 +162,32 @@ type PostSnapshotRow = RowDataPacket & {
   published_at_label: string | null;
 };
 
-const chartPalette = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+// Bảng màu mặc định của theme là thang xám nên các biểu đồ trạng thái dùng màu cố định theo ngữ nghĩa.
+const chartPalette = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6"];
+
+const orderStatusColors: Record<string, string> = {
+  pending: "#f59e0b",
+  confirmed: "#0ea5e9",
+  processing: "#6366f1",
+  shipping: "#8b5cf6",
+  completed: "#10b981",
+  cancelled: "#f43f5e",
+  refunded: "#94a3b8",
+};
+
+const affiliateStatusColors: Record<string, string> = {
+  pending: "#f59e0b",
+  approved: "#10b981",
+  rejected: "#f43f5e",
+};
+
+const customerMixColors: Record<string, string> = {
+  "Thành viên": "#6366f1",
+  "Khách lẻ": "#94a3b8",
+};
+
+// Sau mốc này biểu đồ theo ngày quá dày nên gộp theo tháng.
+const MAX_DAILY_POINTS = 92;
 
 const orderStatusLabels: Record<string, string> = {
   pending: "Chờ xử lý",
@@ -222,8 +252,21 @@ function withColors<T extends { label: string }>(items: T[]): Array<T & { fill: 
   }));
 }
 
+function withFixedColors<T extends { label: string }>(
+  items: T[],
+  keys: string[],
+  colors: Record<string, string>,
+): Array<T & { fill: string }> {
+  return items.map((item, index) => ({
+    ...item,
+    fill: new Map(Object.entries(colors)).get(keys.at(index) ?? "") ?? chartPalette[index % chartPalette.length],
+  }));
+}
+
 function createEmptyDashboardData(): SrxDashboardData {
   return {
+    unavailable: true,
+    performanceGranularity: "day",
     summary: {
       totalRevenue: 0,
       totalOrders: 0,
@@ -304,6 +347,70 @@ function mergePerformanceSeries(
   return [...map.values()].sort((left, right) => left.date.localeCompare(right.date));
 }
 
+function parseDay(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, (month || 1) - 1, day || 1));
+}
+
+function formatDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function emptyPoint(date: string): SrxDashboardPerformancePoint {
+  return { date, revenue: 0, orders: 0, customers: 0, applications: 0 };
+}
+
+/**
+ * Chuẩn hoá chuỗi thời gian: điền các ngày không phát sinh dữ liệu bằng 0 để biểu đồ không nối sai xu hướng,
+ * và gộp theo tháng khi khoảng thời gian quá dài.
+ */
+function normalizePerformanceSeries(points: SrxDashboardPerformancePoint[]): {
+  series: SrxDashboardPerformancePoint[];
+  granularity: SrxDashboardGranularity;
+} {
+  if (points.length === 0) {
+    return { series: [], granularity: "day" };
+  }
+
+  const first = parseDay(points[0].date);
+  const last = parseDay(points[points.length - 1].date);
+  const spanDays = Math.round((last.getTime() - first.getTime()) / 86_400_000) + 1;
+
+  if (spanDays > MAX_DAILY_POINTS) {
+    const months = new Map<string, SrxDashboardPerformancePoint>();
+
+    for (const point of points) {
+      const key = `${point.date.slice(0, 7)}-01`;
+      const bucket = months.get(key) ?? emptyPoint(key);
+      bucket.revenue += point.revenue;
+      bucket.orders += point.orders;
+      bucket.customers += point.customers;
+      bucket.applications += point.applications;
+      months.set(key, bucket);
+    }
+
+    // Điền cả các tháng trống nằm giữa.
+    const series: SrxDashboardPerformancePoint[] = [];
+    const cursor = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1));
+    while (cursor <= last) {
+      const key = formatDay(cursor);
+      series.push(months.get(key) ?? emptyPoint(key));
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+
+    return { series, granularity: "month" };
+  }
+
+  const byDate = new Map(points.map((point) => [point.date, point]));
+  const series: SrxDashboardPerformancePoint[] = [];
+  for (let cursor = new Date(first); cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const key = formatDay(cursor);
+    series.push(byDate.get(key) ?? emptyPoint(key));
+  }
+
+  return { series, granularity: "day" };
+}
+
 export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Promise<SrxDashboardData> {
   return withSrxReadFallback("dashboard", createEmptyDashboardData(), async () => {
     const db = getSrxDB();
@@ -315,7 +422,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
     const applicationWhere = buildWhereClause([], "aa.created_at", range);
     const postWhere = buildWhereClause(["p.status = 'published'"], "COALESCE(p.published_at, p.created_at)", range);
 
-    const [summaryRows] = await db.query<SummaryRow[]>(
+    const summaryRowsQuery = db.query<SummaryRow[]>(
       `
         SELECT
           COUNT(*) AS total_orders,
@@ -327,7 +434,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       paidOrdersWhere.params,
     );
 
-    const [customerSummaryRows] = await db.query<CustomerSummaryRow[]>(
+    const customerSummaryRowsQuery = db.query<CustomerSummaryRow[]>(
       `
         SELECT COUNT(*) AS total_customers
         FROM users u
@@ -341,7 +448,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       "o.placed_at",
       range,
     );
-    const [repeatRows] = await db.query<RepeatCustomerRow[]>(
+    const repeatRowsQuery = db.query<RepeatCustomerRow[]>(
       `
         SELECT COUNT(*) AS repeat_customers
         FROM (
@@ -355,7 +462,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       repeatWhere.params,
     );
 
-    const [operationsRows] = await db.query<OperationsRow[]>(`
+    const operationsRowsQuery = db.query<OperationsRow[]>(`
       SELECT
         (SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND status = 'active') AS active_products,
         (SELECT COUNT(*) FROM posts WHERE status = 'published') AS published_posts,
@@ -367,7 +474,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
         (SELECT COUNT(*) FROM orders WHERE order_status = 'pending') AS pending_orders
     `);
 
-    const [dailyOrderRows] = await db.query<DailyOrderRow[]>(
+    const dailyOrderRowsQuery = db.query<DailyOrderRow[]>(
       `
         SELECT
           DATE_FORMAT(o.placed_at, '%Y-%m-%d') AS date,
@@ -381,7 +488,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       paidOrdersWhere.params,
     );
 
-    const [dailyCustomerRows] = await db.query<DailyCountRow[]>(
+    const dailyCustomerRowsQuery = db.query<DailyCountRow[]>(
       `
         SELECT
           DATE_FORMAT(u.created_at, '%Y-%m-%d') AS date,
@@ -394,7 +501,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       customerWhere.params,
     );
 
-    const [dailyApplicationRows] = await db.query<DailyCountRow[]>(
+    const dailyApplicationRowsQuery = db.query<DailyCountRow[]>(
       `
         SELECT
           DATE_FORMAT(aa.created_at, '%Y-%m-%d') AS date,
@@ -407,7 +514,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       applicationWhere.params,
     );
 
-    const [orderStatusRows] = await db.query<CountRevenueRow[]>(
+    const orderStatusRowsQuery = db.query<CountRevenueRow[]>(
       `
         SELECT
           o.order_status AS label,
@@ -421,7 +528,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       ordersWhere.params,
     );
 
-    const [customerMixRows] = await db.query<CountRevenueRow[]>(
+    const customerMixRowsQuery = db.query<CountRevenueRow[]>(
       `
         SELECT
           CASE
@@ -438,7 +545,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       paidOrdersWhere.params,
     );
 
-    const [productCategoryRows] = await db.query<CountRow[]>(
+    const productCategoryRowsQuery = db.query<CountRow[]>(
       `
         SELECT
           COALESCE(pc.name, 'Chưa phân loại') AS label,
@@ -451,7 +558,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       `,
     );
 
-    const [contentCategoryRows] = await db.query<CountRow[]>(
+    const contentCategoryRowsQuery = db.query<CountRow[]>(
       `
         SELECT
           ac.name AS label,
@@ -465,7 +572,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       postWhere.params,
     );
 
-    const [affiliateStatusRows] = await db.query<CountRow[]>(
+    const affiliateStatusRowsQuery = db.query<CountRow[]>(
       `
         SELECT
           aa.status AS label,
@@ -478,7 +585,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       applicationWhere.params,
     );
 
-    const [topProductRows] = await db.query<ProductRow[]>(
+    const topProductRowsQuery = db.query<ProductRow[]>(
       `
         SELECT
           p.name,
@@ -491,7 +598,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       `,
     );
 
-    const [latestOrderRows] = await db.query<OrderSnapshotRow[]>(
+    const latestOrderRowsQuery = db.query<OrderSnapshotRow[]>(
       `
         SELECT
           o.order_number,
@@ -508,7 +615,7 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       ordersWhere.params,
     );
 
-    const [recentPostRows] = await db.query<PostSnapshotRow[]>(
+    const recentPostRowsQuery = db.query<PostSnapshotRow[]>(
       `
         SELECT
           p.title,
@@ -522,6 +629,41 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
       `,
       postWhere.params,
     );
+
+    // Các truy vấn độc lập nhau nên chạy song song thay vì chờ từng câu một.
+    const [
+      [summaryRows],
+      [customerSummaryRows],
+      [repeatRows],
+      [operationsRows],
+      [dailyOrderRows],
+      [dailyCustomerRows],
+      [dailyApplicationRows],
+      [orderStatusRows],
+      [customerMixRows],
+      [productCategoryRows],
+      [contentCategoryRows],
+      [affiliateStatusRows],
+      [topProductRows],
+      [latestOrderRows],
+      [recentPostRows],
+    ] = await Promise.all([
+      summaryRowsQuery,
+      customerSummaryRowsQuery,
+      repeatRowsQuery,
+      operationsRowsQuery,
+      dailyOrderRowsQuery,
+      dailyCustomerRowsQuery,
+      dailyApplicationRowsQuery,
+      orderStatusRowsQuery,
+      customerMixRowsQuery,
+      productCategoryRowsQuery,
+      contentCategoryRowsQuery,
+      affiliateStatusRowsQuery,
+      topProductRowsQuery,
+      latestOrderRowsQuery,
+      recentPostRowsQuery,
+    ]);
 
     const summaryRow = summaryRows[0] ?? { total_orders: 0, total_revenue: 0, registered_orders: 0 };
     const customerSummaryRow = customerSummaryRows[0] ?? { total_customers: 0 };
@@ -544,7 +686,13 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
 
     const topProductTotal = topProductRows.reduce((sum, item) => sum + asNumber(item.sold_count), 0);
 
+    const { series: performanceSeries, granularity: performanceGranularity } = normalizePerformanceSeries(
+      mergePerformanceSeries(dailyOrderRows, dailyCustomerRows, dailyApplicationRows),
+    );
+
     return {
+      unavailable: false,
+      performanceGranularity,
       summary: {
         totalRevenue,
         totalOrders,
@@ -590,20 +738,24 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
           hint: "Số phương thức thanh toán đang bật",
         },
       ],
-      performance: mergePerformanceSeries(dailyOrderRows, dailyCustomerRows, dailyApplicationRows),
-      orderStatus: withColors(
+      performance: performanceSeries,
+      orderStatus: withFixedColors(
         orderStatusRows.map((row) => ({
           label: orderStatusLabels[row.label ?? ""] ?? String(row.label ?? "Khác"),
           count: asNumber(row.count),
           revenue: asNumber(row.revenue),
         })),
+        orderStatusRows.map((row) => row.label ?? ""),
+        orderStatusColors,
       ),
-      customerMix: withColors(
+      customerMix: withFixedColors(
         customerMixRows.map((row) => ({
           label: String(row.label ?? "Khác"),
           count: asNumber(row.count),
           revenue: asNumber(row.revenue),
         })),
+        customerMixRows.map((row) => String(row.label ?? "")),
+        customerMixColors,
       ),
       productCategories: withColors(
         productCategoryRows.map((row) => ({
@@ -617,11 +769,13 @@ export async function getSrxDashboardData(range: SrxDashboardDateRange = {}): Pr
           count: asNumber(row.count),
         })),
       ),
-      affiliateStatus: withColors(
+      affiliateStatus: withFixedColors(
         affiliateStatusRows.map((row) => ({
           label: affiliateApplicationStatusLabels[row.label ?? ""] ?? String(row.label ?? "Khác"),
           count: asNumber(row.count),
         })),
+        affiliateStatusRows.map((row) => row.label ?? ""),
+        affiliateStatusColors,
       ),
       topProducts: topProductRows.map((row) => ({
         name: String(row.name ?? "Không tên"),
